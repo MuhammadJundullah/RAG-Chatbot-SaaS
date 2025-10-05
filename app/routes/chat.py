@@ -6,6 +6,7 @@ from app.services.rag_service import rag_service
 from app.services.query_service import query_service
 from app.services.gemini_service import gemini_service
 from app.utils.auth import get_current_user
+from app.utils.helpers import _needs_database_query
 from app.database.schema import User, Company
 from app.database.connection import db_manager
 import uuid
@@ -19,9 +20,13 @@ async def chat_endpoint(
     db: AsyncSession = Depends(db_manager.get_db_session)
 ):
     """
-    Main chat endpoint for authenticated users. 
+    Main chat endpoint for authenticated and active users. 
     Orchestrates RAG and Dynamic Database queries.
+    Requires the user to be active (approved by a company admin).
     """
+    if not current_user.is_active:
+        raise HTTPException(status_code=403, detail="Your account is not active. Please contact your company admin.")
+
     try:
         conversation_id = request.conversation_id or str(uuid.uuid4())
         user_message = request.message
@@ -37,7 +42,7 @@ async def chat_endpoint(
         )
         
         # Step 2: Check if the question seems to require a database query
-        needs_database = await _needs_database_query(user_message)
+        needs_database = _needs_database_query(user_message)
         query_results_str = None
         used_database = False
         
@@ -79,13 +84,4 @@ async def chat_endpoint(
         print(f"Unhandled error in chat endpoint: {e}")
         raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
 
-async def _needs_database_query(message: str) -> bool:
-    """Simple heuristic to check if a question might need a database query."""
-    db_keywords = [
-        'berapa', 'jumlah', 'total', 'rata', 'average', 'sum',
-        'pelanggan', 'customer', 'tagihan', 'bill', 'penjualan', 'sales',
-        'data', 'tampilkan', 'show', 'list', 'find', 'get'
-    ]
-    
-    message_lower = message.lower()
-    return any(keyword in message_lower for keyword in db_keywords)
+

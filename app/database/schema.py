@@ -9,6 +9,7 @@ from sqlalchemy import (
     Enum,
     DateTime,
     func,
+    Boolean
 )
 from sqlalchemy.orm import relationship
 from app.database.connection import Base
@@ -52,6 +53,7 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     role = Column(Enum(UserRole), nullable=False)
+    is_active = Column(Boolean, default=False, nullable=False)
     
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     division_id = Column(Integer, ForeignKey("divisions.id"), nullable=True)

@@ -32,6 +32,14 @@ async def set_db_connection_string(db: AsyncSession, company: schema.Company, db
     await db.refresh(company)
     return company
 
+async def delete_db_connection_string(db: AsyncSession, company: schema.Company) -> schema.Company:
+    """Sets the database connection string for a company to None."""
+    company.encrypted_db_connection_string = None
+    db.add(company)
+    await db.commit()
+    await db.refresh(company)
+    return company
+
 async def create_company_and_admin(db: AsyncSession, company_data: schemas.CompanyCreate) -> schema.Company:
     # Generate unique company code and a temporary secret
     company_code = str(uuid.uuid4().hex[:6].upper())
@@ -52,6 +60,7 @@ async def create_company_and_admin(db: AsyncSession, company_data: schemas.Compa
         username=company_data.admin_username,
         hashed_password=hashed_password,
         role=schema.UserRole.COMPANY_ADMIN,
+        is_active=True, # Company admin is active by default
         company_id=db_company.id
     )
     db.add(db_user)
@@ -69,6 +78,7 @@ async def create_employee(db: AsyncSession, employee_data: schemas.EmployeeCreat
         username=employee_data.username,
         hashed_password=hashed_password,
         role=schema.UserRole.EMPLOYEE,
+        is_active=False, # Employee is not active by default
         company_id=company.id,
         division_id=employee_data.division_id
     )
@@ -97,6 +107,20 @@ async def get_division_by_id(db: AsyncSession, division_id: int) -> schema.Divis
     result = await db.execute(select(schema.Division).filter(schema.Division.id == division_id))
     return result.scalar_one_or_none()
 
+async def update_division(db: AsyncSession, division: schema.Division, update_data: schemas.DivisionUpdate) -> schema.Division:
+    """Updates a division's details."""
+    for key, value in update_data.model_dump(exclude_unset=True).items():
+        setattr(division, key, value)
+    db.add(division)
+    await db.commit()
+    await db.refresh(division)
+    return division
+
+async def delete_division(db: AsyncSession, division: schema.Division):
+    """Deletes a division."""
+    await db.delete(division)
+    await db.commit()
+
 # --- Permission CRUD ---
 
 async def add_permission_for_division(db: AsyncSession, permission: schemas.PermissionCreate, division_id: int) -> schema.DivisionPermission:
@@ -116,3 +140,15 @@ async def get_permissions_for_division(db: AsyncSession, division_id: int) -> li
         select(schema.DivisionPermission).filter(schema.DivisionPermission.division_id == division_id)
     )
     return result.scalars().all()
+
+async def get_permission_by_id(db: AsyncSession, permission_id: int) -> schema.DivisionPermission:
+    """Gets a single permission by its ID."""
+    result = await db.execute(
+        select(schema.DivisionPermission).filter(schema.DivisionPermission.id == permission_id)
+    )
+    return result.scalar_one_or_none()
+
+async def delete_permission(db: AsyncSession, permission: schema.DivisionPermission):
+    """Deletes a permission."""
+    await db.delete(permission)
+    await db.commit()

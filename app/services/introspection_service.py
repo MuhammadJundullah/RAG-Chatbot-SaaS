@@ -5,16 +5,16 @@ from app.services.connection_manager import external_connection_manager
 from typing import Dict, List, Any
 
 class IntrospectionService:
-    async def get_schema_for_company(self, company: Company) -> str:
+    async def get_schema_for_company(self, company: Company) -> Dict[str, Any]:
         """
         Connects to a company's external database and introspects its schema.
-        Returns a formatted string representation of the schema for the LLM.
+        Returns a structured dictionary representation of the schema.
         """
         engine = external_connection_manager.get_engine(company)
         if not engine:
-            return "No external database configured for this company."
+            return {"error": "No external database configured for this company."}
 
-        formatted_schema = f"Schema for external database '{company.name}':\n"
+        schema_data = []
         
         try:
             async with engine.connect() as conn:
@@ -22,17 +22,19 @@ class IntrospectionService:
                     return inspect(sync_conn)
                 
                 inspector = await conn.run_sync(sync_inspector)
-                tables = await conn.run_sync(inspector.get_table_names)
+                
+                # Correctly pass arguments within run_sync using a lambda
+                tables = await conn.run_sync(lambda sync_conn: inspector.get_table_names(schema="public"))
 
                 for table_name in tables:
-                    formatted_schema += f"- Table: {table_name}\n"
-                    columns = await conn.run_sync(inspector.get_columns, table_name)
-                    for column in columns:
-                        formatted_schema += f"  - Column: {column['name']} (Type: {column['type']})\n"
+                    # Correctly pass arguments within run_sync using a lambda
+                    columns = await conn.run_sync(lambda sync_conn: inspector.get_columns(table_name, schema="public"))
+                    column_names = [col['name'] for col in columns]
+                    schema_data.append({"table_name": table_name, "columns": column_names})
         except Exception as e:
-            return f"Error introspecting schema: {e}"
+            return {"error": f"Error introspecting schema: {e}"}
         
-        return formatted_schema
+        return {"schema": schema_data}
 
 # Singleton instance
 introspection_service = IntrospectionService()

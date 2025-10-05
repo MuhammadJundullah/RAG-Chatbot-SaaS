@@ -38,6 +38,7 @@ class UserInDB(UserBase):
     id: int
     hashed_password: str
     role: UserRole
+    is_active: bool
     company_id: int
     division_id: Optional[int] = None
 
@@ -47,6 +48,7 @@ class UserInDB(UserBase):
 class UserPublic(UserBase):
     id: int
     role: UserRole
+    is_active: bool
     company_id: int
     division_id: Optional[int] = None
 
@@ -60,6 +62,9 @@ class DivisionBase(BaseModel):
 
 class DivisionCreate(DivisionBase):
     pass
+
+class DivisionUpdate(BaseModel):
+    name: Optional[str] = None
 
 class DivisionPublic(DivisionBase):
     id: int
@@ -101,6 +106,10 @@ class CompanyRegistrationResponse(CompanyPublic):
 # --- Dynamic Database Models ---
 class DBConnectionStringCreate(BaseModel):
     db_url: str
+
+class DBConnectionStatus(BaseModel):
+    is_configured: bool
+    db_host: Optional[str] = None
 
 # --- Permission Models ---
 class PermissionBase(BaseModel):

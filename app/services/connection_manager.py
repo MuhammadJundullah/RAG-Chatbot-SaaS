@@ -48,5 +48,31 @@ class ExternalConnectionManager:
         async with session_maker() as session:
             yield session
 
+    async def test_connection(self, db_url: str) -> tuple[bool, str]:
+        """
+        Tests a database connection string.
+        Returns a tuple of (is_successful, message).
+        """
+        if not db_url:
+            return False, "Database URL cannot be empty."
+        
+        try:
+            # Create a temporary engine with a short connection timeout
+            engine = create_async_engine(db_url, connect_args={"timeout": 5})
+            
+            # Try to connect
+            async with engine.connect() as conn:
+                # If connect() succeeds, the connection is valid
+                pass
+            
+            # Dispose of the temporary engine
+            await engine.dispose()
+            
+            return True, "Connection successful."
+        except Exception as e:
+            # Catch any exception during engine creation or connection
+            # and return it as a message.
+            return False, f"Connection failed: {e}"
+
 # Singleton instance
 external_connection_manager = ExternalConnectionManager()

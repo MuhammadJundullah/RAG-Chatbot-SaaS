@@ -13,7 +13,7 @@ async def init_db():
         # To start fresh, you can uncomment the following lines to drop all tables.
         # This is useful in development if you make schema changes.
         # print("Dropping all existing tables...")
-        # await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.drop_all)
         
         print("Creating all tables based on the current schema...")
         await conn.run_sync(Base.metadata.create_all)
