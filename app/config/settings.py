@@ -6,15 +6,13 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str
     GEMINI_API_KEY: str
-    GEMINI_MODEL: str = "gemini-pro" 
+    GEMINI_MODEL: str = "gemini-2.5-flash" 
     VECTOR_DB_PATH: str = "./chroma_db"
 
     # Authentication settings
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
-    ADMIN_USERNAME: str = "admin"
-    ADMIN_PASSWORD: str = "admin"
 
 @lru_cache()
 def get_settings():

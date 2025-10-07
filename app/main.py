@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth, chat, documents, divisions, company, permissions
+from app.routes import auth, chat, documents, divisions, company
 from app.database.connection import db_manager
 
 app = FastAPI(
@@ -23,7 +23,7 @@ app.include_router(chat.router, prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")
 app.include_router(divisions.router, prefix="/api/v1")
 app.include_router(company.router, prefix="/api/v1", tags=["Company Management"])
-app.include_router(permissions.router, prefix="/api/v1")
+
 
 @app.on_event("startup")
 async def startup_event():

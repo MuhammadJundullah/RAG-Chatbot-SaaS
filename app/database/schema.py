@@ -43,7 +43,6 @@ class Division(Base):
 
     company = relationship("Company", back_populates="divisions")
     users = relationship("User", back_populates="division")
-    permissions = relationship("DivisionPermission", back_populates="division", cascade="all, delete-orphan")
 
 # User Table (replaces old User model)
 class User(Base):
@@ -60,16 +59,3 @@ class User(Base):
 
     company = relationship("Company", back_populates="users")
     division = relationship("Division", back_populates="users")
-
-# Table for managing division-level permissions on external databases
-class DivisionPermission(Base):
-    __tablename__ = "division_permissions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    division_id = Column(Integer, ForeignKey("divisions.id"), nullable=False)
-    table_name = Column(String, nullable=False)
-    
-    # Comma-separated list of column names, or "*" for all columns
-    allowed_columns = Column(String, nullable=False)
-
-    division = relationship("Division", back_populates="permissions")

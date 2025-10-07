@@ -120,35 +120,3 @@ async def delete_division(db: AsyncSession, division: schema.Division):
     """Deletes a division."""
     await db.delete(division)
     await db.commit()
-
-# --- Permission CRUD ---
-
-async def add_permission_for_division(db: AsyncSession, permission: schemas.PermissionCreate, division_id: int) -> schema.DivisionPermission:
-    """Adds a new table/column permission for a division."""
-    db_permission = schema.DivisionPermission(
-        **permission.model_dump(),
-        division_id=division_id
-    )
-    db.add(db_permission)
-    await db.commit()
-    await db.refresh(db_permission)
-    return db_permission
-
-async def get_permissions_for_division(db: AsyncSession, division_id: int) -> list[schema.DivisionPermission]:
-    """Gets all permissions for a specific division."""
-    result = await db.execute(
-        select(schema.DivisionPermission).filter(schema.DivisionPermission.division_id == division_id)
-    )
-    return result.scalars().all()
-
-async def get_permission_by_id(db: AsyncSession, permission_id: int) -> schema.DivisionPermission:
-    """Gets a single permission by its ID."""
-    result = await db.execute(
-        select(schema.DivisionPermission).filter(schema.DivisionPermission.id == permission_id)
-    )
-    return result.scalar_one_or_none()
-
-async def delete_permission(db: AsyncSession, permission: schema.DivisionPermission):
-    """Deletes a permission."""
-    await db.delete(permission)
-    await db.commit()

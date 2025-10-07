@@ -16,6 +16,12 @@ Platform SaaS untuk chatbot AI yang disesuaikan dengan konteks perusahaan menggu
 - [Getting Started](#getting-started)
 - [Authentication](#authentication)
 - [API Endpoints](#api-endpoints)
+  - [1. Health & Status](#1-health--status)
+  - [2. Authentication & Registration](#2-authentication--registration)
+  - [3. Company Management](#3-company-management)
+  - [4. Division Management](#4-division-management)
+  - [5. Document Management](#5-document-management)
+  - [6. AI Chat](#6-ai-chat)
 - [Response Codes](#response-codes)
 - [Security](#security)
 
@@ -42,7 +48,7 @@ Multi-Tenant Company Chatbot API memungkinkan setiap perusahaan memiliki AI chat
 | **Multi-Tenancy** | Setiap perusahaan memiliki space data terisolasi |
 | **User Roles** | COMPANY_ADMIN (full access) & EMPLOYEE (restricted) |
 | **Document RAG** | Upload & manage PDF documents untuk knowledge base |
-| **Dynamic DB** | Connect external databases dengan permission per divisi |
+| **Dynamic DB** | Connect external databases |
 | **Intelligent Chat** | AI yang combine RAG + Database + Context awareness |
 | **Security** | JWT auth, bcrypt passwords, SQL injection prevention |
 
@@ -132,8 +138,8 @@ uvicorn app.main:app --reload --port 8000
 
 | Role | Description | Capabilities |
 |------|-------------|--------------|
-| **COMPANY_ADMIN** | Administrator perusahaan | Manage divisions, upload/delete documents, set DB connection, manage permissions, full chat access |
-| **EMPLOYEE** | Karyawan perusahaan | Chat with AI, access scoped to division permissions |
+| **COMPANY_ADMIN** | Administrator perusahaan | Manage divisions, upload/delete documents, set DB connection, full chat access |
+| **EMPLOYEE** | Karyawan perusahaan | Chat with AI |
 
 ### Token Structure
 
@@ -310,7 +316,197 @@ password=SecurePassword123!
 
 ---
 
-### 3. Division Management
+### 3. Company Management
+
+#### Set Database Connection
+
+Simpan connection string ke database eksternal perusahaan.
+
+```http
+POST /api/v1/company/database-connection
+```
+
+**Authentication**: COMPANY_ADMIN only
+
+**Request Body**:
+```json
+{
+  "db_url": "postgresql+asyncpg://user:password@host:5432/database_name"
+}
+```
+
+**Supported Database Types**:
+
+| Database | Connection String Format |
+|----------|-------------------------|
+| PostgreSQL | `postgresql+asyncpg://user:pass@host:port/db` |
+| MySQL | `mysql+aiomysql://user:pass@host:port/db` |
+
+**Response 200**:
+```json
+{
+  "status": "success",
+  "message": "Database connection string updated successfully."
+}
+```
+
+**Security Notes**:
+- Connection string di-encrypt sebelum disimpan
+- Database harus read-only untuk keamanan
+- Dapat di-update kapan saja
+
+---
+
+#### Get Database Connection Status
+
+Cek status koneksi database eksternal.
+
+```http
+GET /api/v1/company/database-connection
+```
+
+**Authentication**: COMPANY_ADMIN only
+
+**Response 200**:
+```json
+{
+  "is_configured": true,
+  "db_host": "your-db-host.com"
+}
+```
+
+---
+
+#### Delete Database Connection
+
+Hapus connection string database eksternal.
+
+```http
+DELETE /api/v1/company/database-connection
+```
+
+**Authentication**: COMPANY_ADMIN only
+
+**Response 200**:
+```json
+{
+  "status": "success",
+  "message": "Database connection string deleted successfully."
+}
+```
+
+---
+
+#### Get External Database Schema
+
+Introspeksi dan dapatkan skema (tabel dan kolom) dari database eksternal.
+
+```http
+GET /api/v1/company/database-schema
+```
+
+**Authentication**: COMPANY_ADMIN only
+
+**Response 200**:
+```json
+{
+  "schema": {
+    "users": [
+      "id",
+      "name",
+      "email"
+    ],
+    "products": [
+      "id",
+      "product_name",
+      "price"
+    ]
+  }
+}
+```
+
+---
+
+#### List Company Employees
+
+Dapatkan daftar semua karyawan di perusahaan.
+
+```http
+GET /api/v1/company/employees
+```
+
+**Authentication**: COMPANY_ADMIN only
+
+**Response 200**:
+```json
+[
+  {
+    "id": 5,
+    "username": "john_doe",
+    "role": "EMPLOYEE",
+    "company_id": 1,
+    "division_id": 2,
+    "is_active": true
+  }
+]
+```
+
+---
+
+#### List Pending Employees
+
+Dapatkan daftar karyawan yang registrasinya masih pending (belum aktif).
+
+```http
+GET /api/v1/company/employees/pending
+```
+
+**Authentication**: COMPANY_ADMIN only
+
+**Response 200**:
+```json
+[
+  {
+    "id": 6,
+    "username": "jane_doe",
+    "role": "EMPLOYEE",
+    "company_id": 1,
+    "division_id": 1,
+    "is_active": false
+  }
+]
+```
+
+---
+
+#### Activate Employee
+
+Aktifkan seorang karyawan yang statusnya masih pending.
+
+```http
+PUT /api/v1/company/employees/{employee_id}/activate
+```
+
+**Authentication**: COMPANY_ADMIN only
+
+**Path Parameters**:
+- `employee_id` (integer, required)
+
+**Response 200**:
+```json
+{
+  "status": "success",
+  "message": "Employee jane_doe has been activated."
+}
+```
+
+**Error Responses**:
+- `404`: Employee tidak ditemukan
+- `400`: Employee sudah aktif
+
+---
+
+### 4. Division Management
 
 #### Create Division
 
@@ -446,291 +642,7 @@ DELETE /api/v1/divisions/{division_id}
 
 ---
 
-### 4. Company Management
-
-#### Set Database Connection
-
-Simpan connection string ke database eksternal perusahaan.
-
-```http
-POST /api/v1/company/database-connection
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Request Body**:
-```json
-{
-  "db_url": "postgresql+asyncpg://user:password@host:5432/database_name"
-}
-```
-
-**Supported Database Types**:
-
-| Database | Connection String Format |
-|----------|-------------------------|
-| PostgreSQL | `postgresql+asyncpg://user:pass@host:port/db` |
-| MySQL | `mysql+aiomysql://user:pass@host:port/db` |
-
-**Response 200**:
-```json
-{
-  "status": "success",
-  "message": "Database connection string updated successfully."
-}
-```
-
-**Security Notes**:
-- Connection string di-encrypt sebelum disimpan
-- Database harus read-only untuk keamanan
-- Dapat di-update kapan saja
-
----
-
-#### Get Database Connection Status
-
-Cek status koneksi database eksternal.
-
-```http
-GET /api/v1/company/database-connection
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Response 200**:
-```json
-{
-  "is_configured": true,
-  "db_host": "your-db-host.com"
-}
-```
-
----
-
-#### Delete Database Connection
-
-Hapus connection string database eksternal.
-
-```http
-DELETE /api/v1/company/database-connection
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Response 200**:
-```json
-{
-  "status": "success",
-  "message": "Database connection string deleted successfully."
-}
-```
-
----
-
-#### Get External Database Schema
-
-Introspeksi dan dapatkan skema (tabel dan kolom) dari database eksternal.
-
-```http
-GET /api/v1/company/database-schema
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Response 200**:
-```json
-{
-  "schema": {
-    "users": [
-      "id",
-      "name",
-      "email"
-    ],
-    "products": [
-      "id",
-      "product_name",
-      "price"
-    ]
-  }
-}
-```
-
----
-
-### 4.1. Company Employee Management
-
-#### List Company Employees
-
-Dapatkan daftar semua karyawan di perusahaan.
-
-```http
-GET /api/v1/company/employees
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Response 200**:
-```json
-[
-  {
-    "id": 5,
-    "username": "john_doe",
-    "role": "EMPLOYEE",
-    "company_id": 1,
-    "division_id": 2,
-    "is_active": true
-  }
-]
-```
-
----
-
-#### List Pending Employees
-
-Dapatkan daftar karyawan yang registrasinya masih pending (belum aktif).
-
-```http
-GET /api/v1/company/employees/pending
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Response 200**:
-```json
-[
-  {
-    "id": 6,
-    "username": "jane_doe",
-    "role": "EMPLOYEE",
-    "company_id": 1,
-    "division_id": 1,
-    "is_active": false
-  }
-]
-```
-
----
-
-#### Activate Employee
-
-Aktifkan seorang karyawan yang statusnya masih pending.
-
-```http
-PUT /api/v1/company/employees/{employee_id}/activate
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Path Parameters**:
-- `employee_id` (integer, required)
-
-**Response 200**:
-```json
-{
-  "status": "success",
-  "message": "Employee jane_doe has been activated."
-}
-```
-
-**Error Responses**:
-- `404`: Employee tidak ditemukan
-- `400`: Employee sudah aktif
-
----
-
-### 5. Permission Management
-
-#### Add Division Permission
-
-Berikan hak akses tabel/kolom untuk divisi.
-
-```http
-POST /api/v1/divisions/{division_id}/permissions
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Path Parameters**:
-- `division_id` (integer, required)
-
-**Request Body**:
-```json
-{
-  "table_name": "sales_data",
-  "allowed_columns": "product_name,quantity,total_price,sale_date"
-}
-```
-
-**Special Values**:
-- `allowed_columns: "*"` untuk akses semua kolom
-
-**Response 200**:
-```json
-{
-  "id": 1,
-  "division_id": 2,
-  "table_name": "sales_data",
-  "allowed_columns": "product_name,quantity,total_price,sale_date"
-}
-```
-
----
-
-#### List Division Permissions
-
-Lihat semua permission yang dimiliki divisi.
-
-```http
-GET /api/v1/divisions/{division_id}/permissions
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Path Parameters**:
-- `division_id` (integer, required)
-
-**Response 200**:
-```json
-[
-  {
-    "id": 1,
-    "division_id": 2,
-    "table_name": "sales_data",
-    "allowed_columns": "product_name,quantity,total_price"
-  },
-  {
-    "id": 2,
-    "division_id": 2,
-    "table_name": "customers",
-    "allowed_columns": "*"
-  }
-]
-```
-
----
-
-#### Delete Permission
-
-Hapus sebuah permission rule.
-
-```http
-DELETE /api/v1/permissions/{permission_id}
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Path Parameters**:
-- `permission_id` (integer, required)
-
-**Response 204**: No Content
-
-**Error Responses**:
-- `404`: Permission tidak ditemukan
-- `403`: Tidak punya akses ke permission ini
-
----
-
-### 6. Document Management
+### 5. Document Management
 
 #### Upload Document
 
@@ -825,7 +737,7 @@ DELETE /api/v1/documents/{filename}
 
 ---
 
-### 7. AI Chat
+### 6. AI Chat
 
 #### Chat with AI
 
@@ -878,7 +790,7 @@ POST /api/v1/chat
 **Database Queries**
 - Auto-detect pertanyaan yang memerlukan data
 - Generate safe SQL queries (validated)
-- Permission-based access (ADMIN: full access, EMPLOYEE: division-based)
+
 - Keywords trigger: berapa, jumlah, total, rata-rata, pelanggan, tampilkan, data
 
 **Context Management**
@@ -889,7 +801,7 @@ POST /api/v1/chat
 
 **Multi-Tenancy & Security**
 - Data isolation per company
-- Permission-based data access
+
 - Safe SQL query validation
 - No cross-company data leakage
 
@@ -971,7 +883,6 @@ Response:
 | **204** | No Content | Request berhasil, no response body |
 | **400** | Bad Request | Request invalid |
 | **401** | Unauthorized | Authentication gagal |
-| **403** | Forbidden | User tidak punya permission |
 | **404** | Not Found | Resource tidak ditemukan |
 | **422** | Unprocessable Entity | Validation error |
 | **500** | Internal Server Error | Server error |
@@ -1049,12 +960,6 @@ Response:
 - Read-only access recommended
 - SQL injection prevention via parameterized queries
 - Query validation before execution
-
-**Permission System**:
-- Table-level access control
-- Column-level access control
-- Division-based restrictions for employees
-- Full access for company admins
 
 ### Multi-Tenancy Security
 

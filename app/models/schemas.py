@@ -111,21 +111,6 @@ class DBConnectionStatus(BaseModel):
     is_configured: bool
     db_host: Optional[str] = None
 
-# --- Permission Models ---
-class PermissionBase(BaseModel):
-    table_name: str
-    allowed_columns: str # e.g., "id,name,email" or "*"
-
-class PermissionCreate(PermissionBase):
-    pass
-
-class Permission(PermissionBase):
-    id: int
-    division_id: int
-
-    class Config:
-        from_attributes = True
-
 
 # --- Chat Models ---
 
