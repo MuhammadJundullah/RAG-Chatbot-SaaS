@@ -36,7 +36,7 @@ Multi-Tenant Company Chatbot API memungkinkan setiap perusahaan memiliki AI chat
 - **Role-Based Access**: Kontrol akses berbasis role dan divisi
 
 **Base URL**: `http://localhost:8000`  
-**API Version**: `v2.0.0`  
+**API Version**: `v1.0.0`  
 **API Prefix**: `/api/v1`
 
 ---
