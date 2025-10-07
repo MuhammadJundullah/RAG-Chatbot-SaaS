@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # New command to run migrations before starting the server
+    command: sh -c "python -m app.database.init_db && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./.env
+    volumes:
+      # Mount app code for hot-reloading
+      - ./app:/app/app
+      # Mount the chroma_db directory to persist vector data
+      - ./chroma_db:/app/chroma_db
+    depends_on:
+      # Updated depends_on to wait for the db to be healthy
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    env_file:
+      - ./.env
+    volumes:
+      # Persist PostgreSQL data
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Optional: Expose PostgreSQL port to the host for debugging
+      - "5432:5432"
+    # Healthcheck to ensure the database is ready for connections
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d chatbot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

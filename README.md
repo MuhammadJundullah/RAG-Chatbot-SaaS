@@ -70,59 +70,67 @@ Password:     bcrypt + SHA256
 
 ## Getting Started
 
-### Prerequisites
+The recommended way to run this project for development is by using Docker. This ensures a consistent and easy-to-manage environment.
 
+### Running with Docker (Recommended)
+
+**Prerequisites:**
+- Docker and Docker Compose must be installed on your system.
+
+**Step-by-step Guide:**
+
+1.  **Clone the Repository**
+    ```sh
+    git clone <your-repository-url>
+    cd company_chatbot
+    ```
+
+2.  **Create Environment File**
+    The project uses a `.env` file for configuration. Copy the provided template to create your own configuration file.
+    ```sh
+    cp .env.example .env
+    ```
+
+3.  **Configure Your Secrets**
+    Open the newly created `.env` file with a text editor and fill in your actual credentials, especially:
+    - `POSTGRES_USER`, `POSTGRES_PASSWORD`
+    - `GEMINI_API_KEY`
+    - `SECRET_KEY` (use a long, random string)
+
+4.  **Build and Run the Containers**
+    This single command will build the API image, start both the API and database containers, and automatically run database migrations on startup.
+    ```sh
+    docker compose up --build
+    ```
+
+5.  **Access the Application**
+    The application will be running and available at `http://localhost:8000`. The interactive API documentation can be found at:
+    - **Swagger UI**: `http://localhost:8000/docs`
+    - **ReDoc**: `http://localhost:8000/redoc`
+
+**Development Workflow (Hot-Reloading):**
+Thanks to the volume mount, any changes you make to the code in the `./app` directory will automatically be detected, and the server will restart inside the container. You do not need to rebuild the image for simple code changes.
+
+---
+
+### Running Locally (Without Docker)
+
+This method is for users who prefer to run the application directly on their host machine.
+
+**Prerequisites:**
 - Python 3.11+
-- PostgreSQL 13+
-- pip or conda
+- A running PostgreSQL instance
 
-### Installation
+**Steps:**
 
-```bash
-# Clone repository
-git clone <repository-url>
-cd company_chatbot
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or
-venv\Scripts\activate  # Windows
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### Environment Setup
-
-Create `.env` file:
-
-```env
-# Database
-DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/chatbot_db
-
-# Security
-SECRET_KEY=your-super-secret-key-min-32-chars
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-# AI
-GEMINI_API_KEY=your-gemini-api-key
-
-# ChromaDB
-CHROMA_PERSIST_DIRECTORY=./chroma_db
-```
-
-### Run Server
-
-```bash
-uvicorn app.main:app --reload --port 8000
-```
-
-### API Documentation
-
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+1.  Install dependencies: `pip install -r requirements.txt`
+2.  Create and configure your `.env` file from the `.env.example` template.
+3.  **Important:** In your `.env` file, ensure the `DATABASE_URL` points to your local PostgreSQL instance (e.g., `..._password@localhost:5432/...`).
+4.  Run the database migration script manually: `python -m app.database.init_db`
+5.  Run the application server:
+    ```sh
+    uvicorn app.main:app --reload --port 8000
+    ```
 
 ---
 
