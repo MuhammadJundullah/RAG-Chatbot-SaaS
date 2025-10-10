@@ -41,18 +41,17 @@ async def delete_db_connection_string(db: AsyncSession, company: schema.Company)
     return company
 
 async def create_company_and_admin(db: AsyncSession, company_data: schemas.CompanyCreate) -> schema.Company:
-    # Generate unique company code and a temporary secret
     company_code = str(uuid.uuid4().hex[:6].upper())
-    company_secret = secrets.token_hex(24) # 48-character hex string, safe for bcrypt
+    company_secret = secrets.token_hex(24) 
 
     # Create Company
     db_company = schema.Company(
         name=company_data.name,
         company_code=company_code,
-        company_secret=company_secret # Store raw secret
+        company_secret=company_secret
     )
     db.add(db_company)
-    await db.flush() # Flush to get the company ID
+    await db.flush() 
 
     # Create Admin User for the company
     hashed_password = get_password_hash(company_data.admin_password)
@@ -60,13 +59,12 @@ async def create_company_and_admin(db: AsyncSession, company_data: schemas.Compa
         username=company_data.admin_username,
         hashed_password=hashed_password,
         role=schema.UserRole.COMPANY_ADMIN,
-        is_active=True, # Company admin is active by default
+        is_active=True,
         company_id=db_company.id
     )
     db.add(db_user)
     await db.commit()
     await db.refresh(db_company)
-    # We should return the unhashed secret here one time for the admin to know
     db_company.unhashed_secret = company_secret
     return db_company
 
@@ -78,7 +76,7 @@ async def create_employee(db: AsyncSession, employee_data: schemas.EmployeeCreat
         username=employee_data.username,
         hashed_password=hashed_password,
         role=schema.UserRole.EMPLOYEE,
-        is_active=False, # Employee is not active by default
+        is_active=False,
         company_id=company.id,
         division_id=employee_data.division_id
     )

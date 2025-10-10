@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     VECTOR_DB_PATH: str = "./chroma_db"
 
     # Authentication settings
-    SECRET_KEY: str
+    SECRET_KEY: str = "secret-key"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
 

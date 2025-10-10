@@ -6,12 +6,12 @@ from app.database.connection import db_manager
 app = FastAPI(
     title="Multi-Tenant Company Chatbot API",
     description="A SaaS platform for company-specific AI chatbots using RAG and Database Integration.",
-    version="2.0.0"
+    version="1.0.0"
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict this to your frontend's domain
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -19,11 +19,10 @@ app.add_middleware(
 
 # Include routers with a common prefix
 app.include_router(auth.router, prefix="/api/v1", tags=["Authentication & Registration"])
-app.include_router(chat.router, prefix="/api/v1")
-app.include_router(documents.router, prefix="/api/v1")
-app.include_router(divisions.router, prefix="/api/v1")
+app.include_router(chat.router, prefix="/api/v1", tags=["Chat Management"])
+app.include_router(documents.router, prefix="/api/v1", tags=["Document Management"])
+app.include_router(divisions.router, prefix="/api/v1", tags=["Division Management"])
 app.include_router(company.router, prefix="/api/v1", tags=["Company Management"])
-
 
 @app.on_event("startup")
 async def startup_event():

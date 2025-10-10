@@ -25,14 +25,14 @@ class UserCreate(UserBase):
     @field_validator('password')
     @classmethod
     def validate_password_length(cls, v):
-        if len(v.encode('utf-8')) > 200:  # Set reasonable limit
+        if len(v.encode('utf-8')) > 200:  
             raise ValueError('Password is too long (max 200 bytes)')
         return v
 
 class EmployeeCreate(UserCreate):
     company_code: str
     company_secret: str
-    division_id: Optional[int] = None # Optional: Employee can be assigned to a division later
+    division_id: Optional[int] = None 
 
 class UserInDB(UserBase):
     id: int
@@ -85,7 +85,7 @@ class CompanyCreate(CompanyBase):
     @field_validator('admin_password')
     @classmethod
     def validate_password_length(cls, v):
-        if len(v.encode('utf-8')) > 200:  # Set reasonable limit
+        if len(v.encode('utf-8')) > 200: 
             raise ValueError('Password is too long (max 200 bytes)')
         return v
 
