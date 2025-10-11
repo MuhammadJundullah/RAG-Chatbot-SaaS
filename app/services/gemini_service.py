@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config.settings import settings
 from typing import Optional, AsyncGenerator
 from app import crud
+from datetime import date
 
 class GeminiService:
     def __init__(self):
@@ -25,12 +26,13 @@ class GeminiService:
 
         **Instructions:**
         - Analyze the user's question and the database schema.
-        - If the question is asking for specific data that appears to be in the database (e.g., "how many customers", "list all sales in May", "what is the total revenue"), then a database query is appropriate.
+        - If the question can be answered using data in the database, then a database query is appropriate.
         - If the question is general, conversational, or asks for information not present in the schema (e.g., "hello", "what is the company's mission?", "explain this SOP document"), then a database query is not needed.
         - Respond with a single word: "Yes" or "No".
 
         **Decision (Yes/No):**
         """
+
         try:
             response = await self.model.generate_content_async(prompt)
             decision = response.text.strip().lower()
@@ -46,6 +48,11 @@ class GeminiService:
         prompt = f"""
         You are an expert SQL generator. Based on the database schema provided below, write a single, executable SQL query to answer the user's question.
 
+        **IMPORTANT CONTEXT:**
+        - Today's date is {date.today().isoformat()}.
+        - When a user asks about a time period like "this month" or "last month", use today's date to calculate the correct date range for the SQL query.
+        - For example, if today is 2025-05-11 and the user asks "sales this month", the WHERE clause should be something like "WHERE date_column >= '2025-05-01' AND date_column < '2025-06-01'".
+
         **Database Schema:**
         {schema_info}
 
@@ -57,7 +64,6 @@ class GeminiService:
         2.  Do NOT generate any `INSERT`, `UPDATE`, `DELETE`, or any other type of query.
         3.  The query should be a single line of text.
         4.  Do not add any explanation, comments, or markdown formatting. Just the raw SQL.
-        5.  If the question cannot be answered with a SQL query based on the schema, return the text "NOT_POSSIBLE".
 
         **SQL Query:**
         """
@@ -89,20 +95,32 @@ class GeminiService:
         company = await db.get(crud.schema.Company, company_id)
         company_name = company.name if company else "your company"
 
-        persona = f"You are a helpful AI assistant for {company_name}. Your role is to assist employees. You are speaking to an employee with the role: {user_role}."
-        
-        prompt_parts = [persona]
+        # More flexible and analytical system prompt
+        system_instruction = f"""You are a specialized AI business assistant for {company_name}. Your role is to help employees by answering questions and providing data-driven insights.
+
+Your core instructions are:
+1.  **Strictly Data-Bound:** Your ONLY source of information is the content provided below under "BEGIN DOCUMENTS" and "BEGIN DATABASE RESULTS". You MUST NOT use any of your own general knowledge.
+2.  **Act as an Analyst:** If the user asks for summaries, analysis, recommendations, or strategic advice (e.g., "how to improve sales", "what are the key trends"), act as a helpful business analyst. Analyze the data provided and formulate your response based SOLELY on that data. When relevant, use today's date ({date.today().isoformat()}) to provide more insightful context, for example, by comparing past data to the current period.
+3.  **Role Awareness:** You are speaking to an employee with the role: {user_role}.
+"""
+
+        prompt_parts = [system_instruction]
 
         if context:
-            prompt_parts.append(f"Use the following internal company documents as your primary source of information:\n---BEGIN DOCUMENTS---\n{context}\n---END DOCUMENTS---")
+            prompt_parts.append(f"---BEGIN DOCUMENTS---\n{context}\n---END DOCUMENTS---")
 
         if query_results:
-            prompt_parts.append(f"Additionally, here is some data retrieved from the company's internal database:\n---BEGIN DATABASE RESULTS---\n{query_results}\n---END DATABASE RESULTS---")
+            prompt_parts.append(f"---BEGIN DATABASE RESULTS---\n{query_results}\n---END DATABASE RESULTS---")
 
-        prompt_parts.append(f"Based on the information provided, answer the following user question. If the information is not available in the documents or database, say that you do not have access to that information. Stream your response, sending back parts of the answer as they are generated.\nUser Question: {question}")
+        prompt_parts.append(f"Based ONLY on the context provided above, answer this question: {question}")
 
         try:
-            response_stream = await self.model.generate_content_async(prompt_parts, stream=True)
+            generation_config = genai.GenerationConfig(temperature=0.5)
+            response_stream = await self.model.generate_content_async(
+                prompt_parts, 
+                stream=True,
+                generation_config=generation_config
+            )
             async for chunk in response_stream:
                 yield chunk.text
         except Exception as e:

@@ -1,122 +1,120 @@
-import chromadb
-import onnxruntime
-import chromadb.utils.embedding_functions as embedding_functions
+from pinecone import Pinecone
+from sentence_transformers import SentenceTransformer
 from app.config.settings import settings
 from typing import List, Optional, Dict, Any
 from pypdf import PdfReader
 import io
 import uuid
 
-# Force ONNX runtime to use CPU only, to avoid CoreML bugs on macOS.
-# This is an aggressive approach to ensure it takes effect before ChromaDB initializes it.
-try:
-    if 'CoreMLExecutionProvider' in onnxruntime.get_available_providers():
-        onnxruntime.set_available_providers(['CPUExecutionProvider'])
-        print("ONNX runtime provider forced to CPU.")
-except Exception as e:
-    print(f"Could not set ONNX provider: {e}")
-
-
 class RAGService:
     def __init__(self):
-        self.client = chromadb.PersistentClient(path=settings.VECTOR_DB_PATH)
-        self.embedding_function = embedding_functions.DefaultEmbeddingFunction()
+        """Initializes the Pinecone client and the embedding model using the new v3 syntax."""
+        if not settings.PINECONE_API_KEY:
+            raise ValueError("PINECONE_API_KEY must be set.")
+        
+        pc = Pinecone(api_key=settings.PINECONE_API_KEY)
+        
+        self.index_name = "company-chatbot"
+        self.index = pc.Index(self.index_name)
+        self.embedding_model = SentenceTransformer(settings.EMBEDDING_MODEL_NAME)
+        print(f"RAGService initialized with Pinecone (v3 syntax). Index: '{self.index_name}'.")
 
-    def _get_collection_for_company(self, company_id: int):
-        """Gets or creates a ChromaDB collection for a specific company."""
-        collection_name = f"company_{company_id}"
-        return self.client.get_or_create_collection(
-            name=collection_name,
-            embedding_function=self.embedding_function
-        )
+    def _get_namespace(self, company_id: int) -> str:
+        """Creates a Pinecone namespace string for a given company ID."""
+        return f"company-{company_id}"
 
     async def list_documents(self, company_id: int) -> List[str]:
         """
-        Lists all unique document filenames present in a company's collection.
+        Lists all unique document filenames from the Pinecone index for a company.
+        NOTE: This is a best-effort implementation as Pinecone is not optimized
+        for listing all metadata values. It queries a large number of vectors
+        to build a list of unique sources.
         """
-        collection = self._get_collection_for_company(company_id)
         try:
-            results = collection.get()
+            namespace = self._get_namespace(company_id)
+            # Query for a large number of vectors to get their metadata
+            # We query with a dummy vector, as a vector is required.
+            dummy_vector = [0.0] * 384
+            response = self.index.query(
+                vector=dummy_vector,
+                top_k=1000, # Adjust as needed for more documents
+                include_metadata=True,
+                namespace=namespace
+            )
             
-            if not results or not results.get('metadatas'):
+            if not response.get('matches'):
                 return []
             
-            source_files = {
-                metadata['source'] 
-                for metadata in results['metadatas'] 
-                if metadata and 'source' in metadata
-            }
+            # Extract unique source filenames from metadata
+            source_files = {match['metadata']['source'] for match in response['matches'] if 'source' in match['metadata']}
             return sorted(list(source_files))
         except Exception as e:
             print(f"Error listing documents for company {company_id}: {e}")
             return []
 
     async def delete_document(self, company_id: int, filename: str) -> Dict[str, Any]:
-        """
-        Deletes all chunks associated with a specific filename from a company's collection.
-        """
-        collection = self._get_collection_for_company(company_id)
+        """Deletes all vectors associated with a specific filename from a company's namespace."""
         try:
-            existing_chunks = collection.get(where={"source": filename}, include=[])
-            num_to_delete = len(existing_chunks.get('ids', []))
-
-            if num_to_delete == 0:
-                 return {"status": "not_found", "message": f"No document found with filename '{filename}'."}
-
-            collection.delete(where={"source": filename})
-            
+            namespace = self._get_namespace(company_id)
+            # Using metadata filtering to delete
+            self.index.delete(
+                filter={"source": {"$eq": filename}},
+                namespace=namespace
+            )
             return {
-                "status": "success", 
-                "message": f"Document '{filename}' and all its associated chunks have been deleted.",
-                "chunks_deleted": num_to_delete
+                "status": "success",
+                "message": f"Document '{filename}' and all its associated vectors have been deleted from the index."
             }
         except Exception as e:
             print(f"Error deleting document '{filename}' for company {company_id}: {e}")
             raise e
 
-    async def get_relevant_context(self, query: str, company_id: int, n_results: int = 3) -> str:
-        """
-        Retrieve relevant context from a company's specific vector database collection.
-        """
-        collection = self._get_collection_for_company(company_id)
+    async def get_relevant_context(self, query: str, company_id: int, n_results: int = 5) -> str:
+        """Retrieves relevant context from Pinecone using vector similarity search."""
         try:
-            results = collection.query(
-                query_texts=[query],
-                n_results=n_results
+            namespace = self._get_namespace(company_id)
+            query_embedding = self.embedding_model.encode(query).tolist()
+
+            response = self.index.query(
+                vector=query_embedding,
+                top_k=n_results,
+                include_metadata=True,
+                namespace=namespace
             )
 
-            if results['documents'] and results['documents'][0]:
-                context = "\n".join(results['documents'][0])
+            if response.get('matches'):
+                # We stored the original text in the 'content' metadata field
+                context = "\n".join([match['metadata']['content'] for match in response['matches'] if 'content' in match['metadata']])
                 return context
             return ""
         except Exception as e:
             print(f"RAG error for company {company_id}: {e}")
             return ""
 
-    async def add_documents(self, documents: List[str], company_id: int, metadata: Optional[List[dict]] = None):
-        """
-        Add documents to a company's specific vector database collection.
-        """
-        collection = self._get_collection_for_company(company_id)
+    async def add_documents(self, documents: List[str], company_id: int, source_filename: str):
+        """Embeds document chunks and upserts them into the Pinecone index."""
         try:
-            ids = [str(uuid.uuid4()) for _ in documents]
+            namespace = self._get_namespace(company_id)
+            embeddings = self.embedding_model.encode(documents).tolist()
+            
+            vectors_to_upsert = []
+            for doc, emb in zip(documents, embeddings):
+                vector_id = str(uuid.uuid4())
+                metadata = {
+                    'source': source_filename,
+                    'content': doc
+                }
+                vectors_to_upsert.append((vector_id, emb, metadata))
 
-            collection.add(
-                documents=documents,
-                metadatas=metadata if metadata else [{}] * len(documents),
-                ids=ids
-            )
-            print(f"Added {len(documents)} document chunks to ChromaDB for company {company_id}.")
+            # Upsert in batches if necessary, though for a single doc this is fine
+            self.index.upsert(vectors=vectors_to_upsert, namespace=namespace)
+            print(f"Added {len(documents)} document chunks to Pinecone for company {company_id}.")
         except Exception as e:
-            # Re-raise the exception so the error is not silent
             print(f"Error adding documents for company {company_id}: {e}")
             raise e
 
     async def process_and_add_document(self, file_content: bytes, file_name: str, company_id: int) -> Dict[str, Any]:
-        """
-        Processes a document, extracts text, chunks it, and adds it to the
-        company's specific ChromaDB collection.
-        """
+        """Processes a file, chunks it, and adds it to the Pinecone index."""
         text_content = ""
         if file_name.lower().endswith(".pdf"):
             try:
@@ -144,13 +142,11 @@ class RAGService:
         if not chunks:
             return {"status": "failed", "message": "Could not chunk document text."}
 
-        metadatas = [{"source": file_name, "chunk_index": i} for i in range(len(chunks))]
-
-        await self.add_documents(chunks, company_id, metadatas)
+        await self.add_documents(chunks, company_id, file_name)
 
         return {
             "status": "success",
-            "message": f"Document '{file_name}' processed and added to ChromaDB for company {company_id}.",
+            "message": f"Document '{file_name}' processed and added to Pinecone for company {company_id}.",
             "chunks_added": len(chunks)
         }
 

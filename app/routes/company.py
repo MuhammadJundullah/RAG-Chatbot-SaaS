@@ -120,7 +120,8 @@ async def get_company_employees(
     if not company:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found.")
 
-    return company.users
+    employees = [user for user in company.users if user.role == schema.UserRole.EMPLOYEE]
+    return employees
 
 @router.put("/company/employees/{employee_id}/activate", status_code=status.HTTP_200_OK, tags=["Company Employee Management"])
 async def activate_employee(

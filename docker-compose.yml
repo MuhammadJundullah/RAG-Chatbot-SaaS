@@ -14,8 +14,6 @@ services:
     volumes:
       # Mount app code for hot-reloading
       - ./app:/app/app
-      # Mount the chroma_db directory to persist vector data
-      - ./chroma_db:/app/chroma_db
     depends_on:
       # Updated depends_on to wait for the db to be healthy
       db:
