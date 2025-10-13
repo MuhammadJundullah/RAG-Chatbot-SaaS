@@ -483,9 +483,3 @@ Endpoint khusus untuk pengguna dengan peran `admin`.
 | **404** | Not Found | Resource tidak ditemukan |
 | **422** | Unprocessable Entity | Error validasi |
 | **500** | Internal Server Error | Terjadi error di server |
-
----
-
-## Security
-
-// ... (Content is complete)
