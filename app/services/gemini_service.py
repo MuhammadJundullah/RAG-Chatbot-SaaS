@@ -2,7 +2,7 @@ import google.generativeai as genai
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config.settings import settings
 from typing import Optional, AsyncGenerator
-from app import crud
+from app.database import schema
 from datetime import date
 
 class GeminiService:
@@ -51,7 +51,7 @@ class GeminiService:
         **IMPORTANT CONTEXT:**
         - Today's date is {date.today().isoformat()}.
         - When a user asks about a time period like "this month" or "last month", use today's date to calculate the correct date range for the SQL query.
-        - For example, if today is 2025-05-11 and the user asks "sales this month", the WHERE clause should be something like "WHERE date_column >= '2025-05-01' AND date_column < '2025-06-01'".
+        - For example, if today is 2025-05-11 and the user asks "sales this month", the WHERE clause should be something like \"WHERE date_column >= '2025-05-01' AND date_column < '2025-06-01'\".
 
         **Database Schema:**
         {schema_info}
@@ -83,25 +83,27 @@ class GeminiService:
     async def generate_chat_response(
         self, 
         question: str, 
-        company_id: int,
-        user_role: str,
         db: AsyncSession,
+        current_user: schema.Users,
         context: Optional[str] = None, 
         query_results: Optional[str] = None
     ) -> AsyncGenerator[str, None]:
         """
         Generates a final chat response as a stream, personalizing the prompt with company-specific details.
         """
-        company = await db.get(crud.schema.Company, company_id)
+        # Get company name
+        company = await db.get(schema.Company, current_user.Companyid)
         company_name = company.name if company else "your company"
 
-        # More flexible and analytical system prompt
+        # Get role name
+        role_name = current_user.role if current_user.role else "employee"
+
         system_instruction = f"""You are a specialized AI business assistant for {company_name}. Your role is to help employees by answering questions and providing data-driven insights.
 
 Your core instructions are:
-1.  **Strictly Data-Bound:** Your ONLY source of information is the content provided below under "BEGIN DOCUMENTS" and "BEGIN DATABASE RESULTS". You MUST NOT use any of your own general knowledge.
-2.  **Act as an Analyst:** If the user asks for summaries, analysis, recommendations, or strategic advice (e.g., "how to improve sales", "what are the key trends"), act as a helpful business analyst. Analyze the data provided and formulate your response based SOLELY on that data. When relevant, use today's date ({date.today().isoformat()}) to provide more insightful context, for example, by comparing past data to the current period.
-3.  **Role Awareness:** You are speaking to an employee with the role: {user_role}.
+1.  **Strictly Data-Bound:** Your ONLY source of information is the content provided below under \"BEGIN DOCUMENTS\" and \"BEGIN DATABASE RESULTS\". You MUST NOT use any of your own general knowledge.
+2.  **Act as an Analyst:** If the user asks for summaries, analysis, recommendations, or strategic advice (e.g., "how to improve sales", "what are the key trends"), act as a helpful business analyst. Analyze the data provided and formulate your response based SOLEly on that data. When relevant, use today's date ({date.today().isoformat()}) to provide more insightful context, for example, by comparing past data to the current period.
+3.  **Role Awareness:** You are speaking to an employee with the role: {role_name}.
 """
 
         prompt_parts = [system_instruction]

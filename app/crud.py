@@ -1,120 +1,185 @@
-import secrets
-import uuid
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from sqlalchemy.future import select
+from typing import Optional
+from datetime import date
 from app.database import schema
 from app.models import schemas
-from app.utils.security import get_password_hash, verify_password
-from app.utils.encryption import encrypt_string
-
-# --- User CRUD ---
-
-async def get_user_by_username(db: AsyncSession, username: str) -> schema.User:
-    result = await db.execute(select(schema.User).filter(schema.User.username == username))
-    return result.scalar_one_or_none()
+from app.utils.security import get_password_hash
 
 # --- Company CRUD ---
 
-async def get_company_by_name(db: AsyncSession, name: str) -> schema.Company:
+async def get_company(db: AsyncSession, company_id: int):
+    result = await db.execute(select(schema.Company).filter(schema.Company.id == company_id))
+    return result.scalar_one_or_none()
+
+async def get_company_by_name(db: AsyncSession, name: str):
     result = await db.execute(select(schema.Company).filter(schema.Company.name == name))
     return result.scalar_one_or_none()
 
-async def get_company_by_code(db: AsyncSession, code: str) -> schema.Company:
-    result = await db.execute(select(schema.Company).filter(schema.Company.company_code == code))
+async def get_company_by_code(db: AsyncSession, code: str):
+    result = await db.execute(select(schema.Company).filter(schema.Company.code == code))
     return result.scalar_one_or_none()
 
-async def set_db_connection_string(db: AsyncSession, company: schema.Company, db_url: str) -> schema.Company:
-    """Encrypts and saves the database connection string for a company."""
-    company.encrypted_db_connection_string = encrypt_string(db_url)
-    db.add(company)
-    await db.commit()
-    await db.refresh(company)
-    return company
+async def get_companies(db: AsyncSession, skip: int = 0, limit: int = 100):
+    result = await db.execute(select(schema.Company).offset(skip).limit(limit))
+    return result.scalars().all()
 
-async def delete_db_connection_string(db: AsyncSession, company: schema.Company) -> schema.Company:
-    """Sets the database connection string for a company to None."""
-    company.encrypted_db_connection_string = None
-    db.add(company)
-    await db.commit()
-    await db.refresh(company)
-    return company
-
-async def create_company_and_admin(db: AsyncSession, company_data: schemas.CompanyCreate) -> schema.Company:
-    company_code = str(uuid.uuid4().hex[:6].upper())
-    company_secret = secrets.token_hex(24) 
-
-    # Create Company
-    db_company = schema.Company(
-        name=company_data.name,
-        company_code=company_code,
-        company_secret=company_secret
-    )
+async def create_company(db: AsyncSession, company: schemas.CompanyCreate):
+    db_company = schema.Company(**company.model_dump())
     db.add(db_company)
-    await db.flush() 
-
-    # Create Admin User for the company
-    hashed_password = get_password_hash(company_data.admin_password)
-    db_user = schema.User(
-        username=company_data.admin_username,
-        hashed_password=hashed_password,
-        role=schema.UserRole.COMPANY_ADMIN,
-        is_active=True,
-        company_id=db_company.id
-    )
-    db.add(db_user)
     await db.commit()
     await db.refresh(db_company)
-    db_company.unhashed_secret = company_secret
     return db_company
 
-# --- Employee CRUD ---
 
-async def create_employee(db: AsyncSession, employee_data: schemas.EmployeeCreate, company: schema.Company) -> schema.User:
-    hashed_password = get_password_hash(employee_data.password)
-    db_employee = schema.User(
-        username=employee_data.username,
-        hashed_password=hashed_password,
-        role=schema.UserRole.EMPLOYEE,
-        is_active=False,
-        company_id=company.id,
-        division_id=employee_data.division_id
+async def create_company_and_admin(db: AsyncSession, data: schemas.CompanyAdminCreate):
+    # Create the company
+    company_data = schemas.CompanyCreate(
+        name=data.company_name,
+        code=data.company_code,
+        logo=data.company_logo
     )
-    db.add(db_employee)
-    await db.commit()
-    await db.refresh(db_employee)
-    return db_employee
+    db_company = await create_company(db, company=company_data)
+
+    # Create the admin user
+    admin_data = schemas.UserCreate(
+        name=data.admin_name,
+        email=data.admin_email,
+        password=data.admin_password,
+        role="admin",
+        status="active",
+        Companyid=db_company.id
+    )
+    db_user = await create_user(db, user=admin_data)
+
+    return db_company, db_user
 
 # --- Division CRUD ---
 
-async def create_division(db: AsyncSession, division_data: schemas.DivisionCreate, company_id: int) -> schema.Division:
-    db_division = schema.Division(
-        name=division_data.name,
-        company_id=company_id
-    )
+async def create_division(db: AsyncSession, division: schemas.DivisionCreate):
+    db_division = schema.Division(**division.model_dump())
     db.add(db_division)
     await db.commit()
     await db.refresh(db_division)
     return db_division
 
-async def get_divisions_by_company(db: AsyncSession, company_id: int) -> list[schema.Division]:
-    result = await db.execute(select(schema.Division).filter(schema.Division.company_id == company_id))
-    return result.scalars().all()
-
-async def get_division_by_id(db: AsyncSession, division_id: int) -> schema.Division:
+async def get_division(db: AsyncSession, division_id: int):
     result = await db.execute(select(schema.Division).filter(schema.Division.id == division_id))
     return result.scalar_one_or_none()
 
-async def update_division(db: AsyncSession, division: schema.Division, update_data: schemas.DivisionUpdate) -> schema.Division:
-    """Updates a division's details."""
-    for key, value in update_data.model_dump(exclude_unset=True).items():
-        setattr(division, key, value)
-    db.add(division)
-    await db.commit()
-    await db.refresh(division)
-    return division
+async def get_divisions_by_company(db: AsyncSession, company_id: int, skip: int = 0, limit: int = 100):
+    result = await db.execute(
+        select(schema.Division)
+        .filter(schema.Division.Companyid == company_id)
+        .offset(skip)
+        .limit(limit)
+    )
+    return result.scalars().all()
 
-async def delete_division(db: AsyncSession, division: schema.Division):
-    """Deletes a division."""
-    await db.delete(division)
+# --- User CRUD ---
+
+async def get_user(db: AsyncSession, user_id: int):
+    result = await db.execute(select(schema.Users).filter(schema.Users.id == user_id))
+    return result.scalar_one_or_none()
+
+async def get_user_by_email(db: AsyncSession, email: str):
+    result = await db.execute(select(schema.Users).filter(schema.Users.email == email))
+    return result.scalar_one_or_none()
+
+async def get_users(db: AsyncSession, skip: int = 0, limit: int = 100):
+    result = await db.execute(select(schema.Users).offset(skip).limit(limit))
+    return result.scalars().all()
+
+async def create_user(db: AsyncSession, user: schemas.UserCreate):
+    hashed_password = get_password_hash(user.password)
+    db_user = schema.Users(
+        name=user.name,
+        email=user.email,
+        password=hashed_password,
+        status=user.status,
+        role=user.role,
+        Companyid=user.Companyid,
+        Divisionid=user.Divisionid,
+    )
+    db.add(db_user)
     await db.commit()
+    await db.refresh(db_user)
+    return db_user
+
+
+async def get_pending_users_by_company(db: AsyncSession, company_id: int):
+    result = await db.execute(
+        select(schema.Users)
+        .filter(schema.Users.Companyid == company_id)
+        .filter(schema.Users.status == "pending_approval")
+    )
+    return result.scalars().all()
+
+
+async def update_user_status(db: AsyncSession, user: schema.Users, status: str):
+    user.status = status
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+async def delete_user(db: AsyncSession, user: schema.Users):
+    await db.delete(user)
+    await db.commit()
+
+# --- Document CRUD ---
+
+async def get_document(db: AsyncSession, document_id: int):
+    result = await db.execute(select(schema.Documents).filter(schema.Documents.id == document_id))
+    return result.scalar_one_or_none()
+
+async def get_documents(db: AsyncSession, skip: int = 0, limit: int = 100):
+    result = await db.execute(select(schema.Documents).offset(skip).limit(limit))
+    return result.scalars().all()
+
+
+
+async def delete_document(db: AsyncSession, document: schema.Documents):
+    await db.delete(document)
+    await db.commit()
+
+# --- Chatlog CRUD ---
+
+async def create_chatlog(db: AsyncSession, chatlog: schemas.ChatlogCreate):
+    db_chatlog = schema.Chatlogs(**chatlog.model_dump())
+    db.add(db_chatlog)
+    await db.commit()
+    await db.refresh(db_chatlog)
+    return db_chatlog
+
+async def get_chatlogs(
+    db: AsyncSession,
+    company_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    skip: int = 0,
+    limit: int = 100,
+):
+    query = select(schema.Chatlogs)
+    if company_id:
+        query = query.filter(schema.Chatlogs.Companyid == company_id)
+    if user_id:
+        query = query.filter(schema.Chatlogs.UsersId == user_id)
+    if start_date:
+        query = query.filter(schema.Chatlogs.created_at >= start_date)
+    if end_date:
+        query = query.filter(schema.Chatlogs.created_at <= end_date)
+    
+    result = await db.execute(query.offset(skip).limit(limit))
+    return result.scalars().all()
+
+# --- Embedding CRUD ---
+
+async def create_embedding(db: AsyncSession, embedding: schemas.EmbeddingCreate):
+    db_embedding = schema.Embeddings(**embedding.model_dump())
+    db.add(db_embedding)
+    await db.commit()
+    await db.refresh(db_embedding)
+    return db_embedding

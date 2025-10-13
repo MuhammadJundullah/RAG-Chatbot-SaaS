@@ -11,9 +11,8 @@ from app.database import schema
 from app.models import schemas
 from app import crud
 
-# OAuth2PasswordBearer for token extraction from the Authorization header
 # The tokenUrl should point to the new login endpoint
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 # --- JWT Token Management ---
 
@@ -31,7 +30,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 # --- User Authentication and Authorization Dependencies ---
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(db_manager.get_db_session)) -> schema.User:
+async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(db_manager.get_db_session)) -> schema.Users:
     """
     Dependency to get the current user from a JWT token.
     Decodes the token, validates the user, and returns the full user object.
@@ -43,32 +42,21 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     )
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
+        email: str = payload.get("sub")
+        if email is None:
             raise credentials_exception
         
-        # The payload is now just for identification (username), fetch full user data from DB
-        token_data = schemas.TokenData(username=username)
+        token_data = schemas.TokenData(
+            email=email, 
+            role=payload.get("role"), 
+            company_id=payload.get("company_id")
+        )
 
     except JWTError:
         raise credentials_exception
     
-    user = await crud.get_user_by_username(db, username=token_data.username)
+    user = await crud.get_user_by_email(db, email=token_data.email)
     if user is None:
         raise credentials_exception
         
     return user
-
-# --- Role-based Authorization Dependencies ---
-
-def get_current_company_admin(current_user: schema.User = Depends(get_current_user)) -> schema.User:
-    """
-    Dependency to ensure the current user is a COMPANY_ADMIN.
-    Raises a 403 Forbidden error if the user does not have the correct role.
-    """
-    if current_user.role != schema.UserRole.COMPANY_ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="The user does not have enough permissions. Company admin required.",
-        )
-    return current_user

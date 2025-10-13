@@ -3,25 +3,28 @@ from typing import List
 import urllib.parse
 
 from app.services.rag_service import rag_service
-from app.utils.auth import get_current_company_admin
-from app.database.schema import User
+from app.utils.auth import get_current_user
+from app.database.schema import Users
 from app.models import schemas
+from app import crud
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database.connection import db_manager
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/documents",
+    tags=["Documents"],
+)
+
+# --- RAG Document Management ---
 
 @router.post(
-    "/documents/upload", 
+    "/upload", 
     response_model=schemas.DocumentUploadResponse,
-    tags=["Documents"]
 )
-async def upload_document(
+async def upload_document_to_rag(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_company_admin)
+    current_user: Users = Depends(get_current_user)
 ):
-    """
-    Uploads a document (e.g., PDF) to the company's RAG knowledge base.
-    This endpoint requires COMPANY_ADMIN authentication.
-    """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file name provided.")
 
@@ -30,7 +33,7 @@ async def upload_document(
         result = await rag_service.process_and_add_document(
             file_content=file_content, 
             file_name=file.filename,
-            company_id=current_user.company_id
+            company_id=current_user.Companyid
         )
         
         if result["status"] == "failed":
@@ -43,44 +46,76 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")
 
 @router.get(
-    "/documents",
+    "/",
     response_model=List[str],
-    tags=["Documents"]
 )
-async def list_uploaded_documents(
-    current_user: User = Depends(get_current_company_admin)
+async def list_rag_documents(
+    current_user: Users = Depends(get_current_user)
 ):
-    """
-    Lists all unique document filenames that have been uploaded for the company.
-    Requires COMPANY_ADMIN authentication.
-    """
-    documents = await rag_service.list_documents(company_id=current_user.company_id)
+    documents = await rag_service.list_documents(company_id=current_user.Companyid)
     return documents
 
 @router.delete(
-    "/documents/{filename}",
+    "/{filename}",
     response_model=schemas.DocumentDeleteResponse,
-    tags=["Documents"]
 )
-async def delete_document(
+async def delete_rag_document(
     filename: str,
-    current_user: User = Depends(get_current_company_admin)
+    current_user: Users = Depends(get_current_user),
+    db: AsyncSession = Depends(db_manager.get_db_session)
 ):
-    """
-    Deletes a document and all its associated chunks from the RAG knowledge base.
-    The filename must be URL-encoded if it contains special characters.
-    Requires COMPANY_ADMIN authentication.
-    """
     decoded_filename = urllib.parse.unquote(filename)
     
     try:
-        result = await rag_service.delete_document(
-            company_id=current_user.company_id,
+        # 1. Delete from RAG service (Pinecone)
+        rag_result = await rag_service.delete_document(
+            company_id=current_user.Companyid,
             filename=decoded_filename
         )
-        if result["status"] == "not_found":
-            raise HTTPException(status_code=404, detail=result["message"])
+
+        # 2. Delete from relational database
+        db_document_result = await db.execute(
+            select(schema.Documents).filter(
+                schema.Documents.title == decoded_filename,
+                schema.Documents.Companyid == current_user.Companyid
+            )
+        )
+        db_document = db_document_result.scalar_one_or_none()
+
+        if db_document:
+            await crud.delete_document(db=db, document=db_document)
+
+        if rag_result["status"] == "not_found" and not db_document:
+            raise HTTPException(status_code=404, detail="Document not found in RAG or database.")
         
-        return result
+        return {"status": "success", "message": f"Document '{decoded_filename}' deleted successfully."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
+
+# --- Database Document CRUD ---
+
+
+
+@router.get("/db", response_model=List[schemas.Document])
+async def read_documents(
+    skip: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(db_manager.get_db_session),
+    current_user: Users = Depends(get_current_user)
+):
+    documents = await crud.get_documents(db, skip=skip, limit=limit)
+    company_documents = [doc for doc in documents if doc.Companyid == current_user.Companyid]
+    return company_documents
+
+@router.get("/{document_id}/db", response_model=schemas.Document)
+async def read_document(
+    document_id: int,
+    db: AsyncSession = Depends(db_manager.get_db_session),
+    current_user: Users = Depends(get_current_user)
+):
+    db_document = await crud.get_document(db, document_id=document_id)
+    if db_document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if db_document.Companyid != current_user.Companyid:
+        raise HTTPException(status_code=403, detail="You do not have permission to access this document.")
+    return db_document

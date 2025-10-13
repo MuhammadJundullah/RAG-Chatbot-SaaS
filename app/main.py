@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth, chat, documents, divisions, company
+from app.routes import auth, chat, documents, company, divisions, chatlogs, admin
 from app.database.connection import db_manager
 
 app = FastAPI(
@@ -17,12 +17,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers with a common prefix
-app.include_router(auth.router, prefix="/api/v1", tags=["Authentication & Registration"])
-app.include_router(chat.router, prefix="/api/v1", tags=["Chat Management"])
-app.include_router(documents.router, prefix="/api/v1", tags=["Document Management"])
-app.include_router(divisions.router, prefix="/api/v1", tags=["Division Management"])
-app.include_router(company.router, prefix="/api/v1", tags=["Company Management"])
+# Include routers
+app.include_router(auth.router)
+app.include_router(chat.router)
+app.include_router(documents.router)
+app.include_router(company.router)
+app.include_router(divisions.router)
+app.include_router(chatlogs.router)
+app.include_router(admin.router)
 
 @app.on_event("startup")
 async def startup_event():

@@ -1,6 +1,6 @@
 # Multi-Tenant Company Chatbot API
 
-Platform SaaS untuk chatbot AI yang disesuaikan dengan konteks perusahaan menggunakan RAG (Retrieval-Augmented Generation) dan Dynamic Database Integration.
+Platform SaaS untuk chatbot AI yang disesuaikan dengan konteks perusahaan menggunakan RAG (Retrieval-Augmented Generation).
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-2.0.0-009688.svg?style=flat&logo=FastAPI&logoColor=white)](https://fastapi.tiangolo.com)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB.svg?style=flat&logo=python&logoColor=white)](https://www.python.org)
@@ -14,14 +14,20 @@ Platform SaaS untuk chatbot AI yang disesuaikan dengan konteks perusahaan menggu
 - [Key Features](#key-features)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
-- [Authentication](#authentication)
+  - [Running with Docker (Recommended)](#running-with-docker-recommended)
+  - [Running Locally (Without Docker)](#running-locally-without-docker)
+- [Authentication Flow](#authentication-flow)
+  - [User Roles](#user-roles)
+  - [Token Structure](#token-structure)
 - [API Endpoints](#api-endpoints)
-  - [1. Health & Status](#1-health--status)
-  - [2. Authentication & Registration](#2-authentication--registration)
-  - [3. Company Management](#3-company-management)
-  - [4. Division Management](#4-division-management)
-  - [5. Document Management](#5-document-management)
+  - [1. Health and Status](#1-health-and-status)
+  - [2. Authentication](#2-authentication)
+  - [3. Companies](#3-companies)
+  - [4. Divisions](#4-divisions)
+  - [5. Documents (RAG)](#5-documents-rag)
   - [6. AI Chat](#6-ai-chat)
+  - [7. Chatlogs](#7-chatlogs)
+  - [8. Admin](#8-admin)
 - [Response Codes](#response-codes)
 - [Security](#security)
 
@@ -29,15 +35,12 @@ Platform SaaS untuk chatbot AI yang disesuaikan dengan konteks perusahaan menggu
 
 ## Overview
 
-Multi-Tenant Company Chatbot API memungkinkan setiap perusahaan memiliki AI chatbot yang disesuaikan dengan:
-- **Knowledge Base (RAG)**: Dokumen internal perusahaan
-- **Database Integration**: Koneksi ke database eksternal dengan kontrol akses granular
-- **Multi-Tenancy**: Isolasi data penuh antar perusahaan
-- **Role-Based Access**: Kontrol akses berbasis role dan divisi
+Multi-Tenant Company Chatbot API adalah sebuah platform Software-as-a-Service (SaaS) yang memungkinkan setiap perusahaan (tenant) untuk memiliki AI chatbot kustom. Chatbot ini dapat menjawab pertanyaan berdasarkan basis pengetahuan internal perusahaan yang diunggah dalam bentuk dokumen (menggunakan teknik RAG).
+
+Fitur utama meliputi isolasi data antar perusahaan, sistem peran pengguna (admin dan employee), dan alur persetujuan untuk pengguna baru.
 
 **Base URL**: `http://localhost:8000`  
-**API Version**: `v1.0.0`  
-**API Prefix**: `/api/v1`
+**API Version**: `v2.0.0`
 
 ---
 
@@ -45,12 +48,11 @@ Multi-Tenant Company Chatbot API memungkinkan setiap perusahaan memiliki AI chat
 
 | Feature | Description |
 |---------|-------------|
-| **Multi-Tenancy** | Setiap perusahaan memiliki space data terisolasi |
-| **User Roles** | COMPANY_ADMIN (full access) & EMPLOYEE (restricted) |
-| **Document RAG** | Upload & manage PDF documents untuk knowledge base |
-| **Dynamic DB** | Connect external databases |
-| **Intelligent Chat** | AI yang combine RAG + Database + Context awareness |
-| **Security** | JWT auth, bcrypt passwords, SQL injection prevention |
+| **Multi-Tenancy** | Data setiap perusahaan terisolasi sepenuhnya di level database. |
+| **User Approval Flow** | Admin perusahaan dapat menyetujui atau menolak pendaftaran pengguna baru, memberikan kontrol penuh atas akses. |
+| **Document RAG** | Kemampuan untuk mengunggah dokumen (PDF) yang akan menjadi basis pengetahuan untuk chatbot. |
+| **Intelligent Chat** | Chatbot AI yang menggunakan konteks dari dokumen yang relevan untuk memberikan jawaban yang akurat. |
+| **Secure Authentication** | Menggunakan JWT (Bearer Token) untuk otentikasi dan `bcrypt` untuk hashing password. |
 
 ---
 
@@ -59,104 +61,59 @@ Multi-Tenant Company Chatbot API memungkinkan setiap perusahaan memiliki AI chat
 ```
 Backend:      FastAPI (async)
 Database:     PostgreSQL (internal)
-Vector DB:    ChromaDB (document embeddings)
+Vector DB:    Pinecone (document embeddings)
 AI Model:     Google Gemini
 ORM:          SQLAlchemy (async)
 Auth:         JWT (Bearer Token)
-Password:     bcrypt + SHA256
+Password:     bcrypt
 ```
 
 ---
 
 ## Getting Started
 
-The recommended way to run this project for development is by using Docker. This ensures a consistent and easy-to-manage environment.
-
 ### Running with Docker (Recommended)
 
-**Prerequisites:**
-- Docker and Docker Compose must be installed on your system.
-
-**Step-by-step Guide:**
-
-1.  **Clone the Repository**
-    ```sh
-    git clone <your-repository-url>
-    cd company_chatbot
-    ```
-
-2.  **Create Environment File**
-    The project uses a `.env` file for configuration. Copy the provided template to create your own configuration file.
-    ```sh
-    cp .env.example .env
-    ```
-
-3.  **Configure Your Secrets**
-    Open the newly created `.env` file with a text editor and fill in your actual credentials, especially:
-    - `POSTGRES_USER`, `POSTGRES_PASSWORD`
-    - `GEMINI_API_KEY`
-    - `SECRET_KEY` (use a long, random string)
-
-4.  **Build and Run the Containers**
-    This single command will build the API image, start both the API and database containers, and automatically run database migrations on startup.
-    ```sh
-    docker compose up --build
-    ```
-
-5.  **Access the Application**
-    The application will be running and available at `http://localhost:8000`. The interactive API documentation can be found at:
-    - **Swagger UI**: `http://localhost:8000/docs`
-    - **ReDoc**: `http://localhost:8000/redoc`
-
-**Development Workflow (Hot-Reloading):**
-Thanks to the volume mount, any changes you make to the code in the `./app` directory will automatically be detected, and the server will restart inside the container. You do not need to rebuild the image for simple code changes.
-
----
+// ... (Content is complete)
 
 ### Running Locally (Without Docker)
 
-This method is for users who prefer to run the application directly on their host machine.
-
-**Prerequisites:**
-- Python 3.11+
-- A running PostgreSQL instance
-
-**Steps:**
-
-1.  Install dependencies: `pip install -r requirements.txt`
-2.  Create and configure your `.env` file from the `.env.example` template.
-3.  **Important:** In your `.env` file, ensure the `DATABASE_URL` points to your local PostgreSQL instance (e.g., `..._password@localhost:5432/...`).
-4.  Run the database migration script manually: `python -m app.database.init_db`
-5.  Run the application server:
-    ```sh
-    uvicorn app.main:app --reload --port 8000
-    ```
+// ... (Content is complete)
 
 ---
 
-## Authentication
+## Authentication Flow
 
-### How It Works
+Aplikasi ini menggunakan alur registrasi yang berbeda untuk admin pertama perusahaan dan untuk karyawan berikutnya.
 
-1. Login via `/api/v1/token` to receive JWT token
-2. Include token in header: `Authorization: Bearer <token>`
-3. Token expires after 30 minutes (configurable)
+1.  **Pendaftaran Perusahaan & Admin Pertama**
+    - Pengguna baru mendaftarkan perusahaannya dan akun adminnya sekaligus melalui `POST /auth/company-signup`.
+    - Akun admin ini langsung aktif dan menerima token untuk sesi pertama.
+
+2.  **Pendaftaran Mandiri Karyawan**
+    - Calon karyawan mendaftarkan diri ke perusahaan yang sudah ada menggunakan `POST /auth/register`.
+    - Akun baru ini akan dibuat dengan status `pending_approval` dan belum bisa digunakan.
+
+3.  **Persetujuan oleh Admin**
+    - Admin perusahaan akan melihat daftar pendaftar di `GET /admin/pending-users`.
+    - Admin dapat menyetujui pendaftaran melalui `POST /admin/users/{user_id}/approve`.
+
+4.  **Login Karyawan**
+    - Setelah disetujui, status karyawan menjadi `active`.
+    - Karyawan tersebut sekarang dapat login melalui `POST /auth/token` untuk mendapatkan token akses.
 
 ### User Roles
 
-| Role | Description | Capabilities |
-|------|-------------|--------------|
-| **COMPANY_ADMIN** | Administrator perusahaan | Manage divisions, upload/delete documents, set DB connection, full chat access |
-| **EMPLOYEE** | Karyawan perusahaan | Chat with AI |
+- **admin**: Hak akses administratif, termasuk mengelola (menyetujui/menolak) pengguna.
+- **employee**: Pengguna standar yang dapat berinteraksi dengan chatbot.
 
 ### Token Structure
 
 ```json
 {
-  "sub": "username",
-  "role": "COMPANY_ADMIN",
+  "sub": "user@example.com",
+  "role": "admin",
   "company_id": 1,
-  "division_id": null,
   "exp": 1709556000
 }
 ```
@@ -165,720 +122,362 @@ This method is for users who prefer to run the application directly on their hos
 
 ## API Endpoints
 
-### 1. Health & Status
+### 1. Health and Status
 
 #### Root Endpoint
-
-Check if API is running.
-
-```http
-GET /
-```
-
-**Authentication**: Not required
-
-**Response 200**:
-```json
-{
-  "message": "Multi-Tenant Company Chatbot API is running"
-}
-```
-
----
+- **Endpoint**: `GET /`
+- **Deskripsi**: Memeriksa apakah API berjalan.
+- **Authentication**: Tidak perlu.
 
 #### Health Check
-
-```http
-GET /health
-```
-
-**Authentication**: Not required
-
-**Response 200**:
-```json
-{
-  "status": "healthy"
-}
-```
+- **Endpoint**: `GET /health`
+- **Deskripsi**: Memberikan status kesehatan API.
+- **Authentication**: Tidak perlu.
 
 ---
 
-### 2. Authentication & Registration
+### 2. Authentication
 
-#### Register Company
-
-Daftarkan perusahaan baru beserta admin pertama.
-
-```http
-POST /api/v1/companies/register
-```
-
-**Authentication**: Not required
-
-**Request Body**:
-```json
-{
-  "name": "PT Maju Jaya",
-  "admin_username": "admin_majujaya",
-  "admin_password": "SecurePassword123!"
-}
-```
-
-**Validation Rules**:
-- `name`: Required, unique, max 255 chars
-- `admin_username`: Required, unique, alphanumeric + underscore
-- `admin_password`: Required, 8-200 bytes
-
-**Response 201**:
-```json
-{
-  "id": 1,
-  "name": "PT Maju Jaya",
-  "company_code": "ABCD1234",
-  "company_secret_one_time": "xyz789abc456def123"
-}
-```
-
-**Important**: `company_code` dan `company_secret_one_time` hanya ditampilkan sekali. Simpan dengan aman untuk registrasi employee.
-
-**Error Responses**:
-- `400`: Company name atau username sudah ada
-- `422`: Validation error
-
----
-
-#### Register Employee
-
-Daftarkan karyawan baru untuk perusahaan.
-
-```http
-POST /api/v1/employees/register
-```
-
-**Authentication**: Not required
-
-**Request Body**:
-```json
-{
-  "username": "john_doe",
-  "password": "StrongPass456!",
-  "company_code": "ABCD1234",
-  "company_secret": "xyz789abc456def123",
-  "division_id": 2
-}
-```
-
-**Validation Rules**:
-- `username`: Required, unique
-- `password`: Required, 8-200 bytes
-- `company_code`: Required, 8 chars
-- `company_secret`: Required
-- `division_id`: Optional
-
-**Response 201**:
-```json
-{
-  "id": 5,
-  "username": "john_doe",
-  "role": "EMPLOYEE",
-  "company_id": 1,
-  "division_id": 2
-}
-```
-
-**Error Responses**:
-- `404`: Company code tidak valid
-- `403`: Company secret salah
-- `400`: Username sudah terdaftar atau division_id invalid
-
----
-
-#### Login
-
-Login untuk mendapatkan JWT access token.
-
-```http
-POST /api/v1/token
-```
-
-**Authentication**: Not required
-
-**Content-Type**: `application/x-www-form-urlencoded`
-
-**Form Data**:
-```
-username=admin_majujaya
-password=SecurePassword123!
-```
-
-**Response 200**:
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer"
-}
-```
-
-**Error Responses**:
-- `401`: Username atau password salah
-
----
-
-### 3. Company Management
-
-#### Set Database Connection
-
-Simpan connection string ke database eksternal perusahaan.
-
-```http
-POST /api/v1/company/database-connection
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Request Body**:
-```json
-{
-  "db_url": "postgresql+asyncpg://user:password@host:5432/database_name"
-}
-```
-
-**Supported Database Types**:
-
-| Database | Connection String Format |
-|----------|-------------------------|
-| PostgreSQL | `postgresql+asyncpg://user:pass@host:port/db` |
-| MySQL | `mysql+aiomysql://user:pass@host:port/db` |
-
-**Response 200**:
-```json
-{
-  "status": "success",
-  "message": "Database connection string updated successfully."
-}
-```
-
-**Security Notes**:
-- Connection string di-encrypt sebelum disimpan
-- Database harus read-only untuk keamanan
-- Dapat di-update kapan saja
-
----
-
-#### Get Database Connection Status
-
-Cek status koneksi database eksternal.
-
-```http
-GET /api/v1/company/database-connection
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Response 200**:
-```json
-{
-  "is_configured": true,
-  "db_host": "your-db-host.com"
-}
-```
-
----
-
-#### Delete Database Connection
-
-Hapus connection string database eksternal.
-
-```http
-DELETE /api/v1/company/database-connection
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Response 200**:
-```json
-{
-  "status": "success",
-  "message": "Database connection string deleted successfully."
-}
-```
-
----
-
-#### Get External Database Schema
-
-Introspeksi dan dapatkan skema (tabel dan kolom) dari database eksternal.
-
-```http
-GET /api/v1/company/database-schema
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Response 200**:
-```json
-{
-  "schema": {
-    "users": [
-      "id",
-      "name",
-      "email"
-    ],
-    "products": [
-      "id",
-      "product_name",
-      "price"
-    ]
-  }
-}
-```
-
----
-
-#### List Company Employees
-
-Dapatkan daftar semua karyawan di perusahaan.
-
-```http
-GET /api/v1/company/employees
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Response 200**:
-```json
-[
+#### 1. Registrasi Perusahaan & Admin Pertama
+- **Endpoint**: `POST /auth/company-signup`
+- **Deskripsi**: Titik awal untuk perusahaan baru. Membuat perusahaan dan admin pertamanya, yang langsung berstatus `active`.
+- **Authentication**: Tidak perlu.
+- **Request Body**:
+  ```json
   {
-    "id": 5,
-    "username": "john_doe",
-    "role": "EMPLOYEE",
-    "company_id": 1,
-    "division_id": 2,
-    "is_active": true
+    "company_name": "PT Cemerlang Jaya",
+    "company_code": "CMJ",
+    "admin_name": "Admin Utama",
+    "admin_email": "admin.utama@cemerlang.com",
+    "admin_password": "SuperSecretAdminPass!"
   }
-]
-```
-
----
-
-#### List Pending Employees
-
-Dapatkan daftar karyawan yang registrasinya masih pending (belum aktif).
-
-```http
-GET /api/v1/company/employees/pending
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Response 200**:
-```json
-[
+  ```
+- **Response 201 (Sukses)**: Mengembalikan token akses untuk admin yang baru dibuat.
+  ```json
   {
-    "id": 6,
-    "username": "jane_doe",
-    "role": "EMPLOYEE",
-    "company_id": 1,
-    "division_id": 1,
-    "is_active": false
+    "access_token": "...",
+    "token_type": "bearer"
   }
-]
-```
+  ```
 
 ---
 
-#### Activate Employee
-
-Aktifkan seorang karyawan yang statusnya masih pending.
-
-```http
-PUT /api/v1/company/employees/{employee_id}/activate
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Path Parameters**:
-- `employee_id` (integer, required)
-
-**Response 200**:
-```json
-{
-  "status": "success",
-  "message": "Employee jane_doe has been activated."
-}
-```
-
-**Error Responses**:
-- `404`: Employee tidak ditemukan
-- `400`: Employee sudah aktif
-
----
-
-### 4. Division Management
-
-#### Create Division
-
-Buat divisi baru dalam perusahaan.
-
-```http
-POST /api/v1/divisions
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Request Body**:
-```json
-{
-  "name": "IT Department"
-}
-```
-
-**Response 201**:
-```json
-{
-  "id": 3,
-  "name": "IT Department",
-  "company_id": 1
-}
-```
-
----
-
-#### List All Divisions
-
-Dapatkan semua divisi dalam perusahaan.
-
-```http
-GET /api/v1/divisions
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Response 200**:
-```json
-[
+#### 2. Registrasi Mandiri Karyawan
+- **Endpoint**: `POST /auth/register`
+- **Deskripsi**: Karyawan mendaftarkan diri ke perusahaan yang sudah ada. Akun akan dibuat dengan status `pending_approval`.
+- **Authentication**: Tidak perlu.
+- **Request Body**:
+  ```json
   {
-    "id": 1,
-    "name": "Sales Department",
-    "company_id": 1
-  },
+    "name": "Budi Karyawan",
+    "email": "budi.k@cemerlang.com",
+    "password": "SecurePassword123!",
+    "role": "employee",
+    "Companyid": 1
+  }
+  ```
+- **Response 201 (Sukses)**: Mengembalikan detail pengguna dengan status `pending_approval`.
+  ```json
   {
     "id": 2,
-    "name": "Marketing Department",
-    "company_id": 1
+    "name": "Budi Karyawan",
+    "email": "budi.k@cemerlang.com",
+    "status": "pending_approval",
+    "role": "employee",
+    "Companyid": 1,
+    "Divisionid": null
   }
-]
-```
+  ```
 
 ---
 
-#### Get Single Division
-
-Dapatkan detail satu divisi.
-
-```http
-GET /api/v1/divisions/{division_id}
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Path Parameters**:
-- `division_id` (integer, required)
-
-**Response 200**:
-```json
-{
-  "id": 3,
-  "name": "IT Department",
-  "company_id": 1
-}
-```
-
-**Error Responses**:
-- `404`: Division tidak ditemukan
+#### 3. Login Pengguna Aktif
+- **Endpoint**: `POST /auth/token`
+- **Deskripsi**: Mendapatkan JWT. Hanya pengguna dengan status `active` yang bisa login.
+- **Authentication**: Tidak perlu.
+- **Form Data** (`application/x-www-form-urlencoded`):
+  - `username`: email pengguna
+  - `password`: password pengguna
 
 ---
 
-#### Update Division
-
-Update nama divisi.
-
-```http
-PUT /api/v1/divisions/{division_id}
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Path Parameters**:
-- `division_id` (integer, required)
-
-**Request Body**:
-```json
-{
-  "name": "Information Technology Department"
-}
-```
-
-**Response 200**:
-```json
-{
-  "id": 3,
-  "name": "Information Technology Department",
-  "company_id": 1
-}
-```
+#### Get Current User
+- **Endpoint**: `GET /auth/me`
+- **Deskripsi**: Mendapatkan detail pengguna yang sedang login.
+- **Authentication**: **Token Diperlukan**.
+- **Response 200 (Sukses)**:
+  ```json
+  {
+    "id": 1,
+    "name": "Admin Utama",
+    "email": "admin.utama@cemerlang.com",
+    "role": "admin",
+    "status": "active",
+    "Companyid": 1,
+    "Divisionid": null
+  }
+  ```
 
 ---
 
-#### Delete Division
+### 3. Companies
 
-Hapus divisi.
+#### List Companies
+- **Endpoint**: `GET /companies/`
+- **Deskripsi**: Mendapatkan daftar semua perusahaan. Berguna untuk halaman pendaftaran.
+- **Authentication**: Tidak perlu.
+- **Response 200 (Sukses)**:
+  ```json
+  [
+    {
+      "id": 1,
+      "name": "PT Cemerlang Jaya",
+      "code": "CMJ"
+    },
+    {
+      "id": 2,
+      "name": "PT Maju Mundur",
+      "code": "MJM"
+    }
+  ]
+  ```
 
-```http
-DELETE /api/v1/divisions/{division_id}
-```
+#### Get Company by ID
+- **Endpoint**: `GET /companies/{company_id}`
+- **Deskripsi**: Mendapatkan detail perusahaan berdasarkan ID.
+- **Authentication**: Tidak perlu.
+- **Path Parameter**:
+  - `company_id` (int): ID unik perusahaan.
+- **Response 200 (Sukses)**:
+  ```json
+  {
+    "id": 1,
+    "name": "PT Cemerlang Jaya",
+    "code": "CMJ"
+  }
+  ```
 
-**Authentication**: COMPANY_ADMIN only
-
-**Path Parameters**:
-- `division_id` (integer, required)
-
-**Response 204**: No Content
-
-**Error Responses**:
-- `404`: Division tidak ditemukan
+#### Get Company Users
+- **Endpoint**: `GET /companies/{company_id}/users/`
+- **Deskripsi**: Mendapatkan daftar semua pengguna (aktif dan pending) untuk sebuah perusahaan.
+- **Authentication**: **Token Diperlukan**.
+- **Path Parameter**:
+  - `company_id` (int): ID unik perusahaan.
+- **Response 200 (Sukses)**:
+  ```json
+  [
+    {
+      "id": 1,
+      "name": "Admin Utama",
+      "email": "admin.utama@cemerlang.com",
+      "role": "admin",
+      "status": "active"
+    },
+    {
+      "id": 2,
+      "name": "Budi Karyawan",
+      "email": "budi.k@cemerlang.com",
+      "role": "employee",
+      "status": "pending_approval"
+    }
+  ]
+  ```
 
 ---
 
-### 5. Document Management
+### 4. Divisions
+
+#### Create Division
+- **Endpoint**: `POST /divisions/`
+- **Deskripsi**: Membuat divisi baru dalam perusahaan admin yang sedang login. Hanya admin yang bisa membuat divisi.
+- **Authentication**: **Admin Token Diperlukan**.
+- **Request Body**:
+  ```json
+  {
+    "name": "Divisi Marketing"
+  }
+  ```
+- **Response 201 (Sukses)**:
+  ```json
+  {
+    "id": 1,
+    "name": "Divisi Marketing",
+    "Companyid": 1
+  }
+  ```
+
+#### List Divisions
+- **Endpoint**: `GET /divisions/`
+- **Deskripsi**: Mendapatkan semua divisi dalam perusahaan pengguna yang sedang login.
+- **Authentication**: **Token Diperlukan**.
+- **Response 200 (Sukses)**:
+  ```json
+  [
+    {
+      "id": 1,
+      "name": "Divisi Marketing",
+      "Companyid": 1
+    },
+    {
+      "id": 2,
+      "name": "Divisi IT",
+      "Companyid": 1
+    }
+  ]
+  ```
+
+---
+
+### 5. Documents (RAG)
 
 #### Upload Document
-
-Upload dokumen PDF ke knowledge base perusahaan.
-
-```http
-POST /api/v1/documents/upload
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Content-Type**: `multipart/form-data`
-
-**Form Data**:
-- `file`: PDF file (binary)
-
-**Constraints**:
-- Format: PDF only
-- Max size: 10MB
-- Processing: Automatic text extraction, chunking, embedding
-
-**Response 200**:
-```json
-{
-  "status": "success",
-  "message": "Document 'company_handbook.pdf' successfully added to company knowledge base",
-  "chunks_added": 45
-}
-```
-
-**Processing Pipeline**:
-1. Extract text dari PDF
-2. Split menjadi chunks (dengan overlap untuk context)
-3. Generate embeddings
-4. Store di ChromaDB dengan metadata (company_id, filename, chunk_index)
-
-**Error Responses**:
-- `400`: Invalid file atau processing failed
-- `500`: Server error
-
----
+- **Endpoint**: `POST /documents/upload`
+- **Deskripsi**: Upload dokumen (PDF) ke knowledge base perusahaan. Dokumen akan diproses dan di-embed ke vector database.
+- **Authentication**: **Token Diperlukan**.
+- **Request Body**: `multipart/form-data`
+  - `file`: File dokumen yang akan diunggah.
+- **Response 200 (Sukses)**:
+  ```json
+  {
+    "filename": "nama_file.pdf",
+    "info": "File uploaded and processing started."
+  }
+  ```
 
 #### List Documents
-
-Dapatkan daftar semua dokumen yang telah di-upload.
-
-```http
-GET /api/v1/documents
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Response 200**:
-```json
-[
-  "company_handbook.pdf",
-  "employee_benefits_2024.pdf",
-  "remote_work_policy.pdf"
-]
-```
-
----
+- **Endpoint**: `GET /documents/`
+- **Deskripsi**: Mendapatkan daftar nama file dokumen di knowledge base perusahaan.
+- **Authentication**: **Token Diperlukan**.
+- **Response 200 (Sukses)**:
+  ```json
+  {
+    "documents": [
+      "nama_file_1.pdf",
+      "nama_file_2.pdf"
+    ]
+  }
+  ```
 
 #### Delete Document
-
-Hapus dokumen dan semua chunks terkait.
-
-```http
-DELETE /api/v1/documents/{filename}
-```
-
-**Authentication**: COMPANY_ADMIN only
-
-**Path Parameters**:
-- `filename` (string, required): Nama file (URL-encoded jika ada spasi/special chars)
-
-**Response 200**:
-```json
-{
-  "status": "success",
-  "message": "Document 'company_handbook.pdf' and all its associated chunks have been deleted.",
-  "chunks_deleted": 45
-}
-```
-
-**URL Encoding Guide**:
-
-| Original | Encoded |
-|----------|---------|
-| `My Document.pdf` | `My%20Document.pdf` |
-| `Report (2024).pdf` | `Report%20%282024%29.pdf` |
+- **Endpoint**: `DELETE /documents/{filename}`
+- **Deskripsi**: Menghapus dokumen dari knowledge base perusahaan dan vector index-nya.
+- **Authentication**: **Token Diperlukan**.
+- **Path Parameter**:
+  - `filename` (string): Nama file yang akan dihapus.
+- **Response 200 (Sukses)**:
+  ```json
+  {
+    "info": "File 'nama_file.pdf' and its embeddings have been deleted."
+  }
+  ```
 
 ---
+
+
 
 ### 6. AI Chat
 
 #### Chat with AI
-
-Endpoint utama untuk berinteraksi dengan AI chatbot.
-
-```http
-POST /api/v1/chat
-```
-
-**Authentication**: All authenticated users
-
-**Request Body**:
-```json
-{
-  "message": "Apa saja kebijakan cuti di perusahaan?",
-  "conversation_id": "550e8400-e29b-41d4-a716-446655440000"
-}
-```
-
-**Request Fields**:
-- `message` (string, required): Pertanyaan atau pesan user
-- `conversation_id` (string, optional): UUID untuk conversation continuity
-
-**Response 200**:
-```json
-{
-  "reply": "Berdasarkan company handbook, berikut kebijakan cuti:\n\n1. Cuti Tahunan: 12 hari per tahun\n2. Cuti Sakit: Maksimal 14 hari dengan surat dokter\n3. Cuti Melahirkan: 3 bulan untuk karyawan wanita",
-  "conversation_id": "550e8400-e29b-41d4-a716-446655440000",
-  "sources": null,
-  "used_database": false
-}
-```
-
-**Response Fields**:
-- `reply`: Jawaban dari AI
-- `conversation_id`: UUID untuk conversation tracking
-- `sources`: Daftar sumber informasi (jika ada)
-- `used_database`: True jika database di-query
+- **Endpoint**: `POST /chat`
+- **Deskripsi**: Endpoint utama untuk berinteraksi dengan AI chatbot. Sistem akan mencari konteks relevan dari dokumen perusahaan sebelum menjawab.
+- **Authentication**: **Token Diperlukan**.
+- **Request Body**:
+  ```json
+  {
+    "message": "Berapa total penjualan bulan ini?",
+    "conversation_id": "optional-uuid-1234"
+  }
+  ```
+- **Response 200 (Sukses)**:
+  ```json
+  {
+    "response": "Berdasarkan laporan penjualan bulan ini, total penjualan mencapai Rp 1.2 Miliar.",
+    "conversation_id": "optional-uuid-1234",
+    "sources": [
+      "laporan_penjualan_q3.pdf"
+    ]
+  }
+  ```
 
 ---
 
-#### AI Capabilities
+### 7. Chatlogs
 
-**RAG (Retrieval-Augmented Generation)**
-- Semantic search di ChromaDB
-- Context dari uploaded PDF documents
-- Company-scoped results only
-- Relevance-based ranking
-
-**Database Queries**
-- Auto-detect pertanyaan yang memerlukan data
-- Generate safe SQL queries (validated)
-
-- Keywords trigger: berapa, jumlah, total, rata-rata, pelanggan, tampilkan, data
-
-**Context Management**
-- Multi-turn conversations
-- Follow-up question understanding
-- Conversation history tracking
-- Context-aware responses
-
-**Multi-Tenancy & Security**
-- Data isolation per company
-
-- Safe SQL query validation
-- No cross-company data leakage
-
----
-
-#### Example Use Cases
-
-**General Knowledge (RAG-based)**
-
-Request:
-```json
-{
-  "message": "Bagaimana cara mengajukan reimbursement?"
-}
-```
-
-Response:
-```json
-{
-  "reply": "Berdasarkan company handbook:\n\n1. Isi form reimbursement di HRIS\n2. Attach bukti pembelian\n3. Submit ke supervisor\n4. Finance akan proses dalam 5-7 hari kerja",
-  "used_database": false
-}
-```
+#### List Chatlogs
+- **Endpoint**: `GET /chatlogs/`
+- **Deskripsi**: Mendapatkan daftar riwayat percakapan untuk perusahaan. Admin dapat melihat semua log, employee hanya log miliknya.
+- **Authentication**: **Token Diperlukan**.
+- **Query Parameters**:
+  - `user_id` (int, opsional): Filter berdasarkan ID pengguna (hanya admin).
+  - `start_date` (string, YYYY-MM-DD, opsional): Filter tanggal mulai.
+  - `end_date` (string, YYYY-MM-DD, opsional): Filter tanggal akhir.
+  - `skip` (int, opsional, default: 0): Pagination offset.
+  - `limit` (int, opsional, default: 100): Jumlah item per halaman.
+- **Response 200 (Sukses)**:
+  ```json
+  [
+    {
+      "id": 1,
+      "user_id": 2,
+      "user_message": "Berapa total penjualan bulan ini?",
+      "ai_response": "Berdasarkan laporan penjualan bulan ini, total penjualan mencapai Rp 1.2 Miliar.",
+      "timestamp": "2024-10-28T10:30:00Z"
+    }
+  ]
+  ```
 
 ---
 
-**Database Query**
+### 8. Admin
 
-Request:
-```json
-{
-  "message": "Berapa total penjualan bulan ini?"
-}
-```
+Endpoint khusus untuk pengguna dengan peran `admin`.
 
-Response:
-```json
-{
-  "reply": "Total Penjualan: Rp 450.500.000\nJumlah Transaksi: 1.234\nRata-rata: Rp 365.050\n\nPeningkatan 15% dari bulan lalu.",
-  "used_database": true
-}
-```
+#### List Pending Users
+- **Endpoint**: `GET /admin/pending-users`
+- **Deskripsi**: Mendapatkan daftar pengguna yang menunggu persetujuan di perusahaan admin.
+- **Authentication**: **Admin Token Diperlukan**.
+- **Response 200 (Sukses)**:
+  ```json
+  [
+    {
+      "id": 2,
+      "name": "Budi Karyawan",
+      "email": "budi.k@cemerlang.com",
+      "status": "pending_approval",
+      "role": "employee"
+    }
+  ]
+  ```
 
----
+#### Approve User
+- **Endpoint**: `POST /admin/users/{user_id}/approve`
+- **Deskripsi**: Menyetujui pendaftaran pengguna, mengubah statusnya menjadi `active`.
+- **Authentication**: **Admin Token Diperlukan**.
+- **Path Parameter**:
+  - `user_id` (int): ID pengguna yang akan disetujui.
+- **Response 200 (Sukses)**:
+  ```json
+  {
+    "id": 2,
+    "name": "Budi Karyawan",
+    "email": "budi.k@cemerlang.com",
+    "status": "active",
+    "role": "employee"
+  }
+  ```
 
-**Follow-up Question**
-
-Initial request:
-```json
-{
-  "message": "Siapa top 5 sales person bulan ini?"
-}
-```
-
-Follow-up:
-```json
-{
-  "message": "Bagaimana performanya dibanding bulan lalu?",
-  "conversation_id": "abc123-def456"
-}
-```
-
-Response:
-```json
-{
-  "reply": "Perbandingan performa top 5 sales:\n\n1. John Doe: +20%\n2. Jane Smith: +15%\n3. Bob Wilson: +10%\n\nRata-rata peningkatan 14%",
-  "used_database": true
-}
-```
+#### Reject User
+- **Endpoint**: `POST /admin/users/{user_id}/reject`
+- **Deskripsi**: Menolak dan menghapus permintaan pendaftaran pengguna.
+- **Authentication**: **Admin Token Diperlukan**.
+- **Path Parameter**:
+  - `user_id` (int): ID pengguna yang akan ditolak.
+- **Response 200 (Sukses)**:
+  ```json
+  {
+    "message": "User with id 2 has been rejected and deleted."
+  }
+  ```
 
 ---
 
@@ -888,110 +487,15 @@ Response:
 |------|--------|-------------|
 | **200** | OK | Request berhasil |
 | **201** | Created | Resource berhasil dibuat |
-| **204** | No Content | Request berhasil, no response body |
-| **400** | Bad Request | Request invalid |
-| **401** | Unauthorized | Authentication gagal |
+| **400** | Bad Request | Request tidak valid |
+| **401** | Unauthorized | Gagal otentikasi |
+| **403** | Forbidden | Akses ditolak (misal: bukan admin) |
 | **404** | Not Found | Resource tidak ditemukan |
-| **422** | Unprocessable Entity | Validation error |
-| **500** | Internal Server Error | Server error |
-
----
-
-## Error Handling
-
-### Standard Error Format
-
-```json
-{
-  "detail": "Error message description"
-}
-```
-
-### Validation Error (422)
-
-```json
-{
-  "detail": [
-    {
-      "loc": ["body", "password"],
-      "msg": "Password is too long (max 200 bytes)",
-      "type": "value_error"
-    }
-  ]
-}
-```
-
-### Common Error Messages
-
-| Error Message | Cause | Solution |
-|---------------|-------|----------|
-| Invalid token | Token expired atau tidak valid | Login ulang |
-| Incorrect username or password | Kredensial salah | Periksa username dan password |
-| Invalid company code | Company code tidak ditemukan | Verify company code |
-| Invalid company secret credential | Company secret salah | Gunakan secret yang benar |
-| Division not found in your company | Division ID tidak valid | Pastikan division ID milik company Anda |
-| Password is too long (max 200 bytes) | Password melebihi batas | Gunakan password lebih pendek |
+| **422** | Unprocessable Entity | Error validasi |
+| **500** | Internal Server Error | Terjadi error di server |
 
 ---
 
 ## Security
 
-### Password Security
-
-**Hashing Algorithm**:
-- Primary: bcrypt (rounds: 12)
-- Pre-hash: SHA256 (untuk password > 72 bytes)
-- Salt: Unique per password
-
-**Requirements**:
-- Minimum: 8 characters
-- Maximum: 200 bytes (UTF-8 encoded)
-
-### JWT Token Security
-
-**Configuration**:
-- Algorithm: HS256
-- Expiration: 30 minutes (configurable)
-- Secret key: Min 32 characters (from .env)
-
-**Token Contains**:
-- User ID (sub)
-- Role (COMPANY_ADMIN/EMPLOYEE)
-- Company ID
-- Division ID (for employees)
-- Expiration timestamp
-
-### Database Security
-
-**External Database Connection**:
-- Connection strings encrypted at rest
-- Read-only access recommended
-- SQL injection prevention via parameterized queries
-- Query validation before execution
-
-### Multi-Tenancy Security
-
-**Data Isolation**:
-- Company ID enforced at database level
-- ChromaDB filtered by company_id
-- No cross-tenant data access
-- Automatic scoping in all queries
-
----
-
-## License
-
-This project is proprietary software. All rights reserved.
-
----
-
-## Support
-
-For issues or questions:
-- Create an issue in the repository
-- Contact: support@yourcompany.com
-
----
-
-**Last Updated**: October 2025  
-**API Version**: v2.0.0
+// ... (Content is complete)

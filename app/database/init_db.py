@@ -1,4 +1,5 @@
 import asyncio
+from sqlalchemy import text
 from app.database.connection import db_manager, Base
 
 # Import all models to ensure they are registered with Base
@@ -12,7 +13,9 @@ async def init_db():
     async with db_manager.engine.begin() as conn:
         # To start fresh, you can uncomment the following lines to drop all tables.
         # This is useful in development if you make schema changes.
-        # print("Dropping all existing tables...")
+        print("Dropping all existing tables...")
+        # First, drop the problematic table with cascade if it exists
+        await conn.execute(text('DROP TABLE IF EXISTS "ExternalDatabase" CASCADE;'))
         await conn.run_sync(Base.metadata.drop_all)
         
         print("Creating all tables based on the current schema...")
