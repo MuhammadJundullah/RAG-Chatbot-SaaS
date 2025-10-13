@@ -72,16 +72,6 @@ Password:     bcrypt
 
 ## Getting Started
 
-### Running with Docker (Recommended)
-
-// ... (Content is complete)
-
-### Running Locally (Without Docker)
-
-// ... (Content is complete)
-
----
-
 ## Authentication Flow
 
 Aplikasi ini menggunakan alur registrasi yang berbeda untuk admin pertama perusahaan dan untuk karyawan berikutnya.
