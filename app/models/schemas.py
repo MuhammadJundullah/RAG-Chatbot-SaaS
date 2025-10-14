@@ -18,30 +18,7 @@ class CompanyUpdate(BaseModel):
 
 class Company(CompanyBase):
     id: int
-
-    class Config:
-        from_attributes = True
-
-
-class CompanyAdminCreate(BaseModel):
-    company_name: str
-    company_code: str
-    company_logo: Optional[str] = None
-    admin_name: str
-    admin_email: str
-    admin_password: str
-
-# --- Division Models ---
-
-class DivisionBase(BaseModel):
-    name: str
-    Companyid: int
-
-class DivisionCreate(DivisionBase):
-    pass
-
-class Division(DivisionBase):
-    id: int
+    is_approved: bool
 
     class Config:
         from_attributes = True
@@ -51,26 +28,44 @@ class Division(DivisionBase):
 class UserBase(BaseModel):
     name: str
     email: str
-    status: Optional[str] = None
 
-class UserCreate(UserBase):
+class UserRegistration(BaseModel):
+    name: str
+    email: str
     password: str
-    role: str  # 'admin' or 'employee'
-    Companyid: int
-    Divisionid: Optional[int] = None
+    # For new company registration
+    company_name: Optional[str] = None
+    company_code: Optional[str] = None
+    # For joining an existing company
+    company_id: Optional[int] = None
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     password: Optional[str] = None
-    status: Optional[str] = None
-    Divisionid: Optional[int] = None
+    division_id: Optional[int] = None
 
 class User(UserBase):
     id: int
+    is_super_admin: bool
+    is_active_in_company: bool
     role: str
-    Companyid: int
-    Divisionid: Optional[int] = None
+    company_id: Optional[int] = None
+    class Config:
+        from_attributes = True
+
+
+# --- Division Models ---
+
+class DivisionBase(BaseModel):
+    name: str
+    company_id: int
+
+class DivisionCreate(DivisionBase):
+    pass
+
+class Division(DivisionBase):
+    id: int
 
     class Config:
         from_attributes = True
@@ -87,7 +82,7 @@ class AdminCreate(BaseModel):
 class DocumentBase(BaseModel):
     title: str
     isi_dokumen: str
-    Companyid: int
+    company_id: int
 
 
 
@@ -107,7 +102,7 @@ class ChatlogBase(BaseModel):
     question: str
     answer: str
     UsersId: int
-    Companyid: int
+    company_id: int
 
 class ChatlogCreate(ChatlogBase):
     pass

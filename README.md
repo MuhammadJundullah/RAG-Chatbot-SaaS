@@ -14,18 +14,20 @@ Platform SaaS untuk chatbot AI yang disesuaikan dengan konteks perusahaan menggu
 - [Key Features](#key-features)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
-- [Authentication Flow](#authentication-flow)
+  - [Menggunakan Docker (Direkomendasikan)](#menggunakan-docker-direkomendasikan)
+  - [Tanpa Docker (Lingkungan Lokal)](#tanpa-docker-lingkungan-lokal)
+- [Authentication and Approval Flow](#authentication-and-approval-flow)
   - [User Roles](#user-roles)
   - [Token Structure](#token-structure)
 - [API Endpoints](#api-endpoints)
   - [1. Health and Status](#1-health-and-status)
   - [2. Authentication](#2-authentication)
-  - [3. Companies](#3-companies)
-  - [4. Divisions](#4-divisions)
-  - [5. Documents (RAG)](#5-documents-rag)
-  - [6. AI Chat](#6-ai-chat)
-  - [7. Chatlogs](#7-chatlogs)
-  - [8. Admin](#8-admin)
+  - [3. Super Admin](#3-super-admin)
+  - [4. Companies & Company Admin](#4-companies--company-admin)
+  - [5. Divisions](#5-divisions)
+  - [6. Documents (RAG)](#6-documents-rag)
+  - [7. AI Chat](#7-ai-chat)
+  - [8. Chatlogs](#8-chatlogs)
 - [Response Codes](#response-codes)
 - [Security](#security)
 
@@ -155,30 +157,31 @@ Pastikan Anda telah menginstal Docker dan Docker Compose di sistem Anda.
 
 
 
-## Authentication Flow
+## Authentication and Approval Flow
 
-Aplikasi ini menggunakan alur registrasi yang berbeda untuk admin pertama perusahaan dan untuk karyawan berikutnya.
+Aplikasi ini menggunakan alur registrasi dan persetujuan multi-tingkat yang melibatkan tiga jenis pengguna: Pengguna Baru, Admin Perusahaan, dan Super Admin.
 
-1.  **Pendaftaran Perusahaan & Admin Pertama**
-    - Pengguna baru mendaftarkan perusahaannya dan akun adminnya sekaligus melalui `POST /auth/company-signup`.
-    - Akun admin ini langsung aktif dan menerima token untuk sesi pertama.
+1.  **Pendaftaran (Unified Endpoint)**
+    - Seorang pengguna baru dapat mendaftar dengan dua cara melalui satu endpoint `POST /auth/register`:
+        - **Mendaftarkan Perusahaan Baru**: Dengan menyertakan detail perusahaan (`company_name`, `company_code`), sebuah perusahaan baru akan dibuat dengan status `pending approval`, dan pengguna akan menjadi `Company Admin` untuk perusahaan tersebut.
+        - **Bergabung dengan Perusahaan**: Dengan menyertakan `company_id` dari perusahaan yang sudah ada, pengguna akan mendaftar sebagai `Employee` dengan status `pending approval`.
 
-2.  **Pendaftaran Mandiri Karyawan**
-    - Calon karyawan mendaftarkan diri ke perusahaan yang sudah ada menggunakan `POST /auth/register`.
-    - Akun baru ini akan dibuat dengan status `pending_approval` dan belum bisa digunakan.
+2.  **Persetujuan Perusahaan (Super Admin)**
+    - Seorang `Super Admin` (dibuat manual atau melalui script) dapat melihat semua perusahaan yang menunggu persetujuan melalui `GET /admin/companies/pending`.
+    - Super Admin kemudian dapat menyetujui perusahaan menggunakan `POST /admin/companies/{company_id}/approve`. Setelah disetujui, perusahaan dan adminnya menjadi aktif.
 
-3.  **Persetujuan oleh Admin**
-    - Admin perusahaan akan melihat daftar pendaftar di `GET /admin/pending-users`.
-    - Admin dapat menyetujui pendaftaran melalui `POST /admin/users/{user_id}/approve`.
+3.  **Persetujuan Karyawan (Company Admin)**
+    - `Company Admin` dari perusahaan yang sudah disetujui dapat melihat karyawan yang menunggu persetujuan di perusahaannya melalui `GET /company/pending-employees`.
+    - Company Admin dapat menyetujui karyawan menggunakan `POST /company/employees/{user_id}/approve`, yang mengaktifkan akun karyawan tersebut.
 
-4.  **Login Karyawan**
-    - Setelah disetujui, status karyawan menjadi `active`.
-    - Karyawan tersebut sekarang dapat login melalui `POST /auth/token` untuk mendapatkan token akses.
+4.  **Login**
+    - Setelah akun mereka aktif (baik oleh Super Admin atau Company Admin), pengguna dapat login melalui `POST /auth/token` untuk mendapatkan token akses JWT.
 
 ### User Roles
 
-- **admin**: Hak akses administratif, termasuk mengelola (menyetujui/menolak) pengguna.
-- **employee**: Pengguna standar yang dapat berinteraksi dengan chatbot.
+- **Super Admin**: Memiliki hak akses tertinggi untuk mengelola seluruh platform, termasuk menyetujui atau menolak pendaftaran perusahaan baru.
+- **Company Admin**: Hak akses administratif untuk satu perusahaan, termasuk mengelola (menyetujui/menolak) pendaftaran karyawan baru di perusahaannya.
+- **Employee**: Pengguna standar yang dapat berinteraksi dengan chatbot setelah disetujui oleh Company Admin.
 
 ### Token Structure
 
@@ -211,63 +214,47 @@ Aplikasi ini menggunakan alur registrasi yang berbeda untuk admin pertama perusa
 
 ### 2. Authentication
 
-#### 1. Registrasi Perusahaan & Admin Pertama
-- **Endpoint**: `POST /auth/company-signup`
-- **Deskripsi**: Titik awal untuk perusahaan baru. Membuat perusahaan dan admin pertamanya, yang langsung berstatus `active`.
-- **Authentication**: Tidak perlu.
-- **Request Body**:
-  ```json
-  {
-    "company_name": "PT Cemerlang Jaya",
-    "company_code": "CMJ",
-    "admin_name": "Admin Utama",
-    "admin_email": "admin.utama@cemerlang.com",
-    "admin_password": "SuperSecretAdminPass!"
-  }
-  ```
-- **Response 201 (Sukses)**: Mengembalikan token akses untuk admin yang baru dibuat.
-  ```json
-  {
-    "access_token": "...",
-    "token_type": "bearer"
-  }
-  ```
-
----
-
-#### 2. Registrasi Mandiri Karyawan
+#### 1. Unified User & Company Registration
 - **Endpoint**: `POST /auth/register`
-- **Deskripsi**: Karyawan mendaftarkan diri ke perusahaan yang sudah ada. Akun akan dibuat dengan status `pending_approval`.
+- **Deskripsi**: Titik masuk tunggal untuk registrasi. Dapat membuat perusahaan baru atau mendaftarkan karyawan ke perusahaan yang sudah ada.
 - **Authentication**: Tidak perlu.
-- **Request Body**:
+- **Request Body (Untuk Perusahaan Baru)**:
+  ```json
+  {
+    "name": "Admin Utama",
+    "email": "admin.utama@cemerlang.com",
+    "password": "SuperSecretAdminPass!",
+    "company_name": "PT Cemerlang Jaya",
+    "company_code": "CMJ"
+  }
+  ```
+- **Request Body (Untuk Karyawan Baru)**:
+  *Catatan: Untuk mendaftar sebagai karyawan, sertakan `company_id` dan hilangkan `company_name` & `company_code`.*
   ```json
   {
     "name": "Budi Karyawan",
     "email": "budi.k@cemerlang.com",
     "password": "SecurePassword123!",
-    "role": "employee",
-    "Companyid": 1,
-    "Divisionid": 1
+    "company_id": 1
   }
   ```
-- **Response 201 (Sukses)**: Mengembalikan detail pengguna dengan status `pending_approval`.
+- **Response 201 (Sukses)**: Mengembalikan pesan konfirmasi.
   ```json
+  // Contoh untuk perusahaan baru
   {
-    "id": 2,
-    "name": "Budi Karyawan",
-    "email": "budi.k@cemerlang.com",
-    "status": "pending_approval",
-    "role": "employee",
-    "Companyid": 1,
-    "Divisionid": 1
+    "message": "Company 'PT Cemerlang Jaya' and admin user 'admin.utama@cemerlang.com' registered successfully. Pending approval from a super admin."
+  }
+  // Contoh untuk karyawan baru
+  {
+    "message": "User 'budi.k@cemerlang.com' registered for company ID 1. Pending approval from the company admin."
   }
   ```
 
 ---
 
-#### 3. Login Pengguna Aktif
+#### 2. Login Pengguna Aktif
 - **Endpoint**: `POST /auth/token`
-- **Deskripsi**: Mendapatkan JWT. Hanya pengguna dengan status `active` yang bisa login.
+- **Deskripsi**: Mendapatkan JWT. Hanya pengguna dengan akun aktif yang bisa login.
 - **Authentication**: Tidak perlu.
 - **Request Body** (`application/json`):
   - `email`: email pengguna
@@ -275,26 +262,60 @@ Aplikasi ini menggunakan alur registrasi yang berbeda untuk admin pertama perusa
 
 ---
 
-#### Get Current User
+#### 3. Get Current User
 - **Endpoint**: `GET /auth/me`
 - **Deskripsi**: Mendapatkan detail pengguna yang sedang login.
 - **Authentication**: **Token Diperlukan**.
-- **Response 200 (Sukses)**:
-  ```json
-  {
-    "id": 1,
-    "name": "Admin Utama",
-    "email": "admin.utama@cemerlang.com",
-    "role": "admin",
-    "status": "active",
-    "Companyid": 1,
-    "Divisionid": null
-  }
-  ```
 
 ---
 
-### 3. Companies
+### 3. Super Admin
+
+Endpoint khusus untuk pengguna dengan `is_super_admin = true`.
+
+#### List Pending Companies
+- **Endpoint**: `GET /admin/companies/pending`
+- **Deskripsi**: Mendapatkan daftar perusahaan yang menunggu persetujuan.
+- **Authentication**: **Super Admin Token Diperlukan**.
+
+#### Approve Company
+- **Endpoint**: `POST /admin/companies/{company_id}/approve`
+- **Deskripsi**: Menyetujui pendaftaran perusahaan, mengaktifkan perusahaan dan adminnya.
+- **Authentication**: **Super Admin Token Diperlukan**.
+- **Path Parameter**:
+  - `company_id` (int): ID perusahaan yang akan disetujui.
+
+---
+
+### 4. Companies & Company Admin
+
+#### List Companies
+- **Endpoint**: `GET /companies/`
+- **Deskripsi**: Mendapatkan daftar semua perusahaan yang telah disetujui. Berguna untuk halaman pendaftaran.
+- **Authentication**: Tidak perlu.
+
+#### Get Company by ID
+- **Endpoint**: `GET /companies/{company_id}`
+- **Deskripsi**: Mendapatkan detail perusahaan berdasarkan ID.
+- **Authentication**: Tidak perlu.
+
+#### Get Company Users
+- **Endpoint**: `GET /companies/{company_id}/users/`
+- **Deskripsi**: Mendapatkan daftar semua pengguna untuk sebuah perusahaan.
+- **Authentication**: **Token Diperlukan**.
+
+#### List Pending Employees (Company Admin)
+- **Endpoint**: `GET /company/pending-employees`
+- **Deskripsi**: Mendapatkan daftar pengguna yang menunggu persetujuan di perusahaan admin.
+- **Authentication**: **Company Admin Token Diperlukan**.
+
+#### Approve Employee (Company Admin)
+- **Endpoint**: `POST /company/employees/{user_id}/approve`
+- **Deskripsi**: Menyetujui pendaftaran karyawan, mengubah statusnya menjadi aktif.
+- **Authentication**: **Company Admin Token Diperlukan**.
+- **Path Parameter**:
+  - `user_id` (int): ID pengguna yang akan disetujui.
+
 
 #### List Companies
 - **Endpoint**: `GET /companies/`

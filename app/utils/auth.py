@@ -60,3 +60,26 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
         raise credentials_exception
         
     return user
+
+async def get_current_super_admin(current_user: schema.Users = Depends(get_current_user)) -> schema.Users:
+    """Dependency to ensure the user is a super admin."""
+    if not current_user.is_super_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The user does not have super admin privileges",
+        )
+    return current_user
+
+async def get_current_company_admin(current_user: schema.Users = Depends(get_current_user)) -> schema.Users:
+    """Dependency to ensure the user is a company admin and the company is approved."""
+    if not current_user.role == 'admin' or not current_user.is_active_in_company:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not an active admin for the company",
+        )
+    if not current_user.company.is_approved:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Company is not approved yet.",
+        )
+    return current_user

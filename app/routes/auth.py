@@ -15,72 +15,30 @@ router = APIRouter(
 )
 
 
-@router.post("/company-signup", status_code=status.HTTP_201_CREATED)
-async def company_signup(
-    data: schemas.CompanyAdminCreate, db: AsyncSession = Depends(db_manager.get_db_session)
-):
-    """
-    Handles the registration of a new company and its first admin user.
-    """
-    # Check if company or admin email already exists
-    db_company = await crud.get_company_by_name(db, name=data.company_name)
-    if db_company:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Company name already registered.",
-        )
-    
-    db_user = await crud.get_user_by_email(db, email=data.admin_email)
-    if db_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered.",
-        )
 
-    company, admin = await crud.create_company_and_admin(db, data=data)
-    
-    # Create access token for the new admin
-    access_token = auth.create_access_token(
-        data={
-            "sub": admin.email,
-            "role": admin.role,
-            "company_id": company.id,
-        }
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
-
-
-@router.post("/register", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
-async def register_user(
-    user: schemas.UserCreate, 
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+async def register(
+    user_data: schemas.UserRegistration, 
     db: AsyncSession = Depends(db_manager.get_db_session)
 ):
     """
-    Handles self-registration for a user to a specific company.
-    The user's status will be 'pending_approval' until an admin approves them.
+    Handles unified registration for both new companies and new employees.
+
+    - **To register a new company:** Provide `name`, `email`, `password`, `company_name`, and `company_code`.
+    - **To register as an employee for an existing company:** Provide `name`, `email`, `password`, and `company_id`.
     """
-    db_user = await crud.get_user_by_email(db, email=user.email)
-    if db_user:
+    user = await crud.register_user(db, user_data=user_data)
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered.",
+            detail="Email or company name may already be registered, or company ID not found.",
         )
-
-    db_company = await crud.get_company(db, company_id=user.Companyid)
-    if not db_company:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Company with id {user.Companyid} not found."
-        )
-
-    # Override status to pending_approval
-    user_data = user.model_dump()
-    user_data["status"] = "pending_approval"
     
-    # Create a new UserCreate schema with the modified data
-    pending_user = schemas.UserCreate(**user_data)
+    if user.role == 'admin':
+        return {"message": f"Company '{user_data.company_name}' and admin user '{user.email}' registered successfully. Pending approval from a super admin."}
+    else:
+        return {"message": f"User '{user.email}' registered for company ID {user_data.company_id}. Pending approval from the company admin."}
 
-    return await crud.create_user(db=db, user=pending_user)
 
 
 @router.post("/token", response_model=schemas.Token)
@@ -96,17 +54,17 @@ async def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if user.status != "active":
+    if not user.is_active_in_company and not user.is_super_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"User account is not active. Current status: {user.status}"
+            detail=f"User account is not active. Please contact your company admin for approval."
         )
 
     access_token = auth.create_access_token(
         data={
             "sub": user.email,
             "role": user.role,
-            "company_id": user.Companyid,
+            "company_id": user.company_id,
         }
     )
     return {"access_token": access_token, "token_type": "bearer"}

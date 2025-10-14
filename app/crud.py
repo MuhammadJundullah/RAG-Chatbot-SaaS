@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import joinedload
 from typing import Optional
 from datetime import date
 from app.database import schema
@@ -24,33 +25,110 @@ async def get_companies(db: AsyncSession, skip: int = 0, limit: int = 100):
     result = await db.execute(select(schema.Company).offset(skip).limit(limit))
     return result.scalars().all()
 
-async def create_company(db: AsyncSession, company: schemas.CompanyCreate):
-    db_company = schema.Company(**company.model_dump())
-    db.add(db_company)
+
+# --- User & Company Registration CRUD ---
+
+async def register_user(db: AsyncSession, user_data: schemas.UserRegistration):
+    """
+    Registers a new user. Can either create a new company or assign to an existing one.
+    """
+    # Check if user already exists
+    existing_user = await get_user_by_email(db, email=user_data.email)
+    if existing_user:
+        return None # Or raise an exception
+
+    hashed_password = get_password_hash(user_data.password)
+    
+    # Case 1: New Company Registration
+    if user_data.company_name and user_data.company_code:
+        # Check if company already exists
+        existing_company = await get_company_by_name(db, name=user_data.company_name)
+        if existing_company:
+            return None # Or raise an exception
+
+        # Create new company (pending approval)
+        new_company = schema.Company(
+            name=user_data.company_name,
+            code=user_data.company_code
+        )
+        db.add(new_company)
+        await db.flush() # Use flush to get the new company ID before committing
+
+        # Create new user as company admin
+        db_user = schema.Users(
+            name=user_data.name,
+            email=user_data.email,
+            password=hashed_password,
+            role="admin",
+            company_id=new_company.id,
+            is_active_in_company=True, # Admin is active by default
+            is_super_admin=False
+        )
+    
+    # Case 2: Employee joining existing company
+    elif user_data.company_id:
+        # Check if company exists
+        company = await get_company(db, company_id=user_data.company_id)
+        if not company:
+            return None # Or raise
+
+        db_user = schema.Users(
+            name=user_data.name,
+            email=user_data.email,
+            password=hashed_password,
+            role="employee",
+            company_id=user_data.company_id,
+            is_active_in_company=False, # Employee must be approved by company admin
+            is_super_admin=False
+        )
+    else:
+        # Invalid data
+        return None
+
+    db.add(db_user)
     await db.commit()
-    await db.refresh(db_company)
-    return db_company
+    await db.refresh(db_user)
+    return db_user
 
+# --- Approval CRUD ---
 
-async def create_company_and_admin(db: AsyncSession, data: schemas.CompanyAdminCreate):
-    # Create the company
-    company_data = schemas.CompanyCreate(
-        name=data.company_name,
-        code=data.company_code,
-        logo=data.company_logo
+async def get_pending_companies(db: AsyncSession, skip: int = 0, limit: int = 100):
+    result = await db.execute(
+        select(schema.Company)
+        .filter(schema.Company.is_approved == False)
+        .offset(skip).limit(limit)
     )
-    db_company = await create_company(db, company=company_data)
+    return result.scalars().all()
 
-    # Create the admin user
-    admin_data = schemas.UserCreate(
-        name=data.admin_name,
-        email=data.admin_email,
-        password=data.admin_password,
-        role="admin",
-        status="active",
-        Companyid=db_company.id
+async def approve_company(db: AsyncSession, company_id: int):
+    company = await get_company(db, company_id=company_id)
+    if not company:
+        return None
+    company.is_approved = True
+    db.add(company)
+    await db.commit()
+    await db.refresh(company)
+    return company
+
+async def get_pending_employees(db: AsyncSession, company_id: int, skip: int = 0, limit: int = 100):
+    result = await db.execute(
+        select(schema.Users)
+        .filter(schema.Users.company_id == company_id)
+        .filter(schema.Users.is_active_in_company == False)
+        .offset(skip).limit(limit)
     )
-    db_user = await create_user(db, user=admin_data)
+    return result.scalars().all()
+
+async def approve_employee(db: AsyncSession, user_id: int):
+    user = await get_user(db, user_id=user_id)
+    if not user:
+        return None
+    user.is_active_in_company = True
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
 
     return db_company, db_user
 
@@ -70,7 +148,7 @@ async def get_division(db: AsyncSession, division_id: int):
 async def get_divisions_by_company(db: AsyncSession, company_id: int, skip: int = 0, limit: int = 100):
     result = await db.execute(
         select(schema.Division)
-        .filter(schema.Division.Companyid == company_id)
+        .filter(schema.Division.company_id == company_id)
         .offset(skip)
         .limit(limit)
     )
@@ -83,28 +161,18 @@ async def get_user(db: AsyncSession, user_id: int):
     return result.scalar_one_or_none()
 
 async def get_user_by_email(db: AsyncSession, email: str):
-    result = await db.execute(select(schema.Users).filter(schema.Users.email == email))
+    result = await db.execute(
+        select(schema.Users)
+        .options(joinedload(schema.Users.company))
+        .filter(schema.Users.email == email)
+    )
     return result.scalar_one_or_none()
 
 async def get_users(db: AsyncSession, skip: int = 0, limit: int = 100):
     result = await db.execute(select(schema.Users).offset(skip).limit(limit))
     return result.scalars().all()
 
-async def create_user(db: AsyncSession, user: schemas.UserCreate):
-    hashed_password = get_password_hash(user.password)
-    db_user = schema.Users(
-        name=user.name,
-        email=user.email,
-        password=hashed_password,
-        status=user.status,
-        role=user.role,
-        Companyid=user.Companyid,
-        Divisionid=user.Divisionid,
-    )
-    db.add(db_user)
-    await db.commit()
-    await db.refresh(db_user)
-    return db_user
+
 
 
 async def get_pending_users_by_company(db: AsyncSession, company_id: int):

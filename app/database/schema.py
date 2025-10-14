@@ -11,12 +11,16 @@ from sqlalchemy.orm import relationship
 from app.database.connection import Base
 
 # 1) Master: Company
+from sqlalchemy import Boolean
+
+
 class Company(Base):
     __tablename__ = "Company"
     id = Column(Integer, primary_key=True)
     name = Column(String(100))
     code = Column(String(10))
     logo = Column(String(255))
+    is_approved = Column(Boolean, default=False)
 
     users = relationship("Users", back_populates="company")
     documents = relationship("Documents", back_populates="company")
@@ -29,11 +33,12 @@ class Users(Base):
     __tablename__ = "Users"
     id = Column(Integer, primary_key=True)
     name = Column(String(255))
-    email = Column(String(255))
+    email = Column(String(255), unique=True, index=True)
     password = Column(String(255))
-    status = Column(String(100))
+    is_super_admin = Column(Boolean, default=False)
+    is_active_in_company = Column(Boolean, default=False)
     role = Column(String(50), nullable=False)  # 'admin' or 'employee'
-    Companyid = Column(Integer, ForeignKey("Company.id"), nullable=False)
+    company_id = Column(Integer, ForeignKey("Company.id"), nullable=True)
     Divisionid = Column(Integer, ForeignKey("Division.id"), nullable=True)
 
     company = relationship("Company", back_populates="users")
@@ -47,7 +52,7 @@ class Documents(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String(100))
     isi_dokumen = Column(String(255))
-    Companyid = Column(Integer, ForeignKey("Company.id"), nullable=False)
+    company_id = Column(Integer, ForeignKey("Company.id"), nullable=False)
 
     company = relationship("Company", back_populates="documents")
     embeddings = relationship("Embeddings", back_populates="document")
@@ -60,7 +65,7 @@ class Chatlogs(Base):
     question = Column(String(255))
     answer = Column(String(255))
     UsersId = Column(Integer, ForeignKey("Users.id"), nullable=False)
-    Companyid = Column(Integer, ForeignKey("Company.id"), nullable=False)
+    company_id = Column(Integer, ForeignKey("Company.id"), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
     user = relationship("Users", back_populates="chatlogs")
@@ -81,7 +86,7 @@ class Division(Base):
     __tablename__ = "Division"
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False)
-    Companyid = Column(Integer, ForeignKey("Company.id"), nullable=False)
+    company_id = Column(Integer, ForeignKey("Company.id"), nullable=False)
 
     company = relationship("Company", back_populates="divisions")
     users = relationship("Users", back_populates="division")
