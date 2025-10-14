@@ -11,7 +11,7 @@ Base = declarative_base()
 class DatabaseManager:
     def __init__(self):
         # Use asyncpg driver with SQLAlchemy
-        self.engine = create_async_engine(settings.DATABASE_URL, echo=False, connect_args={"ssl": "require"})
+        self.engine = create_async_engine(settings.DATABASE_URL, echo=False)
         self.async_session_maker = async_sessionmaker(
             self.engine, expire_on_commit=False, class_=AsyncSession
         )

@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
@@ -97,3 +96,35 @@ async def reject_user(
 
     await crud.delete_user(db, user=user_to_reject)
     return {"status": "success", "message": f"User {user_id} has been rejected and deleted."}
+
+
+
+@router.post("/create-admin", response_model=schemas.User)
+async def create_admin_user(
+    user: schemas.AdminCreate,
+    current_user: Users = Depends(get_current_user),
+    db: AsyncSession = Depends(db_manager.get_db_session)
+):
+    """
+    Create a new admin user for the same company.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can create other admin users."
+        )
+
+    db_user = await crud.get_user_by_email(db, email=user.email)
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    user_data = schemas.UserCreate(
+        name=user.name,
+        email=user.email,
+        password=user.password,
+        role="admin",
+        status="active",
+        Companyid=current_user.Companyid
+    )
+
+    return await crud.create_user(db=db, user=user_data)

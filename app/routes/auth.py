@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud
@@ -86,11 +85,11 @@ async def register_user(
 
 @router.post("/token", response_model=schemas.Token)
 async def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    data: schemas.UserLogin,
     db: AsyncSession = Depends(db_manager.get_db_session),
 ):
-    user = await crud.get_user_by_email(db, email=form_data.username) # Using email as username
-    if not user or not security.verify_password(form_data.password, user.password):
+    user = await crud.get_user_by_email(db, email=data.email)
+    if not user or not security.verify_password(data.password, user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",

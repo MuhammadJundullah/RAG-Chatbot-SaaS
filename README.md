@@ -70,6 +70,91 @@ Password:     bcrypt
 
 ## Getting Started
 
+Untuk menjalankan aplikasi ini, Anda memiliki dua opsi utama: menggunakan Docker (direkomendasikan untuk kemudahan setup) atau menjalankannya secara lokal tanpa Docker.
+
+### Menggunakan Docker (Direkomendasikan)
+
+Pastikan Anda telah menginstal Docker dan Docker Compose di sistem Anda.
+
+1.  **Clone Repositori:**
+    ```bash
+    git clone https://github.com/your-repo/company-chatbot-v2.git
+    cd company-chatbot-v2
+    ```
+
+2.  **Konfigurasi Environment:**
+    Buat file `.env` di root proyek Anda berdasarkan `example.env` (jika ada) atau pastikan variabel lingkungan yang diperlukan diatur. Contoh variabel yang mungkin dibutuhkan:
+    ```env
+    DATABASE_URL="postgresql+asyncpg://user:password@db:5432/mydatabase"
+    SECRET_KEY="your-super-secret-key"
+    ALGORITHM="HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES=30
+    PINECONE_API_KEY="your-pinecone-api-key"
+    PINECONE_ENVIRONMENT="your-pinecone-environment"
+    GEMINI_API_KEY="your-gemini-api-key"
+    ```
+
+3.  **Bangun dan Jalankan Kontainer:**
+    ```bash
+    docker-compose up --build -d
+    ```
+    Ini akan membangun image Docker, membuat kontainer untuk aplikasi dan database PostgreSQL, lalu menjalankannya di latar belakang.
+
+4.  **Inisialisasi Database:**
+    Setelah kontainer berjalan, Anda perlu menginisialisasi skema database. Anda bisa masuk ke dalam kontainer aplikasi dan menjalankan skrip inisialisasi:
+    ```bash
+    docker exec -it <nama_kontainer_aplikasi> bash
+    # Di dalam kontainer:
+    python app/database/init_db.py
+    exit
+    ```
+    Ganti `<nama_kontainer_aplikasi>` dengan nama kontainer aplikasi Anda (misalnya, `company-chatbot-v2-app-1` atau serupa, Anda bisa melihatnya dengan `docker-compose ps`).
+
+5.  **Akses Aplikasi:**
+    Aplikasi akan tersedia di `http://localhost:8000`.
+    Dokumentasi API interaktif (Swagger UI) dapat diakses di `http://localhost:8000/docs`.
+
+### Tanpa Docker (Lingkungan Lokal)
+
+1.  **Clone Repositori:**
+    ```bash
+    git clone https://github.com/your-repo/company-chatbot-v2.git
+    cd company-chatbot-v2
+    ```
+
+2.  **Buat dan Aktifkan Virtual Environment:**
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate
+    ```
+
+3.  **Instal Dependensi:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4.  **Konfigurasi Environment:**
+    Buat file `.env` di root proyek Anda berdasarkan `example.env` (jika ada) atau atur variabel lingkungan yang diperlukan. Pastikan `DATABASE_URL` menunjuk ke instance PostgreSQL lokal Anda (misalnya, `postgresql+asyncpg://user:password@localhost:5432/mydatabase`).
+
+5.  **Siapkan Database PostgreSQL:**
+    Pastikan Anda memiliki server PostgreSQL yang berjalan secara lokal. Buat database baru dan pengguna jika diperlukan.
+
+6.  **Inisialisasi Database:**
+    ```bash
+    python -m app/database/init_db
+    ```
+
+7.  **Jalankan Aplikasi:**
+    ```bash
+    uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ```
+
+8.  **Akses Aplikasi:**
+    Aplikasi akan tersedia di `http://localhost:8000`.
+    Dokumentasi API interaktif (Swagger UI) dapat diakses di `http://localhost:8000/docs`.
+
+
+
 ## Authentication Flow
 
 Aplikasi ini menggunakan alur registrasi yang berbeda untuk admin pertama perusahaan dan untuk karyawan berikutnya.
@@ -184,8 +269,8 @@ Aplikasi ini menggunakan alur registrasi yang berbeda untuk admin pertama perusa
 - **Endpoint**: `POST /auth/token`
 - **Deskripsi**: Mendapatkan JWT. Hanya pengguna dengan status `active` yang bisa login.
 - **Authentication**: Tidak perlu.
-- **Form Data** (`application/x-www-form-urlencoded`):
-  - `username`: email pengguna
+- **Request Body** (`application/json`):
+  - `email`: email pengguna
   - `password`: password pengguna
 
 ---
@@ -299,6 +384,28 @@ Aplikasi ini menggunakan alur registrasi yang berbeda untuk admin pertama perusa
 - **Endpoint**: `GET /divisions/`
 - **Deskripsi**: Mendapatkan semua divisi dalam perusahaan pengguna yang sedang login.
 - **Authentication**: **Token Diperlukan**.
+- **Response 200 (Sukses)**:
+  ```json
+  [
+    {
+      "id": 1,
+      "name": "Divisi Marketing",
+      "Companyid": 1
+    },
+    {
+      "id": 2,
+      "name": "Divisi IT",
+      "Companyid": 1
+    }
+  ]
+  ```
+
+#### List Public Divisions by Company ID
+- **Endpoint**: `GET /divisions/public/{company_id}`
+- **Deskripsi**: Mendapatkan daftar divisi untuk perusahaan tertentu. Berguna untuk pendaftaran mandiri karyawan yang belum terotentikasi agar dapat memilih divisi mereka.
+- **Authentication**: Tidak perlu.
+- **Path Parameter**:
+  - `company_id` (int): ID unik perusahaan.
 - **Response 200 (Sukses)**:
   ```json
   [
@@ -468,6 +575,30 @@ Endpoint khusus untuk pengguna dengan peran `admin`.
   }
   ```
 
+#### Create Admin User
+- **Endpoint**: `POST /admin/create-admin`
+- **Deskripsi**: Membuat pengguna admin baru untuk perusahaan yang sama. Hanya admin yang bisa melakukan ini.
+- **Authentication**: **Admin Token Diperlukan**.
+- **Request Body**:
+  ```json
+  {
+    "name": "Admin Baru",
+    "email": "admin.baru@cemerlang.com",
+    "password": "SuperSecretAdminPass!"
+  }
+  ```
+- **Response 200 (Sukses)**:
+  ```json
+  {
+    "id": 4,
+    "name": "Admin Baru",
+    "email": "admin.baru@cemerlang.com",
+    "status": "active",
+    "role": "admin",
+    "Companyid": 1,
+    "Divisionid": null
+  }
+  ```
 ---
 
 ## Response Codes

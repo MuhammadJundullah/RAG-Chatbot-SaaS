@@ -124,6 +124,9 @@ async def update_user_status(db: AsyncSession, user: schema.Users, status: str):
     return user
 
 
+
+
+
 async def delete_user(db: AsyncSession, user: schema.Users):
     await db.delete(user)
     await db.commit()

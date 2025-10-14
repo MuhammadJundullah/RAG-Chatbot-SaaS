@@ -31,3 +31,13 @@ async def read_divisions(
 ):
     divisions = await crud.get_divisions_by_company(db, company_id=current_user.Companyid)
     return divisions
+
+@router.get("/public/{company_id}", response_model=List[schemas.Division])
+async def read_public_divisions(
+    company_id: int,
+    db: AsyncSession = Depends(db_manager.get_db_session)
+):
+    divisions = await crud.get_divisions_by_company(db, company_id=company_id)
+    if not divisions:
+        raise HTTPException(status_code=404, detail="No divisions found for this company.")
+    return divisions

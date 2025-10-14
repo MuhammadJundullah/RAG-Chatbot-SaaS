@@ -75,6 +75,13 @@ class User(UserBase):
     class Config:
         from_attributes = True
 
+
+class AdminCreate(BaseModel):
+    name: str
+    email: str
+    password: str
+
+
 # --- Document Models ---
 
 class DocumentBase(BaseModel):
@@ -137,6 +144,10 @@ class TokenData(BaseModel):
     role: Optional[str] = None
     company_id: Optional[int] = None
     division_id: Optional[int] = None
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
 
 # --- Chat Models ---
 
