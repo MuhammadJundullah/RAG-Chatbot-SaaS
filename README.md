@@ -156,13 +156,14 @@ Aplikasi ini menggunakan alur registrasi yang berbeda untuk admin pertama perusa
 - **Authentication**: Tidak perlu.
 - **Request Body**:
   ```json
-  {
+ {
     "name": "Budi Karyawan",
     "email": "budi.k@cemerlang.com",
     "password": "SecurePassword123!",
     "role": "employee",
-    "Companyid": 1
-  }
+    "Companyid": 1,
+    "Divisionid": 1
+}
   ```
 - **Response 201 (Sukses)**: Mengembalikan detail pengguna dengan status `pending_approval`.
   ```json
