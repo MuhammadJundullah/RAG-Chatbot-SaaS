@@ -174,7 +174,7 @@ Aplikasi ini menggunakan alur registrasi yang berbeda untuk admin pertama perusa
     "status": "pending_approval",
     "role": "employee",
     "Companyid": 1,
-    "Divisionid": null
+    "Divisionid": 1
   }
   ```
 
