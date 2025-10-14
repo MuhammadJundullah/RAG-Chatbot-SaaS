@@ -14,8 +14,6 @@ Platform SaaS untuk chatbot AI yang disesuaikan dengan konteks perusahaan menggu
 - [Key Features](#key-features)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
-  - [Running with Docker (Recommended)](#running-with-docker-recommended)
-  - [Running Locally (Without Docker)](#running-locally-without-docker)
 - [Authentication Flow](#authentication-flow)
   - [User Roles](#user-roles)
   - [Token Structure](#token-structure)
