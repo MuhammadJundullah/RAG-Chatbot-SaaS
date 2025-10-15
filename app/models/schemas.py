@@ -169,3 +169,12 @@ class DocumentDeleteResponse(BaseModel):
     status: str
     message: str
     chunks_deleted: Optional[int] = None
+
+class OcrExtractResponse(BaseModel):
+    extracted_text: str
+    temp_doc_id: str # A temporary ID to link extraction to embedding
+
+class OcrEmbedRequest(BaseModel):
+    temp_doc_id: str
+    confirmed_text: str
+    original_filename: str

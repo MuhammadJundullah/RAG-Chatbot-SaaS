@@ -10,6 +10,9 @@ COPY requirements.txt .
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Running Database Migration
+RUN python -m app.database.init_db
+
 # Copy the rest of the application's code
 COPY ./app /app/app
 

@@ -17,3 +17,6 @@ pydantic-settings==2.1.0
 sse_starlette==1.6.5
 pinecone-client==3.2.2
 sentence-transformers==2.7.0
+Pillow
+pytesseract
+PyMuPDF

@@ -25,7 +25,6 @@ async def get_companies(db: AsyncSession, skip: int = 0, limit: int = 100):
     result = await db.execute(select(schema.Company).offset(skip).limit(limit))
     return result.scalars().all()
 
-
 # --- User & Company Registration CRUD ---
 
 async def register_user(db: AsyncSession, user_data: schemas.UserRegistration):
@@ -198,7 +197,7 @@ async def get_users(db: AsyncSession, skip: int = 0, limit: int = 100):
 async def get_pending_users_by_company(db: AsyncSession, company_id: int):
     result = await db.execute(
         select(schema.Users)
-        .filter(schema.Users.Companyid == company_id)
+        .filter(schema.Users.company_id == company_id)
         .filter(schema.Users.status == "pending_approval")
     )
     return result.scalars().all()
@@ -255,7 +254,7 @@ async def get_chatlogs(
 ):
     query = select(schema.Chatlogs)
     if company_id:
-        query = query.filter(schema.Chatlogs.Companyid == company_id)
+        query = query.filter(schema.Chatlogs.company_id == company_id)
     if user_id:
         query = query.filter(schema.Chatlogs.UsersId == user_id)
     if start_date:

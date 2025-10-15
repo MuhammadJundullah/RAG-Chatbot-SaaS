@@ -37,7 +37,7 @@ class RAGService:
             dummy_vector = [0.0] * 384
             response = self.index.query(
                 vector=dummy_vector,
-                top_k=1000, # Adjust as needed for more documents
+                top_k=1000,
                 include_metadata=True,
                 namespace=namespace
             )
@@ -113,10 +113,15 @@ class RAGService:
             print(f"Error adding documents for company {company_id}: {e}")
             raise e
 
-    async def process_and_add_document(self, file_content: bytes, file_name: str, company_id: int) -> Dict[str, Any]:
+    async def process_and_add_document(self, file_content: bytes, file_name: str, company_id: int, is_ocr_processed: bool = False) -> Dict[str, Any]:
         """Processes a file, chunks it, and adds it to the Pinecone index."""
         text_content = ""
-        if file_name.lower().endswith(".pdf"):
+        if is_ocr_processed:
+            try:
+                text_content = file_content.decode('utf-8')
+            except UnicodeDecodeError:
+                raise ValueError("Failed to decode pre-processed OCR text.")
+        elif file_name.lower().endswith(".pdf"):
             try:
                 reader = PdfReader(io.BytesIO(file_content))
                 for page in reader.pages:

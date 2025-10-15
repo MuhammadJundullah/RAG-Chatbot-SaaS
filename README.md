@@ -249,7 +249,6 @@ Aplikasi ini menggunakan alur registrasi dan persetujuan multi-tingkat yang meli
     "message": "User 'budi.k@cemerlang.com' registered for company ID 1. Pending approval from the company admin."
   }
   ```
-
 ---
 
 #### 2. Login Pengguna Aktif
@@ -514,8 +513,44 @@ Endpoint khusus untuk pengguna dengan `is_super_admin = true`.
 - **Response 200 (Sukses)**:
   ```json
   {
-    "filename": "nama_file.pdf",
-    "info": "File uploaded and processing started."
+    "status": "success",
+    "message": "Document 'nama_file.pdf' processed and added to Pinecone for company 1.",
+    "chunks_added": 10
+  }
+  ```
+
+#### OCR - Extract Text from Scanned Document/Image
+- **Endpoint**: `POST /documents/ocr-extract`
+- **Deskripsi**: Mengunggah dokumen hasil scan (PDF) atau gambar yang berisi teks untuk diekstraksi menggunakan OCR. Teks yang diekstrak akan dikembalikan untuk pratinjau.
+- **Authentication**: **Token Diperlukan**.
+- **Request Body**: `multipart/form-data`
+  - `file`: File gambar (JPG, PNG, TIFF, BMP, WEBP) atau PDF hasil scan.
+- **Response 200 (Sukses)**:
+  ```json
+  {
+    "extracted_text": "Teks yang berhasil diekstrak dari dokumen...",
+    "temp_doc_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+  }
+  ```
+
+#### OCR - Embed Confirmed Text to RAG
+- **Endpoint**: `POST /documents/ocr-embed`
+- **Deskripsi**: Mengirim teks yang telah dikonfirmasi (setelah pratinjau OCR) untuk di-embed ke dalam database vektor RAG. Ini akan membuat dokumen baru di knowledge base perusahaan.
+- **Authentication**: **Token Diperlukan**.
+- **Request Body**: `application/json`
+  ```json
+  {
+    "temp_doc_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+    "confirmed_text": "Teks yang sudah dikonfirmasi dan siap untuk di-embedding.",
+    "original_filename": "nama_file_scan.pdf"
+  }
+  ```
+- **Response 200 (Sukses)**:
+  ```json
+  {
+    "status": "success",
+    "message": "Document 'nama_file_scan.pdf' processed and added to Pinecone for company 1.",
+    "chunks_added": 15
   }
   ```
 
@@ -573,7 +608,7 @@ Endpoint khusus untuk pengguna dengan `is_super_admin = true`.
     ]
   }
   ```
-
+  
 ---
 
 ### 7. Chatlogs
@@ -600,7 +635,6 @@ Endpoint khusus untuk pengguna dengan `is_super_admin = true`.
     }
   ]
   ```
-
 ---
 
 ## Response Codes

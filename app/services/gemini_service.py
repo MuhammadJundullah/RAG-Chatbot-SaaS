@@ -47,7 +47,7 @@ Your core instructions are:
         prompt_parts.append(f"Based ONLY on the context provided above, answer this question: {question}")
 
         try:
-            generation_config = genai.GenerationConfig(temperature=0.5)
+            generation_config = genai.GenerationConfig(temperature=0.1)
             response_stream = await self.model.generate_content_async(
                 prompt_parts, 
                 stream=True,
