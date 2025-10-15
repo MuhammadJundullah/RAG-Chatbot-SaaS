@@ -18,7 +18,6 @@ class CompanyUpdate(BaseModel):
 
 class Company(CompanyBase):
     id: int
-    is_approved: bool
 
     class Config:
         from_attributes = True
@@ -53,8 +52,7 @@ class User(UserBase):
     company_id: Optional[int] = None
     class Config:
         from_attributes = True
-
-
+        
 # --- Division Models ---
 
 class DivisionBase(BaseModel):

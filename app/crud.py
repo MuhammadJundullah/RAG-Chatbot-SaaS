@@ -35,7 +35,7 @@ async def register_user(db: AsyncSession, user_data: schemas.UserRegistration):
     # Check if user already exists
     existing_user = await get_user_by_email(db, email=user_data.email)
     if existing_user:
-        return None # Or raise an exception
+        return None
 
     hashed_password = get_password_hash(user_data.password)
     
@@ -44,7 +44,7 @@ async def register_user(db: AsyncSession, user_data: schemas.UserRegistration):
         # Check if company already exists
         existing_company = await get_company_by_name(db, name=user_data.company_name)
         if existing_company:
-            return None # Or raise an exception
+            return None
 
         # Create new company (pending approval)
         new_company = schema.Company(
@@ -61,16 +61,16 @@ async def register_user(db: AsyncSession, user_data: schemas.UserRegistration):
             password=hashed_password,
             role="admin",
             company_id=new_company.id,
-            is_active_in_company=True, # Admin is active by default
+            is_active_in_company=False, # Admin must be approved by super admin
             is_super_admin=False
         )
     
     # Case 2: Employee joining existing company
-    elif user_data.company_id:
+    elif user_data.company_id is not None:
         # Check if company exists
         company = await get_company(db, company_id=user_data.company_id)
         if not company:
-            return None # Or raise
+            return None
 
         db_user = schema.Users(
             name=user_data.name,
@@ -93,21 +93,41 @@ async def register_user(db: AsyncSession, user_data: schemas.UserRegistration):
 # --- Approval CRUD ---
 
 async def get_pending_companies(db: AsyncSession, skip: int = 0, limit: int = 100):
+    # Subquery to find company IDs of inactive admin users
+    inactive_admin_company_ids = (
+        select(schema.Users.company_id)
+        .filter(schema.Users.role == 'admin', schema.Users.is_active_in_company == False)
+        .distinct()
+    )
+
+    # Main query to get the company objects
     result = await db.execute(
         select(schema.Company)
-        .filter(schema.Company.is_approved == False)
-        .offset(skip).limit(limit)
+        .filter(schema.Company.id.in_(inactive_admin_company_ids))
+        .offset(skip)
+        .limit(limit)
     )
     return result.scalars().all()
 
 async def approve_company(db: AsyncSession, company_id: int):
+    # Find the company to ensure it exists and we can return it
     company = await get_company(db, company_id=company_id)
     if not company:
         return None
-    company.is_approved = True
-    db.add(company)
-    await db.commit()
-    await db.refresh(company)
+
+    # Find and activate the admin of that company
+    admin_user_result = await db.execute(
+        select(schema.Users)
+        .filter(schema.Users.company_id == company_id, schema.Users.role == 'admin')
+    )
+    admin_user = admin_user_result.scalar_one_or_none()
+
+    if admin_user and not admin_user.is_active_in_company:
+        admin_user.is_active_in_company = True
+        db.add(admin_user)
+        await db.commit()
+        await db.refresh(admin_user)
+
     return company
 
 async def get_pending_employees(db: AsyncSession, company_id: int, skip: int = 0, limit: int = 100):

@@ -77,9 +77,4 @@ async def get_current_company_admin(current_user: schema.Users = Depends(get_cur
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User is not an active admin for the company",
         )
-    if not current_user.company.is_approved:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Company is not approved yet.",
-        )
     return current_user

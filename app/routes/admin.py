@@ -28,7 +28,7 @@ async def get_pending_companies(
     return companies
 
 
-@router.post("/companies/{company_id}/approve", response_model=schemas.Company)
+@router.patch("/companies/{company_id}/approve", response_model=schemas.Company)
 async def approve_company(
     company_id: int,
     db: AsyncSession = Depends(db_manager.get_db_session)

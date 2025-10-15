@@ -14,8 +14,6 @@ router = APIRouter(
     tags=["Authentication"],
 )
 
-
-
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
     user_data: schemas.UserRegistration, 
@@ -38,8 +36,6 @@ async def register(
         return {"message": f"Company '{user_data.company_name}' and admin user '{user.email}' registered successfully. Pending approval from a super admin."}
     else:
         return {"message": f"User '{user.email}' registered for company ID {user_data.company_id}. Pending approval from the company admin."}
-
-
 
 @router.post("/token", response_model=schemas.Token)
 async def login_for_access_token(

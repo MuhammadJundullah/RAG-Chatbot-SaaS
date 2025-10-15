@@ -24,7 +24,7 @@ async def chat_endpoint(
         try:
             conversation_id = request.conversation_id or str(uuid.uuid4())
             user_message = request.message
-            company_id = current_user.Companyid
+            company_id = current_user.company_id
 
             # 1. Get context from RAG service
             rag_context = await rag_service.get_relevant_context(
@@ -37,7 +37,7 @@ async def chat_endpoint(
             async for chunk in gemini_service.generate_chat_response(
                 question=user_message,
                 context=rag_context,
-                query_results=None, # No external DB query results
+                query_results=None,
                 db=db,
                 current_user=current_user
             ):
@@ -49,7 +49,7 @@ async def chat_endpoint(
                 question=user_message,
                 answer=full_response,
                 UsersId=current_user.id,
-                Companyid=company_id,
+                company_id=company_id,
             )
             await crud.create_chatlog(db=db, chatlog=chatlog_data)
 

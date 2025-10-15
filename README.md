@@ -289,33 +289,66 @@ Endpoint khusus untuk pengguna dengan `is_super_admin = true`.
 
 ### 4. Companies & Company Admin
 
-#### List Companies
-- **Endpoint**: `GET /companies/`
-- **Deskripsi**: Mendapatkan daftar semua perusahaan yang telah disetujui. Berguna untuk halaman pendaftaran.
-- **Authentication**: Tidak perlu.
-
-#### Get Company by ID
-- **Endpoint**: `GET /companies/{company_id}`
-- **Deskripsi**: Mendapatkan detail perusahaan berdasarkan ID.
-- **Authentication**: Tidak perlu.
-
-#### Get Company Users
-- **Endpoint**: `GET /companies/{company_id}/users/`
-- **Deskripsi**: Mendapatkan daftar semua pengguna untuk sebuah perusahaan.
-- **Authentication**: **Token Diperlukan**.
-
 #### List Pending Employees (Company Admin)
-- **Endpoint**: `GET /company/pending-employees`
+- **Endpoint**: `GET /companies/pending-employees`
 - **Deskripsi**: Mendapatkan daftar pengguna yang menunggu persetujuan di perusahaan admin.
-- **Authentication**: **Company Admin Token Diperlukan**.
+- **Authentication**: **Company Admin Token Diperlukan** (Header: `Authorization: Bearer <token>`).
+- **Request Body**: Tidak ada (kosong).
+- **Response 200 (Sukses)**: Mengembalikan array berisi objek pengguna yang berstatus `pending`.
+  ```json
+  [
+    {
+      "id": 12,
+      "name": "Calon Karyawan Satu",
+      "email": "calon.satu@example.com",
+      "is_super_admin": false,
+      "is_active_in_company": false,
+      "role": "employee",
+      "company_id": 1,
+      "division_id": null
+    },
+    {
+      "id": 15,
+      "name": "Calon Karyawan Dua",
+      "email": "calon.dua@example.com",
+      "is_super_admin": false,
+      "is_active_in_company": false,
+      "role": "employee",
+      "company_id": 1,
+      "division_id": 2
+    }
+  ]
+  ```
 
 #### Approve Employee (Company Admin)
-- **Endpoint**: `POST /company/employees/{user_id}/approve`
-- **Deskripsi**: Menyetujui pendaftaran karyawan, mengubah statusnya menjadi aktif.
-- **Authentication**: **Company Admin Token Diperlukan**.
+- **Endpoint**: `POST /companies/employees/{user_id}/approve`
+- **Deskripsi**: Menyetujui pendaftaran pengguna, mengubah statusnya menjadi `active`.
+- **Authentication**: **Admin Token Diperlukan**.
 - **Path Parameter**:
   - `user_id` (int): ID pengguna yang akan disetujui.
+- **Response 200 (Sukses)**:
+  ```json
+  {
+    "id": 2,
+    "name": "Budi Karyawan",
+    "email": "budi.k@cemerlang.com",
+    "status": "active",
+    "role": "employee"
+  }
+  ```
 
+#### Reject Employee (Company Admin)
+- **Endpoint**: `POST /companies/employees/{user_id}/reject`
+- **Deskripsi**: Menolak dan menghapus permintaan pendaftaran pengguna.
+- **Authentication**: **Admin Token Diperlukan**.
+- **Path Parameter**:
+  - `user_id` (int): ID pengguna yang akan ditolak.
+- **Response 200 (Sukses)**:
+  ```json
+  {
+    "message": "User with id 2 has been rejected and deleted."
+  }
+  ```
 
 #### List Companies
 - **Endpoint**: `GET /companies/`
@@ -352,7 +385,7 @@ Endpoint khusus untuk pengguna dengan `is_super_admin = true`.
   }
   ```
 
-#### Get Company Users
+#### Get Company Users (Company Admin)
 - **Endpoint**: `GET /companies/{company_id}/users/`
 - **Deskripsi**: Mendapatkan daftar semua pengguna (aktif dan pending) untuk sebuah perusahaan.
 - **Authentication**: **Token Diperlukan**.
@@ -376,6 +409,31 @@ Endpoint khusus untuk pengguna dengan `is_super_admin = true`.
       "status": "pending_approval"
     }
   ]
+  ```
+
+#### Create New Company Admin (Company Admin)
+- **Endpoint**: `POST /admin/create-admin`
+- **Deskripsi**: Membuat pengguna admin baru untuk perusahaan yang sama. Hanya admin yang bisa melakukan ini.
+- **Authentication**: **Admin Token Diperlukan**.
+- **Request Body**:
+  ```json
+  {
+    "name": "Admin Baru",
+    "email": "admin.baru@cemerlang.com",
+    "password": "SuperSecretAdminPass!"
+  }
+  ```
+- **Response 200 (Sukses)**:
+  ```json
+  {
+    "id": 4,
+    "name": "Admin Baru",
+    "email": "admin.baru@cemerlang.com",
+    "status": "active",
+    "role": "admin",
+    "Companyid": 1,
+    "Divisionid": null
+  }
   ```
 
 ---
@@ -543,83 +601,6 @@ Endpoint khusus untuk pengguna dengan `is_super_admin = true`.
   ]
   ```
 
----
-
-### 8. Admin
-
-Endpoint khusus untuk pengguna dengan peran `admin`.
-
-#### List Pending Users
-- **Endpoint**: `GET /admin/pending-users`
-- **Deskripsi**: Mendapatkan daftar pengguna yang menunggu persetujuan di perusahaan admin.
-- **Authentication**: **Admin Token Diperlukan**.
-- **Response 200 (Sukses)**:
-  ```json
-  [
-    {
-      "id": 2,
-      "name": "Budi Karyawan",
-      "email": "budi.k@cemerlang.com",
-      "status": "pending_approval",
-      "role": "employee"
-    }
-  ]
-  ```
-
-#### Approve User
-- **Endpoint**: `POST /admin/users/{user_id}/approve`
-- **Deskripsi**: Menyetujui pendaftaran pengguna, mengubah statusnya menjadi `active`.
-- **Authentication**: **Admin Token Diperlukan**.
-- **Path Parameter**:
-  - `user_id` (int): ID pengguna yang akan disetujui.
-- **Response 200 (Sukses)**:
-  ```json
-  {
-    "id": 2,
-    "name": "Budi Karyawan",
-    "email": "budi.k@cemerlang.com",
-    "status": "active",
-    "role": "employee"
-  }
-  ```
-
-#### Reject User
-- **Endpoint**: `POST /admin/users/{user_id}/reject`
-- **Deskripsi**: Menolak dan menghapus permintaan pendaftaran pengguna.
-- **Authentication**: **Admin Token Diperlukan**.
-- **Path Parameter**:
-  - `user_id` (int): ID pengguna yang akan ditolak.
-- **Response 200 (Sukses)**:
-  ```json
-  {
-    "message": "User with id 2 has been rejected and deleted."
-  }
-  ```
-
-#### Create Admin User
-- **Endpoint**: `POST /admin/create-admin`
-- **Deskripsi**: Membuat pengguna admin baru untuk perusahaan yang sama. Hanya admin yang bisa melakukan ini.
-- **Authentication**: **Admin Token Diperlukan**.
-- **Request Body**:
-  ```json
-  {
-    "name": "Admin Baru",
-    "email": "admin.baru@cemerlang.com",
-    "password": "SuperSecretAdminPass!"
-  }
-  ```
-- **Response 200 (Sukses)**:
-  ```json
-  {
-    "id": 4,
-    "name": "Admin Baru",
-    "email": "admin.baru@cemerlang.com",
-    "status": "active",
-    "role": "admin",
-    "Companyid": 1,
-    "Divisionid": null
-  }
-  ```
 ---
 
 ## Response Codes

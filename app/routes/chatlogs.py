@@ -28,13 +28,13 @@ async def read_chatlogs(
     # In a real application, you'd want to add authorization here
     # to ensure only admins can see all logs.
     # For now, we'll just filter by the user's company.
-    if company_id and company_id != current_user.Companyid:
+    if company_id and company_id != current_user.company_id:
         # If a company_id is provided, it must match the user's company
         # Or the user must be a super-admin, which we are not implementing now.
-        company_id = current_user.Companyid
+        company_id = current_user.company_id
         
     if not company_id:
-        company_id = current_user.Companyid
+        company_id = current_user.company_id
 
     chatlogs = await crud.get_chatlogs(
         db,

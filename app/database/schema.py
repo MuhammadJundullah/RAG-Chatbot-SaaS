@@ -19,9 +19,7 @@ class Company(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(100))
     code = Column(String(10))
-    logo = Column(String(255))
-    is_approved = Column(Boolean, default=False)
-
+    logo = Column(String(255), nullable=True)
     users = relationship("Users", back_populates="company")
     documents = relationship("Documents", back_populates="company")
     chatlogs = relationship("Chatlogs", back_populates="company")
@@ -37,7 +35,7 @@ class Users(Base):
     password = Column(String(255))
     is_super_admin = Column(Boolean, default=False)
     is_active_in_company = Column(Boolean, default=False)
-    role = Column(String(50), nullable=False)  # 'admin' or 'employee'
+    role = Column(String(50), nullable=False)
     company_id = Column(Integer, ForeignKey("Company.id"), nullable=True)
     Divisionid = Column(Integer, ForeignKey("Division.id"), nullable=True)
 
@@ -63,7 +61,7 @@ class Chatlogs(Base):
     __tablename__ = "Chatlogs"
     id = Column(Integer, primary_key=True)
     question = Column(String(255))
-    answer = Column(String(255))
+    answer = Column(Text)
     UsersId = Column(Integer, ForeignKey("Users.id"), nullable=False)
     company_id = Column(Integer, ForeignKey("Company.id"), nullable=False)
     created_at = Column(DateTime, server_default=func.now())

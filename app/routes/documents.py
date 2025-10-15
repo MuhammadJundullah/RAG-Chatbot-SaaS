@@ -33,7 +33,7 @@ async def upload_document_to_rag(
         result = await rag_service.process_and_add_document(
             file_content=file_content, 
             file_name=file.filename,
-            company_id=current_user.Companyid
+            company_id=current_user.company_id
         )
         
         if result["status"] == "failed":
@@ -52,7 +52,7 @@ async def upload_document_to_rag(
 async def list_rag_documents(
     current_user: Users = Depends(get_current_user)
 ):
-    documents = await rag_service.list_documents(company_id=current_user.Companyid)
+    documents = await rag_service.list_documents(company_id=current_user.company_id)
     return documents
 
 @router.delete(
@@ -69,7 +69,7 @@ async def delete_rag_document(
     try:
         # 1. Delete from RAG service (Pinecone)
         rag_result = await rag_service.delete_document(
-            company_id=current_user.Companyid,
+            company_id=current_user.company_id,
             filename=decoded_filename
         )
 
@@ -77,7 +77,7 @@ async def delete_rag_document(
         db_document_result = await db.execute(
             select(schema.Documents).filter(
                 schema.Documents.title == decoded_filename,
-                schema.Documents.Companyid == current_user.Companyid
+                schema.Documents.company_id == current_user.company_id
             )
         )
         db_document = db_document_result.scalar_one_or_none()
@@ -104,7 +104,7 @@ async def read_documents(
     current_user: Users = Depends(get_current_user)
 ):
     documents = await crud.get_documents(db, skip=skip, limit=limit)
-    company_documents = [doc for doc in documents if doc.Companyid == current_user.Companyid]
+    company_documents = [doc for doc in documents if doc.company_id == current_user.company_id]
     return company_documents
 
 @router.get("/{document_id}/db", response_model=schemas.Document)
@@ -116,6 +116,6 @@ async def read_document(
     db_document = await crud.get_document(db, document_id=document_id)
     if db_document is None:
         raise HTTPException(status_code=404, detail="Document not found")
-    if db_document.Companyid != current_user.Companyid:
+    if db_document.company_id != current_user.company_id:
         raise HTTPException(status_code=403, detail="You do not have permission to access this document.")
     return db_document
