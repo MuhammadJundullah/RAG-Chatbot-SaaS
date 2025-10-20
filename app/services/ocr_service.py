@@ -4,12 +4,6 @@ import pytesseract
 from typing import List
 import fitz 
 
-# Ensure Tesseract-OCR is installed on your system and its path is correctly set if not in PATH.
-# For example, on macOS: brew install tesseract
-# On Debian/Ubuntu: sudo apt install tesseract-ocr
-# For Windows, download from: https://tesseract-ocr.github.io/tessdoc/Downloads.html
-# You might need to set pytesseract.pytesseract.tesseract_cmd = r'<full_path_to_tesseract_executable>'
-
 async def extract_text_from_image(image_bytes: bytes) -> str:
     """
     Extracts text from an image using OCR.

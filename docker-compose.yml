@@ -13,3 +13,16 @@ services:
     volumes:
       - ./app:/app/app
     restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sh -c "celery -A app.core.celery_app worker --loglevel=info"
+    env_file:
+      - ./.env
+    volumes:
+      - ./app:/app/app
+    restart: unless-stopped
+    depends_on:
+      - api

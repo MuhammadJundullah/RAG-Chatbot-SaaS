@@ -1,8 +1,8 @@
 import google.generativeai as genai
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.config.settings import settings
+from app.core.config import settings
 from typing import Optional, AsyncGenerator
-from app.database import schema
+from app.models import user_model, company_model
 from datetime import date
 
 class GeminiService:
@@ -14,7 +14,7 @@ class GeminiService:
         self, 
         question: str, 
         db: AsyncSession,
-        current_user: schema.Users,
+        current_user: user_model.Users,
         context: Optional[str] = None, 
         query_results: Optional[str] = None
     ) -> AsyncGenerator[str, None]:
@@ -22,7 +22,7 @@ class GeminiService:
         Generates a final chat response as a stream, personalizing the prompt with company-specific details.
         """
         # Get company name
-        company = await db.get(schema.Company, current_user.company_id)
+        company = await db.get(company_model.Company, current_user.company_id)
         company_name = company.name if company else "your company"
 
         # Get role name

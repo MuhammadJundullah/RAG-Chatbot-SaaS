@@ -1,38 +1,59 @@
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import text
+from app.core.config import settings
+from typing import AsyncGenerator
 import asyncio
 import os
-from sqlalchemy import text
 from sqlalchemy.future import select
-
-from app.database.connection import db_manager, Base
-from app.database import schema
 from app.utils.security import get_password_hash
+from app.models.base import Base
+
+import app.models
+
+class DatabaseManager:
+    def __init__(self):
+        """Initializes the database engine and session maker upon creation."""
+        self.engine = create_async_engine(settings.DATABASE_URL, echo=False)
+        self.async_session_maker = async_sessionmaker(
+            self.engine, expire_on_commit=False, class_=AsyncSession
+        )
+
+    async def close(self):
+        """Closes the database engine connections."""
+        if self.engine:
+            await self.engine.dispose()
+
+    async def get_db_session(self) -> AsyncGenerator[AsyncSession, None]:
+        """Provides a database session."""
+        async with self.async_session_maker() as session:
+            yield session
+
+db_manager = DatabaseManager()
 
 async def create_super_admin(db_session):
     """Creates the initial super admin user from environment variables or defaults."""
-    SUPERADMIN_EMAIL = os.environ.get("SUPERADMIN_EMAIL", "superadmin@example.com")
-    SUPERADMIN_PASSWORD = os.environ.get("SUPERADMIN_PASSWORD", "superadmin")
-
+    SUPERADMIN_EMAIL = settings.SUPERADMIN_EMAIL
+    SUPERADMIN_PASSWORD = settings.SUPERADMIN_PASSWORD
     if SUPERADMIN_EMAIL == "superadmin@example.com":
         print("\033[93mWARNING: SUPERADMIN_EMAIL not set. Using default: superadmin@example.com\033[0m")
     if SUPERADMIN_PASSWORD == "superadmin":
         print("\033[93mWARNING: SUPERADMIN_PASSWORD not set. Using default: superadmin\033[0m")
 
-    # Check if super admin already exists
-    result = await db_session.execute(select(schema.Users).filter(schema.Users.email == SUPERADMIN_EMAIL))
+    from app.models.user_model import Users as UserModel
+    result = await db_session.execute(select(UserModel).filter(UserModel.email == SUPERADMIN_EMAIL))
     if result.scalar_one_or_none():
         print(f"Super admin user '{SUPERADMIN_EMAIL}' already exists.")
         return
 
-    # Create super admin user
     hashed_password = get_password_hash(SUPERADMIN_PASSWORD)
-    super_admin = schema.Users(
+    super_admin = UserModel(
         name="Super Admin",
         email=SUPERADMIN_EMAIL,
         password=hashed_password,
         role="super_admin",
         is_super_admin=True,
-        is_active_in_company=True, # Super admin must be active to log in
-        company_id=None # Super admin does not belong to any company
+        is_active_in_company=True,
+        company_id=None
     )
     db_session.add(super_admin)
     await db_session.commit()
@@ -44,22 +65,19 @@ async def init_db():
     """
     print("Initializing database...")
     async with db_manager.engine.begin() as conn:
+        print(f"Tables known to Base.metadata: {Base.metadata.tables.keys()}")
         print("Dropping all existing tables...")
         await conn.run_sync(Base.metadata.drop_all)
+        print("Finished dropping tables.")
         
         print("Creating all tables based on the current schema...")
         await conn.run_sync(Base.metadata.create_all)
     
-    # Correctly handle the async generator for the session
-    db_session_generator = db_manager.get_db_session()
-    db = await anext(db_session_generator)
-    try:
-        await create_super_admin(db)
-    finally:
+    async for db in db_manager.get_db_session():
         try:
-            # This is how you exhaust the generator to trigger its finally block
-            await anext(db_session_generator)
-        except StopAsyncIteration:
+            await create_super_admin(db)
+        finally:
+            # This will exhaust the generator and close the session
             pass
 
     print("Database initialization finished successfully.")

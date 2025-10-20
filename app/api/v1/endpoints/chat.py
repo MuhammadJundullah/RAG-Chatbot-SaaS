@@ -4,21 +4,20 @@ from sse_starlette.sse import EventSourceResponse
 import json
 import uuid
 
-from app.models import schemas
+from app.schemas import chat_schema, chatlog_schema
 from app.services.rag_service import rag_service
 from app.services.gemini_service import gemini_service
-from app.utils.auth import get_current_user
-from app.database.schema import Users
-from app.database.connection import db_manager
-from app import crud
+from app.core.dependencies import get_current_user, get_db
+from app.models.user_model import Users
+from app.repository import chatlog_repository
 
 router = APIRouter()
 
 @router.post("/chat", tags=["Chat"])
 async def chat_endpoint(
-    request: schemas.ChatRequest,
+    request: chat_schema.ChatRequest,
     current_user: Users = Depends(get_current_user),
-    db: AsyncSession = Depends(db_manager.get_db_session)
+    db: AsyncSession = Depends(get_db)
 ):
     async def event_generator():
         try:
@@ -45,13 +44,13 @@ async def chat_endpoint(
                 yield {"event": "message", "data": chunk}
 
             # 3. Save chat to database
-            chatlog_data = schemas.ChatlogCreate(
+            chatlog_data = chatlog_schema.ChatlogCreate(
                 question=user_message,
                 answer=full_response,
                 UsersId=current_user.id,
                 company_id=company_id,
             )
-            await crud.create_chatlog(db=db, chatlog=chatlog_data)
+            await chatlog_repository.create_chatlog(db=db, chatlog=chatlog_data)
 
             # 4. Send end event
             yield {

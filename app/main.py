@@ -1,13 +1,22 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth, chat, documents, company, divisions, chatlogs, admin
-from app.database.connection import db_manager
+from app.api.v1.endpoints import auth, chat, documents, company, divisions, chatlogs, admin
+from app.core.database import db_manager
 
+# No complex lifespan needed with gevent and simple singleton initialization
 app = FastAPI(
     title="Multi-Tenant Company Chatbot API",
     description="A SaaS platform for company-specific AI chatbots using RAG and Database Integration.",
     version="1.0.0"
 )
+
+# The RAGService, S3Client, and DBEngine are initialized on import now.
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Close database connections on shutdown."""
+    await db_manager.close()
+    print("Database engine closed.")
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,16 +34,6 @@ app.include_router(company.router)
 app.include_router(divisions.router)
 app.include_router(chatlogs.router)
 app.include_router(admin.router)
-
-@app.on_event("startup")
-async def startup_event():
-    await db_manager.connect()
-    print("Database connected")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    await db_manager.close()
-    print("Database disconnected")
 
 @app.get("/")
 async def root():

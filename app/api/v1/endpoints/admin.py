@@ -2,10 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
-from app import crud
-from app.database.connection import db_manager
-from app.models import schemas
-from app.utils.auth import get_current_super_admin
+from app.repository import company_repository, user_repository
+from app.core.dependencies import get_current_super_admin, get_db
+from app.schemas import company_schema
 
 router = APIRouter(
     prefix="/admin",
@@ -14,9 +13,9 @@ router = APIRouter(
 )
 
 
-@router.get("/companies/pending", response_model=List[schemas.Company])
+@router.get("/companies/pending", response_model=List[company_schema.Company])
 async def get_pending_companies(
-    db: AsyncSession = Depends(db_manager.get_db_session),
+    db: AsyncSession = Depends(get_db),
     skip: int = 0,
     limit: int = 100
 ):
@@ -24,20 +23,20 @@ async def get_pending_companies(
     Get a list of companies awaiting approval.
     Accessible only by super admins.
     """
-    companies = await crud.get_pending_companies(db, skip=skip, limit=limit)
+    companies = await user_repository.get_pending_companies(db, skip=skip, limit=limit)
     return companies
 
 
-@router.patch("/companies/{company_id}/approve", response_model=schemas.Company)
+@router.patch("/companies/{company_id}/approve", response_model=company_schema.Company)
 async def approve_company(
     company_id: int,
-    db: AsyncSession = Depends(db_manager.get_db_session)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Approve a company registration.
     Accessible only by super admins.
     """
-    approved_company = await crud.approve_company(db, company_id=company_id)
+    approved_company = await company_repository.approve_company(db, company_id=company_id)
     if not approved_company:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

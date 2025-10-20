@@ -3,18 +3,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import date
 
-from app import crud
-from app.database.connection import db_manager
-from app.models import schemas
-from app.utils.auth import get_current_user
-from app.database.schema import Users
+from app.repository import chatlog_repository
+from app.core.dependencies import get_current_user, get_db
+from app.schemas import chatlog_schema
+from app.models.user_model import Users
 
 router = APIRouter(
     prefix="/chatlogs",
     tags=["Chatlogs"],
 )
 
-@router.get("/", response_model=List[schemas.Chatlog])
+@router.get("/", response_model=List[chatlog_schema.Chatlog])
 async def read_chatlogs(
     company_id: Optional[int] = None,
     user_id: Optional[int] = None,
@@ -22,7 +21,7 @@ async def read_chatlogs(
     end_date: Optional[date] = None,
     skip: int = 0,
     limit: int = 100,
-    db: AsyncSession = Depends(db_manager.get_db_session),
+    db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user),
 ):
     # In a real application, you'd want to add authorization here
@@ -36,7 +35,7 @@ async def read_chatlogs(
     if not company_id:
         company_id = current_user.company_id
 
-    chatlogs = await crud.get_chatlogs(
+    chatlogs = await chatlog_repository.get_chatlogs(
         db,
         company_id=company_id,
         user_id=user_id,

@@ -80,80 +80,104 @@ Pastikan Anda telah menginstal Docker dan Docker Compose di sistem Anda.
 
 1.  **Clone Repositori:**
     ```bash
-    git clone https://github.com/your-repo/company-chatbot-v2.git
-    cd company-chatbot-v2
+    git clone <URL_REPOSITORI_ANDA>
+    cd RAG-Chatbot-SaaS
     ```
 
 2.  **Konfigurasi Environment:**
-    Buat file `.env` di root proyek Anda berdasarkan `example.env` (jika ada) atau pastikan variabel lingkungan yang diperlukan diatur. Contoh variabel yang mungkin dibutuhkan:
-    ```env
-    DATABASE_URL="postgresql+asyncpg://user:password@db:5432/mydatabase"
-    SECRET_KEY="your-super-secret-key"
-    ALGORITHM="HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES=30
-    PINECONE_API_KEY="your-pinecone-api-key"
-    PINECONE_ENVIRONMENT="your-pinecone-environment"
-    GEMINI_API_KEY="your-gemini-api-key"
+    Buat file `.env` dengan menyalin dari template `.env.example`.
+    ```bash
+    cp .env.example .env
     ```
+    Buka file `.env` dan isi semua variabel dengan nilai yang benar. Anda harus menyediakan URL untuk PostgreSQL dan Redis karena mereka tidak termasuk dalam Docker Compose ini.
 
 3.  **Bangun dan Jalankan Kontainer:**
+    Perintah ini akan membangun image, lalu membuat dan menjalankan service `api` (FastAPI) dan `worker` (Celery) secara otomatis.
     ```bash
     docker-compose up --build -d
     ```
-    Ini akan membangun image Docker, membuat kontainer untuk aplikasi dan database PostgreSQL, lalu menjalankannya di latar belakang.
 
-4.  **Inisialisasi Database:**
-    Setelah kontainer berjalan, Anda perlu menginisialisasi skema database. Anda bisa masuk ke dalam kontainer aplikasi dan menjalankan skrip inisialisasi:
+4.  **Inisialisasi Database (Hanya untuk pertama kali):**
+    Setelah kontainer berjalan, jalankan perintah ini di terminal terpisah untuk membuat tabel database dan super admin awal.
     ```bash
-    docker exec -it <nama_kontainer_aplikasi> bash
-    # Di dalam kontainer:
-    python app/database/init_db.py
-    exit
+    docker-compose exec api python -m app.core.database
     ```
-    Ganti `<nama_kontainer_aplikasi>` dengan nama kontainer aplikasi Anda (misalnya, `company-chatbot-v2-app-1` atau serupa, Anda bisa melihatnya dengan `docker-compose ps`).
 
 5.  **Akses Aplikasi:**
     Aplikasi akan tersedia di `http://localhost:8000`.
     Dokumentasi API interaktif (Swagger UI) dapat diakses di `http://localhost:8000/docs`.
 
-### Tanpa Docker (Lingkungan Lokal)
-
-1.  **Clone Repositori:**
+6.  **Melihat Log:**
+    Untuk melihat log gabungan dari server API dan Celery worker, gunakan perintah:
     ```bash
-    git clone https://github.com/your-repo/company-chatbot-v2.git
-    cd company-chatbot-v2
+    docker-compose logs -f
     ```
 
-2.  **Buat dan Aktifkan Virtual Environment:**
+7.  **Menghentikan Aplikasi:**
     ```bash
-    python3 -m venv venv
-    source venv/bin/activate
+    docker-compose down
     ```
 
-3.  **Instal Dependensi:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+### Setup dan Menjalankan Proyek (Lokal)
 
-4.  **Konfigurasi Environment:**
-    Buat file `.env` di root proyek Anda berdasarkan `example.env` (jika ada) atau atur variabel lingkungan yang diperlukan. Pastikan `DATABASE_URL` menunjuk ke instance PostgreSQL lokal Anda (misalnya, `postgresql+asyncpg://user:password@localhost:5432/mydatabase`).
+Panduan ini untuk menjalankan aplikasi secara langsung di mesin lokal Anda.
 
-5.  **Siapkan Database PostgreSQL:**
-    Pastikan Anda memiliki server PostgreSQL yang berjalan secara lokal. Buat database baru dan pengguna jika diperlukan.
+**1. Prasyarat**
+- Python 3.11 atau lebih tinggi.
+- Server PostgreSQL sedang berjalan.
+- Server Redis sedang berjalan.
 
-6.  **Inisialisasi Database:**
-    ```bash
-    python -m app/database/init_db
-    ```
+**2. Clone Repositori**
+```bash
+git clone <URL_REPOSITORI_ANDA>
+cd RAG-Chatbot-SaaS
+```
 
-7.  **Jalankan Aplikasi:**
-    ```bash
-    uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    ```
+**3. Buat dan Aktifkan Virtual Environment**
+```bash
+# Untuk macOS/Linux
+python3 -m venv venv
+source venv/bin/activate
 
-8.  **Akses Aplikasi:**
-    Aplikasi akan tersedia di `http://localhost:8000`.
-    Dokumentasi API interaktif (Swagger UI) dapat diakses di `http://localhost:8000/docs`.
+# Untuk Windows
+python -m venv venv
+venv\Scripts\activate
+```
+
+**4. Instal Dependensi**
+```bash
+pip install -r requirements.txt
+```
+
+**5. Konfigurasi Environment**
+Buat file `.env` dengan menyalin dari template yang sudah disediakan.
+```bash
+cp .env.example .env
+```
+Selanjutnya, buka file `.env` dan isi semua variabel dengan nilai yang benar (URL database, kunci API, kredensial S3, dll).
+
+**6. Inisialisasi Database**
+Perintah ini akan membuat semua tabel database dan user super admin awal berdasarkan `.env`.
+```bash
+python -m app.core.database
+```
+
+**7. Jalankan Aplikasi**
+Anda perlu menjalankan **dua proses** secara bersamaan di **dua terminal terpisah**.
+
+**Terminal 1: Jalankan Server FastAPI**
+```bash
+uvicorn app.main:app --reload
+```
+Server aplikasi sekarang akan berjalan di `http://localhost:8000`.
+
+**Terminal 2: Jalankan Celery Worker**
+Worker ini bertanggung jawab untuk tugas latar belakang seperti OCR dan embedding.
+```bash
+celery -A app.core.celery_app worker --loglevel=info
+```
+
+Setelah kedua proses tersebut berjalan, aplikasi Anda siap digunakan sepenuhnya.
 
 
 
@@ -502,58 +526,70 @@ Endpoint khusus untuk pengguna dengan `is_super_admin = true`.
 
 ---
 
-### 5. Documents (RAG)
+### 5. Documents (RAG) - Alur Proses Embedding
 
-#### Upload Document
+Bagian ini menjelaskan alur kerja baru yang asinkron untuk memproses dokumen. Prosesnya dibagi menjadi beberapa tahap untuk memberikan respon yang cepat kepada pengguna.
+
+#### Tahap 1: Upload Dokumen & Pemicu OCR
 - **Endpoint**: `POST /documents/upload`
-- **Deskripsi**: Upload dokumen (PDF) ke knowledge base perusahaan. Dokumen akan diproses dan di-embed ke vector database.
-- **Authentication**: **Token Diperlukan**.
+- **Deskripsi**: Menerima file, mengunggahnya ke object storage (S3), membuat record di database dengan status "UPLOADED", dan memicu tugas OCR di latar belakang.
+- **Authentication**: **Company Admin Token Diperlukan**.
 - **Request Body**: `multipart/form-data`
-  - `file`: File dokumen yang akan diunggah.
-- **Response 200 (Sukses)**:
+  - `file`: File dokumen yang akan diunggah (PDF, JPG, PNG, dll).
+- **Response 202 (Accepted)**: Mengembalikan detail dokumen yang baru dibuat di database.
   ```json
   {
-    "status": "success",
-    "message": "Document 'nama_file.pdf' processed and added to Pinecone for company 1.",
-    "chunks_added": 10
+    "id": 1,
+    "title": "nama_file_scan.pdf",
+    "company_id": 1,
+    "storage_path": "uploads/1/uuid-nama_file_scan.pdf",
+    "content_type": "application/pdf",
+    "status": "UPLOADED",
+    "extracted_text": null
   }
   ```
 
-#### OCR - Extract Text from Scanned Document/Image
-- **Endpoint**: `POST /documents/ocr-extract`
-- **Deskripsi**: Mengunggah dokumen hasil scan (PDF) atau gambar yang berisi teks untuk diekstraksi menggunakan OCR. Teks yang diekstrak akan dikembalikan untuk pratinjau.
-- **Authentication**: **Token Diperlukan**.
-- **Request Body**: `multipart/form-data`
-  - `file`: File gambar (JPG, PNG, TIFF, BMP, WEBP) atau PDF hasil scan.
-- **Response 200 (Sukses)**:
+#### Tahap 2: Ambil Dokumen untuk Validasi
+- **Endpoint**: `GET /documents/pending-validation`
+- **Deskripsi**: Mendapatkan daftar dokumen yang telah selesai diproses oleh OCR dan siap untuk divalidasi oleh pengguna.
+- **Authentication**: **Company Admin Token Diperlukan**.
+- **Response 200 (Sukses)**: Mengembalikan array berisi objek dokumen.
   ```json
-  {
-    "extracted_text": "Teks yang berhasil diekstrak dari dokumen...",
-    "temp_doc_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef"
-  }
+  [
+    {
+      "id": 1,
+      "title": "nama_file_scan.pdf",
+      "company_id": 1,
+      "storage_path": "uploads/1/uuid-nama_file_scan.pdf",
+      "content_type": "application/pdf",
+      "status": "PENDING_VALIDATION",
+      "extracted_text": "Teks hasil OCR yang perlu diperiksa..."
+    }
+  ]
   ```
 
-#### OCR - Embed Confirmed Text to RAG
-- **Endpoint**: `POST /documents/ocr-embed`
-- **Deskripsi**: Mengirim teks yang telah dikonfirmasi (setelah pratinjau OCR) untuk di-embed ke dalam database vektor RAG. Ini akan membuat dokumen baru di knowledge base perusahaan.
-- **Authentication**: **Token Diperlukan**.
+#### Tahap 3: Konfirmasi Teks & Pemicu Embedding
+- **Endpoint**: `POST /documents/{document_id}/confirm`
+- **Deskripsi**: Mengirimkan teks yang sudah dikoreksi/divalidasi oleh pengguna untuk disimpan, dan memicu tugas embedding di latar belakang.
+- **Authentication**: **Company Admin Token Diperlukan**.
+- **Path Parameter**:
+  - `document_id` (int): ID dokumen yang akan dikonfirmasi.
 - **Request Body**: `application/json`
   ```json
   {
-    "temp_doc_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-    "confirmed_text": "Teks yang sudah dikonfirmasi dan siap untuk di-embedding.",
-    "original_filename": "nama_file_scan.pdf"
+    "confirmed_text": "Teks final yang sudah dikoreksi oleh pengguna."
   }
   ```
-- **Response 200 (Sukses)**:
+- **Response 202 (Accepted)**: Mengembalikan detail dokumen dengan status "EMBEDDING".
   ```json
   {
-    "status": "success",
-    "message": "Document 'nama_file_scan.pdf' processed and added to Pinecone for company 1.",
-    "chunks_added": 15
+    "id": 1,
+    "title": "nama_file_scan.pdf",
+    "company_id": 1,
+    "status": "EMBEDDING",
+    "extracted_text": "Teks final yang sudah dikoreksi oleh pengguna."
   }
   ```
-
 #### List Documents
 - **Endpoint**: `GET /documents/`
 - **Deskripsi**: Mendapatkan daftar nama file dokumen di knowledge base perusahaan.
@@ -569,21 +605,14 @@ Endpoint khusus untuk pengguna dengan `is_super_admin = true`.
   ```
 
 #### Delete Document
-- **Endpoint**: `DELETE /documents/{filename}`
-- **Deskripsi**: Menghapus dokumen dari knowledge base perusahaan dan vector index-nya.
-- **Authentication**: **Token Diperlukan**.
+- **Endpoint**: `DELETE /documents/{document_id}`
+- **Deskripsi**: Menghapus dokumen secara menyeluruh dari Pinecone, S3, dan database PostgreSQL.
+- **Authentication**: **Company Admin Token Diperlukan**.
 - **Path Parameter**:
-  - `filename` (string): Nama file yang akan dihapus.
-- **Response 200 (Sukses)**:
-  ```json
-  {
-    "info": "File 'nama_file.pdf' and its embeddings have been deleted."
-  }
-  ```
+  - `document_id` (int): ID dokumen yang akan dihapus.
+- **Response 204 (No Content)**: Mengembalikan response kosong jika berhasil.
 
 ---
-
-
 
 ### 6. AI Chat
 
