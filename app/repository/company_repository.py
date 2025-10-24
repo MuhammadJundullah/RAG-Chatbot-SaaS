@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import distinct
 from app.models import company_model, user_model
 
 async def get_company(db: AsyncSession, company_id: int):
@@ -17,6 +18,33 @@ async def get_company_by_code(db: AsyncSession, code: str):
 async def get_companies(db: AsyncSession, skip: int = 0, limit: int = 100):
     result = await db.execute(select(company_model.Company).offset(skip).limit(limit))
     return result.scalars().all()
+
+async def get_active_companies(db: AsyncSession, skip: int = 0, limit: int = 100):
+    """Gets a list of companies that have an active admin."""
+    result = await db.execute(
+        select(distinct(company_model.Company.id))
+        .join(user_model.Users, company_model.Company.id == user_model.Users.company_id)
+        .filter(user_model.Users.role == 'admin', user_model.Users.is_active_in_company == True)
+        .offset(skip).limit(limit)
+    )
+    company_ids = result.scalars().all()
+    
+    if not company_ids:
+        return []
+        
+    companies_result = await db.execute(
+        select(company_model.Company).filter(company_model.Company.id.in_(company_ids))
+    )
+    return companies_result.scalars().all()
+
+async def is_company_active(db: AsyncSession, company_id: int) -> bool:
+    """Checks if a company has an active admin."""
+    admin_user_result = await db.execute(
+        select(user_model.Users)
+        .filter(user_model.Users.company_id == company_id, user_model.Users.role == 'admin')
+    )
+    admin_user = admin_user_result.scalar_one_or_none()
+    return admin_user and admin_user.is_active_in_company
 
 async def approve_company(db: AsyncSession, company_id: int):
     """Activates the admin user of a company and returns a status."""

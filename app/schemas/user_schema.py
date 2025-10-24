@@ -43,3 +43,9 @@ class UserLogin(BaseModel):
 class SuperAdminLogin(BaseModel):
     username: str
     password: str
+
+class EmployeeRegistrationByAdmin(BaseModel):
+    name: str
+    email: str
+    password: str
+    division_id: Optional[int] = None

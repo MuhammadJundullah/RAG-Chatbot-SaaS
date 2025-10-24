@@ -69,17 +69,11 @@ async def reject_company(
             detail=f"Company with id {company_id} not found."
         )
 
-    admin_user_result = await db.execute(
-        select(user_model.Users)
-        .filter(user_model.Users.company_id == company_id, user_model.Users.role == 'admin')
-    )
-    admin_user = admin_user_result.scalar_one_or_none()
-
-    if admin_user and admin_user.is_active_in_company:
+    if await company_repository.is_company_active(db, company_id=company_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot reject an active company."
         )
 
-    rejected_company = await company_repository.reject_company(db, company_id=company_id)
+    await company_repository.reject_company(db, company_id=company_id)
     return {"message": f"Company with id {company_id} has been rejected and deleted."}

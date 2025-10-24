@@ -3,11 +3,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List
 
-from app.repository import company_repository, user_repository
-from app.models import user_model, company_model
-from app.core.dependencies import get_current_company_admin, get_db, get_current_user, get_current_super_admin
+from app.repository import company_repository, division_repository
+from app.models import user_model, company_model, division_model
+from app.core.dependencies import get_current_company_admin, get_db, get_current_user
 from app.schemas import user_schema, company_schema
 from app.models.user_model import Users
+from app.services import user_service
 
 router = APIRouter(
     prefix="/companies",
@@ -30,92 +31,19 @@ async def read_company_users(
     users = result.scalars().all()
     return users
 
-
+# get all users of company
 @router.get("/", response_model=List[company_schema.Company])
 async def read_companies(
     skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db),
 ):
-    companies = await company_repository.get_companies(db, skip=skip, limit=limit)
+    companies = await company_repository.get_active_companies(db, skip=skip, limit=limit)
     return companies
 
-@router.get("/pending-employees", response_model=List[user_schema.User])
-async def get_pending_employees(
-    current_admin: user_model.Users = Depends(get_current_company_admin),
-    db: AsyncSession = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100
-):
-    """
-    Get a list of users awaiting approval for the admin's company.
-    Accessible only by the company's admin.
-    """
-    pending_employees = await user_repository.get_pending_employees(
-        db, company_id=current_admin.company_id, skip=skip, limit=limit
-    )
-    return pending_employees
-
-@router.patch("/employees/{user_id}/approve")
-async def approve_employee_registration(
-    user_id: int,
-    current_admin: user_model.Users = Depends(get_current_company_admin),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Approve an employee's registration request.
-    Accessible only by the company's admin.
-    """
-    user_to_approve = await user_repository.get_user(db, user_id=user_id)
-
-    if not user_to_approve or user_to_approve.company_id != current_admin.company_id:
-        raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found in your company."
-            )
-
-    # Ensure the user is actually pending approval
-    if user_to_approve.is_active_in_company:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User is already active."
-        )
-
-    await user_repository.approve_employee(db, user_id=user_id)
-    return {"message": f"Employee with id {user_id} has been approved."}
-
-@router.patch("/employees/{user_id}/reject")
-async def reject_employee_registration(
-    user_id: int,
-    current_admin: user_model.Users = Depends(get_current_company_admin),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Reject an employee's registration request.
-    Accessible only by the company's admin.
-    """
-    user_to_reject = await user_repository.get_user(db, user_id=user_id)
-
-    # Ensure the user exists and belongs to the admin's company
-    if not user_to_reject or user_to_reject.company_id != current_admin.company_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found in your company."
-        )
-
-    # Ensure the user is not already active
-    if user_to_reject.is_active_in_company:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot reject an active user."
-        )
-
-    await user_repository.delete_user(db, user=user_to_reject)
-    return {"message": f"Employee with id {user_id} has been rejected and deleted."}
-
+# get info for a company by id
 @router.get("/{company_id}", response_model=company_schema.Company)
 async def read_company(
     company_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_user)
 ):
     db_company = await company_repository.get_company(db, company_id=company_id)
     if db_company is None:
@@ -123,3 +51,32 @@ async def read_company(
     if db_company.id != current_user.company_id and not current_user.is_super_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view this company's details")
     return db_company
+
+@router.post("/employees/register", response_model=user_schema.User, status_code=status.HTTP_201_CREATED)
+async def register_employee_by_company_admin(
+    employee_data: user_schema.EmployeeRegistrationByAdmin,
+    current_admin: user_model.Users = Depends(get_current_company_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Register a new employee for the admin's company.
+    Accessible only by the company's admin.
+    """
+    if employee_data.division_id:
+        division = await division_repository.get_division(db, employee_data.division_id)
+        if not division or division.company_id != current_admin.company_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Division not found or does not belong to your company."
+            )
+
+    try:
+        new_employee = await user_service.register_employee_by_admin(
+            db, employee_data=employee_data, company_id=current_admin.company_id
+        )
+        return new_employee
+    except user_service.UserRegistrationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=e.detail,
+        )

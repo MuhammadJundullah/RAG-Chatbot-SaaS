@@ -55,27 +55,29 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
             company_id=new_company_obj.id,
             is_active_in_company=False
         )
-    
-    # Business Logic: Employee joining existing company
-    elif user_data.company_id is not None:
-        # Business Logic: Check if company exists
-        company = await company_repository.get_company(db, company_id=user_data.company_id)
-        if not company:
-            raise UserRegistrationError("Company ID not found.")
-
-        # Data Layer: Create new user object as employee
-        db_user = user_model.Users(
-            name=user_data.name,
-            email=user_data.email,
-            password=hashed_password,
-            role="employee",
-            company_id=user_data.company_id,
-            is_active_in_company=False
-        )
     else:
-        raise UserRegistrationError("Invalid registration data: provide either company details or a company ID.")
+        raise UserRegistrationError("Invalid registration data: only new company registration is allowed via this endpoint.")
 
     # Data Layer: Save the new user to the database
+    return await user_repository.create_user(db, user=db_user)
+
+async def register_employee_by_admin(db: AsyncSession, employee_data: user_schema.EmployeeRegistrationByAdmin, company_id: int):
+    existing_user = await user_repository.get_user_by_email(db, email=employee_data.email)
+    if existing_user:
+        raise UserRegistrationError("Email is already registered.")
+
+    hashed_password = get_password_hash(employee_data.password)
+
+    db_user = user_model.Users(
+        name=employee_data.name,
+        email=employee_data.email,
+        password=hashed_password,
+        role="employee",
+        company_id=company_id,
+        is_active_in_company=True,
+        Divisionid=employee_data.division_id
+    )
+
     return await user_repository.create_user(db, user=db_user)
 
 async def authenticate_user(db: AsyncSession, email: str, password: str) -> Optional[user_model.Users]:

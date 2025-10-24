@@ -17,10 +17,9 @@ async def register(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Handles unified registration for both new companies and new employees.
+    Handles registration for new companies.
 
     - **To register a new company:** Provide `name`, `email`, `password`, `company_name`, and optionally `pic_phone_number`.
-    - **To register as an employee for an existing company:** Provide `name`, `email`, `password`, and `company_id`.
     """
     try:
         user = await user_service.register_user(db, user_data=user_data)
@@ -28,7 +27,10 @@ async def register(
         if user.role == 'admin':
             return {"message": f"Company '{user_data.company_name}' and admin user '{user.email}' registered successfully. Pending approval from a super admin."}
         else:
-            return {"message": f"User '{user.email}' registered for company ID {user_data.company_id}. Pending approval from the company admin."}
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Employee self-registration is not allowed. Please contact your company administrator to be registered."
+            )
 
     except UserRegistrationError as e:
         raise HTTPException(
