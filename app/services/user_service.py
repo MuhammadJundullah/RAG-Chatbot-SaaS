@@ -1,5 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
+import secrets
+import string
 from app.schemas import user_schema
 from app.repository import user_repository, company_repository
 from app.utils.security import get_password_hash, verify_password
@@ -9,6 +11,11 @@ class UserRegistrationError(Exception):
     """Custom exception for registration errors."""
     def __init__(self, detail: str):
         self.detail = detail
+
+def generate_company_code(length=6):
+    """Generates a random, secure company code."""
+    alphabet = string.ascii_uppercase + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 async def register_user(db: AsyncSession, user_data: user_schema.UserRegistration):
     """
@@ -23,16 +30,17 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
     hashed_password = get_password_hash(user_data.password)
     
     # Business Logic: New Company Registration
-    if user_data.company_name and user_data.company_code:
+    if user_data.company_name:
         # Business Logic: Check if company name already exists
         existing_company = await company_repository.get_company_by_name(db, name=user_data.company_name)
         if existing_company:
             raise UserRegistrationError("Company name is already registered.")
 
         # Data Layer: Create new company object
+        company_code = generate_company_code()
         new_company_obj = company_model.Company(
             name=user_data.company_name,
-            code=user_data.company_code
+            code=company_code
         )
         db.add(new_company_obj)
         await db.flush()  # Flush to get the new company ID before committing
@@ -42,10 +50,10 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
             name=user_data.name,
             email=user_data.email,
             password=hashed_password,
+            pic_phone_number=user_data.pic_phone_number,
             role="admin",
             company_id=new_company_obj.id,
-            is_active_in_company=False,
-            is_super_admin=False
+            is_active_in_company=False
         )
     
     # Business Logic: Employee joining existing company
@@ -62,8 +70,7 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
             password=hashed_password,
             role="employee",
             company_id=user_data.company_id,
-            is_active_in_company=False,
-            is_super_admin=False
+            is_active_in_company=False
         )
     else:
         raise UserRegistrationError("Invalid registration data: provide either company details or a company ID.")
@@ -88,7 +95,21 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> Opti
         return None
 
     # Business Logic: Validate if user is active
-    if not user.is_active_in_company and not user.is_super_admin:
+    if not user.is_active_in_company:
+        return None
+        
+    return user
+
+async def authenticate_superadmin(db: AsyncSession, username: str, password: str) -> Optional[user_model.Users]:
+    """
+    Authenticates a superadmin by username and password.
+    """
+    user = await user_repository.get_user_by_username(db, username=username)
+    
+    if not user or not verify_password(password, user.password):
+        return None
+
+    if user.role != 'super_admin':
         return None
         
     return user

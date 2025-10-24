@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from typing import List
 
 from app.repository import company_repository, user_repository
 from app.core.dependencies import get_current_super_admin, get_db
 from app.schemas import company_schema
+from app.models import user_model
 
 router = APIRouter(
     prefix="/admin",
@@ -27,7 +29,7 @@ async def get_pending_companies(
     return companies
 
 
-@router.patch("/companies/{company_id}/approve", response_model=company_schema.Company)
+@router.patch("/companies/{company_id}/approve")
 async def approve_company(
     company_id: int,
     db: AsyncSession = Depends(get_db)
@@ -36,10 +38,48 @@ async def approve_company(
     Approve a company registration.
     Accessible only by super admins.
     """
-    approved_company = await company_repository.approve_company(db, company_id=company_id)
-    if not approved_company:
+    approval_status = await company_repository.approve_company(db, company_id=company_id)
+    
+    if approval_status == "approved":
+        return {"message": f"Company with id {company_id} has been approved."}
+    elif approval_status == "already_active":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Company with id {company_id} is already active."
+        )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Company with id {company_id} not found or no admin user associated."
+        )
+
+@router.patch("/companies/{company_id}/reject")
+async def reject_company(
+    company_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Reject a company registration.
+    Accessible only by super admins.
+    """
+    company_to_reject = await company_repository.get_company(db, company_id=company_id)
+    if not company_to_reject:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Company with id {company_id} not found."
         )
-    return approved_company
+
+    admin_user_result = await db.execute(
+        select(user_model.Users)
+        .filter(user_model.Users.company_id == company_id, user_model.Users.role == 'admin')
+    )
+    admin_user = admin_user_result.scalar_one_or_none()
+
+    if admin_user and admin_user.is_active_in_company:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot reject an active company."
+        )
+
+    rejected_company = await company_repository.reject_company(db, company_id=company_id)
+    return {"message": f"Company with id {company_id} has been rejected and deleted."}

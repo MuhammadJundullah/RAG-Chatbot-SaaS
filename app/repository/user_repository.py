@@ -30,17 +30,25 @@ async def get_user_by_email(db: AsyncSession, email: str):
     )
     return result.scalar_one_or_none()
 
+async def get_user_by_username(db: AsyncSession, username: str):
+    result = await db.execute(
+        select(user_model.Users)
+        .options(joinedload(user_model.Users.company))
+        .filter(user_model.Users.username == username)
+    )
+    return result.scalar_one_or_none()
+
 async def get_users(db: AsyncSession, skip: int = 0, limit: int = 100):
     result = await db.execute(select(user_model.Users).offset(skip).limit(limit))
     return result.scalars().all()
 
-async def get_pending_users_by_company(db: AsyncSession, company_id: int):
-    result = await db.execute(
-        select(user_model.Users)
-        .filter(user_model.Users.company_id == company_id)
-        .filter(user_model.Users.status == "pending_approval")
-    )
-    return result.scalars().all()
+# async def get_pending_users_by_company(db: AsyncSession, company_id: int):
+#     result = await db.execute(
+#         select(user_model.Users)
+#         .filter(user_model.Users.company_id == company_id)
+#         .filter(user_model.Users.status == "pending_approval")
+#     )
+#     return result.scalars().all()
 
 async def update_user_status(db: AsyncSession, user: user_model.Users, status: str):
     user.status = status

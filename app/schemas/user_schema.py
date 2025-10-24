@@ -1,17 +1,18 @@
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, model_validator
+from typing import Optional
 
 class UserBase(BaseModel):
     name: str
-    email: str
+    email: Optional[str] = None
+    username: Optional[str] = None
 
 class UserRegistration(BaseModel):
     name: str
     email: str
     password: str
+    pic_phone_number: Optional[str] = None
     # For new company registration
     company_name: Optional[str] = None
-    company_code: Optional[str] = None
     # For joining an existing company
     company_id: Optional[int] = None
 
@@ -23,7 +24,7 @@ class UserUpdate(BaseModel):
 
 class User(UserBase):
     id: int
-    is_super_admin: bool
+    pic_phone_number: Optional[str] = None
     is_active_in_company: bool
     role: str
     company_id: Optional[int] = None
@@ -37,4 +38,8 @@ class AdminCreate(BaseModel):
 
 class UserLogin(BaseModel):
     email: str
+    password: str
+
+class SuperAdminLogin(BaseModel):
+    username: str
     password: str

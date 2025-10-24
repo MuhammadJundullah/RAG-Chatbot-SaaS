@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL_NAME: str
     PINECONE_API_KEY: str
 
+    SUPERADMIN_USERNAME: str = "superadmin"
     SUPERADMIN_EMAIL: str = "superadmin@example.com"
     SUPERADMIN_PASSWORD: str = "superadmin"
     

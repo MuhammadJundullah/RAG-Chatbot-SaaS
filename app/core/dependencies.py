@@ -11,7 +11,7 @@ from app.models import user_model
 from app.schemas import token_schema
 from app.repository import user_repository
 
-# The tokenUrl should point to the new login endpoint
+# The tokenUrl should point to a generic token endpoint
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -32,12 +32,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     )
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
+        user_id: str = payload.get("sub")
+        if user_id is None:
             raise credentials_exception
         
         token_data = token_schema.TokenData(
-            email=email, 
+            sub=user_id, 
             role=payload.get("role"), 
             company_id=payload.get("company_id")
         )
@@ -45,7 +45,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     except JWTError:
         raise credentials_exception
     
-    user = await user_repository.get_user_by_email(db, email=token_data.email)
+    user = await user_repository.get_user(db, user_id=int(token_data.sub))
     if user is None:
         raise credentials_exception
         
@@ -53,7 +53,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
 
 async def get_current_super_admin(current_user: user_model.Users = Depends(get_current_user)) -> user_model.Users:
     """Dependency to ensure the user is a super admin."""
-    if not current_user.is_super_admin:
+    if current_user.role != 'super_admin':
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="The user does not have super admin privileges",

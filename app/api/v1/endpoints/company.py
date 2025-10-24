@@ -54,7 +54,7 @@ async def get_pending_employees(
     )
     return pending_employees
 
-@router.patch("/employees/{user_id}/approve", response_model=user_schema.User)
+@router.patch("/employees/{user_id}/approve")
 async def approve_employee_registration(
     user_id: int,
     current_admin: user_model.Users = Depends(get_current_company_admin),
@@ -66,21 +66,50 @@ async def approve_employee_registration(
     """
     user_to_approve = await user_repository.get_user(db, user_id=user_id)
 
-    # Ensure the user exists and belongs to the admin's company
     if not user_to_approve or user_to_approve.company_id != current_admin.company_id:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found in your company."
-        )
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found in your company."
+            )
 
     # Ensure the user is actually pending approval
     if user_to_approve.is_active_in_company:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User is not pending approval."
+            detail="User is already active."
         )
 
-    return await user_repository.approve_employee(db, user_id=user_id)
+    await user_repository.approve_employee(db, user_id=user_id)
+    return {"message": f"Employee with id {user_id} has been approved."}
+
+@router.patch("/employees/{user_id}/reject")
+async def reject_employee_registration(
+    user_id: int,
+    current_admin: user_model.Users = Depends(get_current_company_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Reject an employee's registration request.
+    Accessible only by the company's admin.
+    """
+    user_to_reject = await user_repository.get_user(db, user_id=user_id)
+
+    # Ensure the user exists and belongs to the admin's company
+    if not user_to_reject or user_to_reject.company_id != current_admin.company_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found in your company."
+        )
+
+    # Ensure the user is not already active
+    if user_to_reject.is_active_in_company:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot reject an active user."
+        )
+
+    await user_repository.delete_user(db, user=user_to_reject)
+    return {"message": f"Employee with id {user_id} has been rejected and deleted."}
 
 @router.get("/{company_id}", response_model=company_schema.Company)
 async def read_company(

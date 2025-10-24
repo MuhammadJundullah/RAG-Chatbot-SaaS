@@ -32,32 +32,32 @@ db_manager = DatabaseManager()
 
 async def create_super_admin(db_session):
     """Creates the initial super admin user from environment variables or defaults."""
-    SUPERADMIN_EMAIL = settings.SUPERADMIN_EMAIL
+    SUPERADMIN_USERNAME = settings.SUPERADMIN_USERNAME
     SUPERADMIN_PASSWORD = settings.SUPERADMIN_PASSWORD
-    if SUPERADMIN_EMAIL == "superadmin@example.com":
-        print("\033[93mWARNING: SUPERADMIN_EMAIL not set. Using default: superadmin@example.com\033[0m")
+    if SUPERADMIN_USERNAME == "superadmin":
+        print("\033[93mWARNING: SUPERADMIN_USERNAME not set. Using default: superadmin\033[0m")
     if SUPERADMIN_PASSWORD == "superadmin":
         print("\033[93mWARNING: SUPERADMIN_PASSWORD not set. Using default: superadmin\033[0m")
 
     from app.models.user_model import Users as UserModel
-    result = await db_session.execute(select(UserModel).filter(UserModel.email == SUPERADMIN_EMAIL))
+    result = await db_session.execute(select(UserModel).filter(UserModel.username == SUPERADMIN_USERNAME))
     if result.scalar_one_or_none():
-        print(f"Super admin user '{SUPERADMIN_EMAIL}' already exists.")
+        print(f"Super admin user '{SUPERADMIN_USERNAME}' already exists.")
         return
 
     hashed_password = get_password_hash(SUPERADMIN_PASSWORD)
     super_admin = UserModel(
         name="Super Admin",
-        email=SUPERADMIN_EMAIL,
+        username=SUPERADMIN_USERNAME,
+        email=None,
         password=hashed_password,
         role="super_admin",
-        is_super_admin=True,
         is_active_in_company=True,
         company_id=None
     )
     db_session.add(super_admin)
     await db_session.commit()
-    print(f"Super admin user '{SUPERADMIN_EMAIL}' created successfully.")
+    print(f"Super admin user '{SUPERADMIN_USERNAME}' created successfully.")
 
 async def init_db():
     """
