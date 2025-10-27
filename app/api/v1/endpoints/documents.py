@@ -161,6 +161,44 @@ async def retry_failed_document_processing(
 
     return updated_doc
 
+@router.put("/{document_id}/content", response_model=document_schema.Document)
+async def update_document_content(
+    document_id: int,
+    request: document_schema.DocumentUpdateContentRequest,
+    current_user: Users = Depends(get_current_company_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Updates the text content of an existing document and re-generates its embeddings."""
+    db_document = await document_repository.get_document(db, document_id=document_id)
+    if not db_document or db_document.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    # Update the document's extracted text in the database
+    updated_doc_db = await document_repository.update_document_text_and_status(
+        db, 
+        document_id=document_id, 
+        text=request.new_content, 
+        status=DocumentStatus.EMBEDDING # Set status to EMBEDDING as new embeddings will be generated
+    )
+
+    # Update embeddings in Pinecone
+    rag_update_result = await rag_service.update_document_content(
+        document_id=str(document_id), # Pinecone document_id is string
+        new_text_content=request.new_content,
+        company_id=current_user.company_id,
+        source_filename=request.filename # Use filename from request for Pinecone metadata
+    )
+
+    if rag_update_result.get("status") == "failed":
+        raise HTTPException(status_code=500, detail=f"Failed to update RAG embeddings: {rag_update_result.get('message')}")
+
+    # After successful RAG update, set status to COMPLETED
+    final_updated_doc = await document_repository.update_document_status_and_reason(
+        db, document_id=document_id, status=DocumentStatus.COMPLETED
+    )
+
+    return final_updated_doc
+
 @router.get("/{document_id}", response_model=document_schema.Document)
 async def read_single_document(
     document_id: int,
@@ -189,9 +227,10 @@ async def delete_document(
         raise HTTPException(status_code=404, detail="Document not found.")
 
     try:
-        await rag_service.delete_document(
-            company_id=db_document.company_id, 
-            filename=db_document.title
+        # Use the new delete_document_by_id which filters by document_id
+        await rag_service.delete_document_by_id(
+            document_id=str(document_id), 
+            company_id=db_document.company_id
         )
 
         try:

@@ -5,6 +5,7 @@ class CompanyBase(BaseModel):
     name: str
     code: str
     logo: Optional[str] = None
+    address: Optional[str] = None
 
 class CompanyCreate(CompanyBase):
     pass

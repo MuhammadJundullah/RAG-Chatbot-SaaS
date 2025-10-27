@@ -22,3 +22,4 @@ class Company(Base):
     documents = relationship("Documents", back_populates="company")
     chatlogs = relationship("Chatlogs", back_populates="company")
     divisions = relationship("Division", back_populates="company")
+    address = Column(String(255), nullable=True)

@@ -17,6 +17,7 @@ class Chatlogs(Base):
     answer = Column(Text)
     UsersId = Column(Integer, ForeignKey("Users.id"), nullable=False)
     company_id = Column(Integer, ForeignKey("Company.id"), nullable=False)
+    conversation_id = Column(String(255), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
     user = relationship("Users", back_populates="chatlogs")

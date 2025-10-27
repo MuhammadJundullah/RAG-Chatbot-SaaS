@@ -16,7 +16,8 @@ class GeminiService:
         db: AsyncSession,
         current_user: user_model.Users,
         context: Optional[str] = None, 
-        query_results: Optional[str] = None
+        query_results: Optional[str] = None,
+        conversation_history: Optional[list[dict]] = None
     ) -> AsyncGenerator[str, None]:
         """
         Generates a final chat response as a stream, personalizing the prompt with company-specific details.
@@ -37,6 +38,11 @@ Your core instructions are:
 """
 
         prompt_parts = [system_instruction]
+
+        if conversation_history:
+            for entry in conversation_history:
+                prompt_parts.append(f"User: {entry['question']}")
+                prompt_parts.append(f"AI: {entry['answer']}")
 
         if context:
             prompt_parts.append(f"---BEGIN DOCUMENTS---\n{context}\n---END DOCUMENTS---")

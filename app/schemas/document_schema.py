@@ -23,3 +23,7 @@ class Document(DocumentBase):
 
     class Config:
         from_attributes = True
+
+class DocumentUpdateContentRequest(BaseModel):
+    new_content: str
+    filename: str

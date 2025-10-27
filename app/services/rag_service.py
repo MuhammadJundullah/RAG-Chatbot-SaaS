@@ -34,6 +34,27 @@ class RAGService:
             else:
                 raise e
 
+    async def delete_document_by_id(self, document_id: str, company_id: int) -> Dict[str, Any]:
+        namespace = self._get_namespace(company_id)
+        try:
+            await asyncio.to_thread(self.index.delete, filter={"document_id": {"$eq": document_id}}, namespace=namespace)
+            return {"status": "success"}
+        except Exception as e:
+            if "Namespace not found" in str(e):
+                return {"status": "success", "message": "Document not in vector index."}
+            else:
+                raise e
+
+    async def update_document_content(self, document_id: str, new_text_content: str, company_id: int, source_filename: str) -> Dict[str, Any]:
+        # First, delete existing embeddings for the document
+        delete_result = await self.delete_document_by_id(document_id, company_id)
+        if delete_result.get("status") == "failed":
+            return delete_result # Or handle error appropriately
+
+        # Then, add the new content as a document
+        add_result = await self.add_text_as_document(new_text_content, source_filename, company_id, document_id)
+        return add_result
+
     async def get_relevant_context(self, query: str, company_id: int, n_results: int = 5) -> str:
         namespace = self._get_namespace(company_id)
         query_embedding = await asyncio.to_thread(self.embedding_model.encode, query)
@@ -48,14 +69,14 @@ class RAGService:
             return "\n".join([match['metadata']['content'] for match in response['matches'] if 'content' in match['metadata']])
         return ""
 
-    async def add_documents(self, documents: List[str], company_id: int, source_filename: str):
+    async def add_documents(self, documents: List[str], company_id: int, source_filename: str, document_id: str):
         namespace = self._get_namespace(company_id)
         embeddings = await asyncio.to_thread(self.embedding_model.encode, documents)
         embeddings = embeddings.tolist()
         vectors_to_upsert = []
         for doc, emb in zip(documents, embeddings):
             vector_id = str(uuid.uuid4())
-            metadata = {'source': source_filename, 'content': doc}
+            metadata = {'source': source_filename, 'content': doc, 'document_id': document_id}
             vectors_to_upsert.append((vector_id, emb, metadata))
         await asyncio.to_thread(self.index.upsert, vectors=vectors_to_upsert, namespace=namespace)
 
@@ -66,11 +87,11 @@ class RAGService:
         overlap = 200
         return [text_content[i:i + chunk_size] for i in range(0, len(text_content), chunk_size - overlap)]
 
-    async def add_text_as_document(self, text_content: str, file_name: str, company_id: int) -> Dict[str, Any]:
+    async def add_text_as_document(self, text_content: str, file_name: str, company_id: int, document_id: str) -> Dict[str, Any]:
         chunks = self._chunk_text(text_content)
         if not chunks:
             return {"status": "failed", "message": "Could not chunk document text."}
-        await self.add_documents(chunks, company_id, file_name)
+        await self.add_documents(chunks, company_id, file_name, document_id)
         return {"status": "success", "chunks_added": len(chunks)}
 
 # Global singleton instance, created on import

@@ -15,7 +15,7 @@ router = APIRouter(
     tags=["Companies"],
 )
 
-# mendapatkan users dari satu company 
+# mendapatkan data users dari satu company 
 @router.get("/users", response_model=List[user_schema.User])
 async def read_company_users(
     db: AsyncSession = Depends(get_db),
@@ -31,6 +31,20 @@ async def read_company_users(
     users = result.scalars().all()
     return users
 
+@router.get("/me", response_model=company_schema.Company)
+async def read_my_company(
+    db: AsyncSession = Depends(get_db),
+    current_user: user_model.Users = Depends(get_current_company_admin)
+):
+    """
+    Get the current admin's company data.
+    Accessible only by the company's admin.
+    """
+    db_company = await company_repository.get_company(db, company_id=current_user.company_id)
+    if db_company is None:
+        raise HTTPException(status_code=404, detail="Company not found for this admin.")
+    return db_company
+
 # get all users of company
 @router.get("/", response_model=List[company_schema.Company])
 async def read_companies(
@@ -39,20 +53,7 @@ async def read_companies(
     companies = await company_repository.get_active_companies(db, skip=skip, limit=limit)
     return companies
 
-# get info for a company by id
-@router.get("/{company_id}", response_model=company_schema.Company)
-async def read_company(
-    company_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: user_model.Users = Depends(get_current_company_admin)
-):
-    db_company = await company_repository.get_company(db, company_id=company_id)
-    if db_company is None:
-        raise HTTPException(status_code=404, detail="Company not found")
-    if db_company.id != current_user.company_id and not current_user.role == "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view this company's details")
-    return db_company
-
+# 
 @router.post("/employees/register", response_model=user_schema.User, status_code=status.HTTP_201_CREATED)
 async def register_employee_by_company_admin(
     employee_data: user_schema.EmployeeRegistrationByAdmin,

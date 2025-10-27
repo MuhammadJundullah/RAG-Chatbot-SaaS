@@ -71,7 +71,8 @@ async def _run_embedding_processing(document_id: int):
         result = await rag_service.add_text_as_document(
             text_content=doc.extracted_text,
             file_name=doc.title,
-            company_id=doc.company_id
+            company_id=doc.company_id,
+            document_id=str(document_id)
         )
         if result.get("status") == "failed":
             raise ValueError(f"RAG service failed: {result.get('message')}")

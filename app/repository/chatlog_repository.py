@@ -24,13 +24,25 @@ async def get_chatlogs(
     query = select(chatlog_model.Chatlogs)
     if company_id:
         query = query.filter(chatlog_model.Chatlogs.company_id == company_id)
-    if user_id:
-        query = query.filter(chatlog_model.Chatlogs.UsersId == user_id)
     if start_date:
         query = query.filter(chatlog_model.Chatlogs.created_at >= start_date)
     if end_date:
         query = query.filter(chatlog_model.Chatlogs.created_at <= end_date)
     
+    result = await db.execute(query.offset(skip).limit(limit))
+    return result.scalars().all()
+
+async def get_chat_history(
+    db: AsyncSession,
+    conversation_id: str,
+    user_id: int,
+    skip: int = 0,
+    limit: int = 100,
+):
+    query = select(chatlog_model.Chatlogs).filter(
+        chatlog_model.Chatlogs.conversation_id == conversation_id,
+        chatlog_model.Chatlogs.UsersId == user_id
+    ).order_by(chatlog_model.Chatlogs.created_at)
     result = await db.execute(query.offset(skip).limit(limit))
     return result.scalars().all()
 

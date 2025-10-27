@@ -6,6 +6,7 @@ class ChatlogBase(BaseModel):
     answer: str
     UsersId: int
     company_id: int
+    conversation_id: str
 
 class ChatlogCreate(ChatlogBase):
     pass
