@@ -15,6 +15,6 @@ class Embeddings(Base):
     __tablename__ = "Embeddings"
     id = Column(Integer, primary_key=True)
     vector_id = Column(String)
-    DocumentsId = Column(Integer, ForeignKey("Documents.id"), nullable=False)
+    document_id = Column(Integer, ForeignKey("Documents.id"), nullable=False)
 
     document = relationship("Documents", back_populates="embeddings")

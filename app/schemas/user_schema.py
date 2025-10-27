@@ -9,6 +9,7 @@ class UserBase(BaseModel):
 class UserRegistration(BaseModel):
     name: str
     email: str
+    username: Optional[str] = None
     password: str
     pic_phone_number: Optional[str] = None
     # For new company registration
@@ -36,16 +37,22 @@ class AdminCreate(BaseModel):
     email: str
     password: str
 
-class UserLogin(BaseModel):
-    email: str
+class UserLoginCombined(BaseModel):
+    email: Optional[str] = None
+    username: Optional[str] = None
     password: str
 
-class SuperAdminLogin(BaseModel):
-    username: str
-    password: str
+    @model_validator(mode='after')
+    def check_email_or_username(self) -> 'UserLoginCombined':
+        if not self.email and not self.username:
+            raise ValueError('Either email or username must be provided')
+        if self.email and self.username:
+            raise ValueError('Only one of email or username can be provided')
+        return self
 
 class EmployeeRegistrationByAdmin(BaseModel):
     name: str
     email: str
+    username: str
     password: str
     division_id: Optional[int] = None

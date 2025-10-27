@@ -51,6 +51,19 @@ async def update_document_text_and_status(db: AsyncSession, document_id: int, te
         await db.refresh(db_document)
     return db_document
 
+async def update_document_status_and_reason(db: AsyncSession, document_id: int, status: document_model.DocumentStatus, reason: str | None = None) -> document_model.Documents | None:
+    """Updates the status and optionally the failure reason of a document."""
+    db_document = await get_document(db, document_id=document_id)
+    if db_document:
+        db_document.status = status
+        db_document.failed_reason = reason
+        # Clear reason if status is not failed
+        if status != document_model.DocumentStatus.PROCESSING_FAILED:
+            db_document.failed_reason = None
+        await db.commit()
+        await db.refresh(db_document)
+    return db_document
+
 async def delete_document(db: AsyncSession, document_id: int) -> document_model.Documents | None:
     """Deletes a document from the database by its ID."""
     db_document = await get_document(db, document_id=document_id)

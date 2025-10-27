@@ -13,7 +13,13 @@ import app.models
 class DatabaseManager:
     def __init__(self):
         """Initializes the database engine and session maker upon creation."""
-        self.engine = create_async_engine(settings.DATABASE_URL, echo=False)
+        self.engine = create_async_engine(
+            settings.DATABASE_URL, 
+            echo=False,
+            pool_size=20,  # Adjust as needed
+            max_overflow=10,  # Adjust as needed
+            pool_timeout=30,  # Seconds, adjust as needed
+        )
         self.async_session_maker = async_sessionmaker(
             self.engine, expire_on_commit=False, class_=AsyncSession
         )
@@ -26,7 +32,10 @@ class DatabaseManager:
     async def get_db_session(self) -> AsyncGenerator[AsyncSession, None]:
         """Provides a database session."""
         async with self.async_session_maker() as session:
-            yield session
+            try:
+                yield session
+            finally:
+                await session.close()
 
 db_manager = DatabaseManager()
 

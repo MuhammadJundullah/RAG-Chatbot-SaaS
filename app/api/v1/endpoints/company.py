@@ -44,11 +44,12 @@ async def read_companies(
 async def read_company(
     company_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: user_model.Users = Depends(get_current_company_admin)
 ):
     db_company = await company_repository.get_company(db, company_id=company_id)
     if db_company is None:
         raise HTTPException(status_code=404, detail="Company not found")
-    if db_company.id != current_user.company_id and not current_user.is_super_admin:
+    if db_company.id != current_user.company_id and not current_user.role == "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view this company's details")
     return db_company
 

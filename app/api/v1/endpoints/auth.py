@@ -19,7 +19,7 @@ async def register(
     """
     Handles registration for new companies.
 
-    - **To register a new company:** Provide `name`, `email`, `password`, `company_name`, and optionally `pic_phone_number`.
+    - **To register a new company:** Provide `name`, `email`, `password`, `company_name`, and optionally `pic_phone_number` and `username`.
     """
     try:
         user = await user_service.register_user(db, user_data=user_data)
@@ -38,54 +38,28 @@ async def register(
             detail=e.detail,
         )
 
-@router.post("/superadmin/token", response_model=token_schema.Token)
-async def login_for_superadmin_access_token(
-    data: user_schema.SuperAdminLogin,
+@router.post("/user/token", response_model=token_schema.Token)
+async def login_for_access_token(
+    data: user_schema.UserLoginCombined,
     db: AsyncSession = Depends(get_db),
 ):
-    user = await user_service.authenticate_superadmin(db, username=data.username, password=data.password)
+    user = await user_service.authenticate_user(db, email=data.email, username=data.username, password=data.password)
     
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password, or user is not a superadmin.",
+            detail="Incorrect credentials or user is inactive/unauthorized.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token_data = auth.create_access_token(
-        data={
-            "sub": str(user.id),
-            "role": user.role,
-        }
-    )
-    return {
-        "access_token": token_data["access_token"],
-        "token_type": "bearer",
-        "expires_in": token_data["expires_in"],
-        "user": user,
+    token_data_payload = {
+        "sub": str(user.id),
+        "role": user.role,
     }
+    if user.company_id:
+        token_data_payload["company_id"] = user.company_id
 
-@router.post("/user/token", response_model=token_schema.Token)
-async def login_for_user_access_token(
-    data: user_schema.UserLogin,
-    db: AsyncSession = Depends(get_db),
-):
-    user = await user_service.authenticate_user(db, email=data.email, password=data.password)
-    
-    if not user or user.role not in ['admin', 'employee']:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password, or user is inactive or not authorized.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    token_data = auth.create_access_token(
-        data={
-            "sub": str(user.id),
-            "role": user.role,
-            "company_id": user.company_id,
-        }
-    )
+    token_data = auth.create_access_token(data=token_data_payload)
     return {
         "access_token": token_data["access_token"],
         "token_type": "bearer",

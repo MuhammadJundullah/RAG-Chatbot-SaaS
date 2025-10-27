@@ -22,10 +22,16 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
     Orchestrates the business logic for registering a new user.
     Can either create a new company or assign to an existing one.
     """
-    # Business Logic: Check if user already exists
-    existing_user = await user_repository.get_user_by_email(db, email=user_data.email)
-    if existing_user:
+    # Business Logic: Check if user already exists by email or username
+    existing_user_by_email = await user_repository.get_user_by_email(db, email=user_data.email)
+    if existing_user_by_email:
         raise UserRegistrationError("Email is already registered.")
+    
+    # For initial admin registration, use email as username if username is not provided
+    username_to_use = user_data.username if user_data.username else user_data.email
+    existing_user_by_username = await user_repository.get_user_by_username(db, username=username_to_use)
+    if existing_user_by_username:
+        raise UserRegistrationError("Username is already registered.")
 
     hashed_password = get_password_hash(user_data.password)
     
@@ -49,6 +55,7 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
         db_user = user_model.Users(
             name=user_data.name,
             email=user_data.email,
+            username=username_to_use,
             password=hashed_password,
             pic_phone_number=user_data.pic_phone_number,
             role="admin",
@@ -62,15 +69,20 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
     return await user_repository.create_user(db, user=db_user)
 
 async def register_employee_by_admin(db: AsyncSession, employee_data: user_schema.EmployeeRegistrationByAdmin, company_id: int):
-    existing_user = await user_repository.get_user_by_email(db, email=employee_data.email)
-    if existing_user:
+    existing_user_by_email = await user_repository.get_user_by_email(db, email=employee_data.email)
+    if existing_user_by_email:
         raise UserRegistrationError("Email is already registered.")
+    
+    existing_user_by_username = await user_repository.get_user_by_username(db, username=employee_data.username)
+    if existing_user_by_username:
+        raise UserRegistrationError("Username is already registered.")
 
     hashed_password = get_password_hash(employee_data.password)
 
     db_user = user_model.Users(
         name=employee_data.name,
         email=employee_data.email,
+        username=employee_data.username,
         password=hashed_password,
         role="employee",
         company_id=company_id,
@@ -80,38 +92,33 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
 
     return await user_repository.create_user(db, user=db_user)
 
-async def authenticate_user(db: AsyncSession, email: str, password: str) -> Optional[user_model.Users]:
+async def authenticate_user(db: AsyncSession, password: str, email: Optional[str] = None, username: Optional[str] = None) -> Optional[user_model.Users]:
     """
-    Authenticates a user by email and password.
+    Authenticates a user by email or username and password.
 
-    - Fetches the user by email.
+    - Fetches the user by email or username.
     - Verifies the password.
-    - Checks if the user account is active.
+    - Checks if the user account is active and authorized for the given role.
 
     Returns the user object if authentication is successful, otherwise None.
     """
-    user = await user_repository.get_user_by_email(db, email=email)
-    
-    # Business Logic: Validate user existence and password
-    if not user or not verify_password(password, user.password):
-        return None
-
-    # Business Logic: Validate if user is active
-    if not user.is_active_in_company:
-        return None
-        
-    return user
-
-async def authenticate_superadmin(db: AsyncSession, username: str, password: str) -> Optional[user_model.Users]:
-    """
-    Authenticates a superadmin by username and password.
-    """
-    user = await user_repository.get_user_by_username(db, username=username)
+    user = None
+    if username:
+        user = await user_repository.get_user_by_username(db, username=username)
+    elif email:
+        user = await user_repository.get_user_by_email(db, email=email)
     
     if not user or not verify_password(password, user.password):
         return None
 
-    if user.role != 'super_admin':
-        return None
+    # Superadmin specific check
+    if user.role == 'super_admin':
+        return user
+
+    # Company admin/employee specific checks
+    if user.role in ['admin', 'employee']:
+        if not user.is_active_in_company:
+            return None
+        return user
         
-    return user
+    return None

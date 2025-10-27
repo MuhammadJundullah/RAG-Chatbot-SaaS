@@ -6,6 +6,7 @@ from botocore.exceptions import ClientError
 
 from app.core.dependencies import get_current_user, get_db, get_current_company_admin
 from app.models.user_model import Users
+from app.models.document_model import DocumentStatus
 from app.schemas import document_schema
 from app.repository import document_repository
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,7 +52,6 @@ async def upload_document(
     safe_filename = "".join(c for c in file.filename if c.isalnum() or c in ('.', '-', '_')).rstrip()
     s3_key = f"smartai/uploads/{current_user.company_id}/{uuid.uuid4()}-{safe_filename}"
 
-    print(f"[DEBUG] Starting S3 upload process for key: {s3_key}")
     try:
         s3 = await s3_client_manager.get_client()
         await s3.put_object(
@@ -60,9 +60,7 @@ async def upload_document(
             Body=file_content
         )
     except Exception as e:
-        print(f"[ERROR] Failed to upload to S3: {e}")
         raise HTTPException(status_code=500, detail="Failed to upload file to storage.")
-    print("[DEBUG] S3 upload successful.")
 
     doc_create = document_schema.DocumentCreate(
         title=file.filename,
@@ -99,8 +97,8 @@ async def confirm_document_and_trigger_embedding(
     if not db_document or db_document.company_id != current_user.company_id:
         raise HTTPException(status_code=404, detail="Document not found.")
     
-    if db_document.status != "PENDING_VALIDATION":
-        raise HTTPException(status_code=400, detail=f"Document is not pending validation. Current status: {db_document.status}")
+    if db_document.status != DocumentStatus.PENDING_VALIDATION:
+        raise HTTPException(status_code=400, detail=f"Document is not pending validation. Current status: {db_document.status.value}")
 
     updated_doc = await document_repository.update_document_text_and_status(
         db, 
@@ -110,6 +108,56 @@ async def confirm_document_and_trigger_embedding(
     )
 
     process_embedding_task.delay(document_id)
+
+    return updated_doc
+
+@router.get("/failed", response_model=List[document_schema.Document])
+async def get_failed_documents(
+    current_user: Users = Depends(get_current_company_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Gets a list of documents that failed during processing."""
+    documents = await document_repository.get_documents_by_status(
+        db, status="PROCESSING_FAILED", company_id=current_user.company_id
+    )
+    return documents
+
+@router.post("/{document_id}/retry", response_model=document_schema.Document)
+async def retry_failed_document_processing(
+    document_id: int,
+    current_user: Users = Depends(get_current_company_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Manually triggers a retry for a document that failed during processing."""
+    db_document = await document_repository.get_document(db, document_id=document_id)
+
+    if not db_document or db_document.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    if db_document.status != DocumentStatus.PROCESSING_FAILED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Document is not in a failed state. Current status: {db_document.status.value}"
+        )
+
+    # Smart retry based on which stage it failed
+    if db_document.failed_reason and "OCR" in db_document.failed_reason:
+        # If OCR failed, we restart from the beginning
+        updated_doc = await document_repository.update_document_status_and_reason(
+            db, document_id=document_id, status=DocumentStatus.UPLOADED
+        )
+        process_ocr_task.delay(document_id)
+        print(f"Document {document_id} has been re-queued for OCR processing.")
+    elif db_document.failed_reason and "Embedding" in db_document.failed_reason:
+        # If Embedding failed, we restart from the embedding step
+        updated_doc = await document_repository.update_document_status_and_reason(
+            db, document_id=document_id, status=DocumentStatus.PENDING_VALIDATION
+        )
+        process_embedding_task.delay(document_id)
+        print(f"Document {document_id} has been re-queued for embedding.")
+    else:
+        # Fallback for unknown failure reason
+        raise HTTPException(status_code=400, detail="Unknown failure reason, cannot determine retry step.")
 
     return updated_doc
 
@@ -141,29 +189,26 @@ async def delete_document(
         raise HTTPException(status_code=404, detail="Document not found.")
 
     try:
-        # 1. Delete from RAG service (Pinecone)
         await rag_service.delete_document(
             company_id=db_document.company_id, 
             filename=db_document.title
         )
 
-        # 2. Delete from S3
         try:
-            async with await s3_client_manager.get_client() as s3:
-                await s3.delete_object(
-                    Bucket=settings.S3_BUCKET_NAME,
-                    Key=db_document.storage_path
-                )
+            s3 = await s3_client_manager.get_client()
+            await s3.delete_object(
+                Bucket=settings.S3_BUCKET_NAME,
+                Key=db_document.storage_path
+            )
         except ClientError as e:
-            # If the object does not exist, we can consider the deletion successful and continue.
             if e.response['Error']['Code'] not in ['404', 'NoSuchKey']:
-                raise e # Re-raise other S3 client errors
+                raise e
             print(f"Warning: S3 object not found during deletion, proceeding. Key: {db_document.storage_path}")
 
-        # 3. Delete from DB
         await document_repository.delete_document(db=db, document_id=document_id)
 
     except Exception as e:
+        print(f"[ERROR] Failed to delete document: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
 
     return None
