@@ -4,10 +4,9 @@ from sqlalchemy.future import select
 from typing import List
 
 from app.repository import company_repository, division_repository
-from app.models import user_model, company_model, division_model
-from app.core.dependencies import get_current_company_admin, get_db, get_current_user
+from app.models import user_model
+from app.core.dependencies import get_current_company_admin, get_db
 from app.schemas import user_schema, company_schema
-from app.models.user_model import Users
 from app.services import user_service
 
 router = APIRouter(

@@ -14,7 +14,6 @@ sqlparse
 python-jose[cryptography]==3.3.0
 bcrypt>=4.0.0
 pydantic-settings==2.1.0
-
 pinecone-client==3.2.2
 sentence-transformers==2.7.0
 Pillow
@@ -25,5 +24,4 @@ boto3==1.34.51
 aiobotocore==2.12.0
 celery==5.3.6
 redis==5.0.1
-pytest==7.4.0
 httpx==0.25.2

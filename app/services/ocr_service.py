@@ -10,10 +10,12 @@ async def extract_text_from_image(image_bytes: bytes) -> str:
     """
     try:
         image = Image.open(io.BytesIO(image_bytes))
+        print(f"[OCR Service] Processing image with size: {image.size}")
         text = pytesseract.image_to_string(image)
+        print(f"[OCR Service] Extracted {len(text)} characters from image.")
         return text
     except Exception as e:
-        print(f"Error extracting text from image: {e}")
+        print(f"[OCR Service] Error extracting text from image: {e}")
         return ""
 
 async def extract_text_from_pdf(pdf_bytes: bytes) -> List[str]:
@@ -25,6 +27,7 @@ async def extract_text_from_pdf(pdf_bytes: bytes) -> List[str]:
     try:
         # Open the PDF from bytes
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        print(f"[OCR Service] Processing PDF with {doc.page_count} pages.")
         for page_num in range(doc.page_count):
             page = doc.load_page(page_num)
             # Render page to an image (pixmap)
@@ -34,6 +37,7 @@ async def extract_text_from_pdf(pdf_bytes: bytes) -> List[str]:
             # Use the image OCR function for each page
             page_text = await extract_text_from_image(img_bytes)
             extracted_texts.append(page_text)
+            print(f"[OCR Service] Page {page_num + 1}: Extracted {len(page_text)} characters.")
         doc.close()
         return extracted_texts
     except Exception as e:

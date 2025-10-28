@@ -1,7 +1,6 @@
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import db_manager
-from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer

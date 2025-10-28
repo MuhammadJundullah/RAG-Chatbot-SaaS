@@ -1,12 +1,9 @@
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-from jose import JWTError, jwt
-from fastapi import Depends, HTTPException, status
+from jose import jwt
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.schemas import token_schema
 
 # The tokenUrl should point to the new login endpoint
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/user/token")

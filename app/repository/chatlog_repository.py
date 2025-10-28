@@ -58,7 +58,6 @@ async def get_all_chatlogs_for_admin(
     limit: int = 100,
 ):
     from app.models.user_model import Users
-    from app.models.division_model import Division
 
     query = select(chatlog_model.Chatlogs)
 
@@ -97,5 +96,29 @@ async def get_chatlogs_for_company_admin(
     if end_date:
         query = query.filter(chatlog_model.Chatlogs.created_at <= end_date)
     
+    result = await db.execute(query.offset(skip).limit(limit))
+    return result.scalars().all()
+
+async def get_unique_conversation_ids_for_user(
+    db: AsyncSession,
+    user_id: int,
+    skip: int = 0,
+    limit: int = 100,
+):
+    # Subquery to find the latest created_at for each conversation_id
+    latest_chat_per_conversation = select(
+        chatlog_model.Chatlogs.conversation_id,
+        chatlog_model.Chatlogs.created_at
+    ).filter(
+        chatlog_model.Chatlogs.UsersId == user_id
+    ).distinct(chatlog_model.Chatlogs.conversation_id).order_by(
+        chatlog_model.Chatlogs.conversation_id,
+        chatlog_model.Chatlogs.created_at.desc()
+    ).subquery()
+
+    # Main query to select distinct conversation_id ordered by their latest message
+    query = select(latest_chat_per_conversation.c.conversation_id).order_by(
+        latest_chat_per_conversation.c.created_at.desc()
+    )
     result = await db.execute(query.offset(skip).limit(limit))
     return result.scalars().all()

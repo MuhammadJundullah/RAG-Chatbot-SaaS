@@ -27,20 +27,20 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(auth.router)
-app.include_router(chat.router)
-app.include_router(documents.router)
-app.include_router(company.router)
-app.include_router(divisions.router)
-app.include_router(chatlogs.user_router)
-app.include_router(chatlogs.admin_router)
-app.include_router(chatlogs.company_admin_router)
-app.include_router(admin.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
+app.include_router(documents.router, prefix="/api")
+app.include_router(company.router, prefix="/api")
+app.include_router(divisions.router, prefix="/api")
+app.include_router(chatlogs.user_router, prefix="/api")
+app.include_router(chatlogs.admin_router, prefix="/api")
+app.include_router(chatlogs.company_admin_router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 
-@app.get("/")
+@app.get("/api")
 async def root():
     return {"message": "Multi-Tenant Company Chatbot API is running"}
 
-@app.get("/health")
+@app.get("/api/health")
 async def health_check():
     return {"status": "healthy"}

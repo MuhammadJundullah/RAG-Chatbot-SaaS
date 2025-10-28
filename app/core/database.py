@@ -1,14 +1,11 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy import text
 from app.core.config import settings
 from typing import AsyncGenerator
 import asyncio
-import os
 from sqlalchemy.future import select
 from app.utils.security import get_password_hash
 from app.models.base import Base
 
-import app.models
 
 class DatabaseManager:
     def __init__(self):

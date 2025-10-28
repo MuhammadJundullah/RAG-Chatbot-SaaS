@@ -1,9 +1,7 @@
 from pinecone import Pinecone
 from sentence_transformers import SentenceTransformer
 from app.core.config import settings
-from typing import List, Optional, Dict, Any
-from pypdf import PdfReader
-import io
+from typing import List, Dict, Any
 import uuid
 import asyncio
 

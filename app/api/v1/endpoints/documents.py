@@ -59,7 +59,7 @@ async def upload_document(
             Key=s3_key,
             Body=file_content
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to upload file to storage.")
 
     doc_create = document_schema.DocumentCreate(
@@ -174,19 +174,19 @@ async def update_document_content(
         raise HTTPException(status_code=404, detail="Document not found.")
 
     # Update the document's extracted text in the database
-    updated_doc_db = await document_repository.update_document_text_and_status(
+    await document_repository.update_document_text_and_status(
         db, 
         document_id=document_id, 
         text=request.new_content, 
-        status=DocumentStatus.EMBEDDING # Set status to EMBEDDING as new embeddings will be generated
+        status=DocumentStatus.EMBEDDING
     )
 
     # Update embeddings in Pinecone
     rag_update_result = await rag_service.update_document_content(
-        document_id=str(document_id), # Pinecone document_id is string
+        document_id=str(document_id), 
         new_text_content=request.new_content,
         company_id=current_user.company_id,
-        source_filename=request.filename # Use filename from request for Pinecone metadata
+        source_filename=request.filename 
     )
 
     if rag_update_result.get("status") == "failed":

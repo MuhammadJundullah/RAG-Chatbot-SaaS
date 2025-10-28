@@ -2,7 +2,6 @@ import enum
 from sqlalchemy import Column, Integer, String, ForeignKey, Text, Enum as SQLAlchemyEnum
 from sqlalchemy.orm import relationship
 from app.models.base import Base
-from app.models.embedding_model import Embeddings
 
 class DocumentStatus(enum.Enum):
     UPLOADED = "UPLOADED"

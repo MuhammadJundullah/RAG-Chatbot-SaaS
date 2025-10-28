@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
 
 class ChatlogBase(BaseModel):
     question: str

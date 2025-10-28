@@ -24,7 +24,7 @@ async def get_active_companies(db: AsyncSession, skip: int = 0, limit: int = 100
     result = await db.execute(
         select(distinct(company_model.Company.id))
         .join(user_model.Users, company_model.Company.id == user_model.Users.company_id)
-        .filter(user_model.Users.role == 'admin', user_model.Users.is_active_in_company == True)
+        .filter(user_model.Users.role == 'admin', user_model.Users.is_active_in_company)
         .offset(skip).limit(limit)
     )
     company_ids = result.scalars().all()

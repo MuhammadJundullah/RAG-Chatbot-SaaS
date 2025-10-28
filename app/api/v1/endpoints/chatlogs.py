@@ -105,6 +105,24 @@ async def read_user_chatlogs(
     )
     return chatlogs
 
+@user_router.get("/conversations", response_model=List[str])
+async def get_user_conversation_ids(
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    skip: int = 0,
+    limit: int = 100,
+):
+    """
+    Retrieve a list of unique conversation IDs for the current user.
+    """
+    conversation_ids = await chatlog_repository.get_unique_conversation_ids_for_user(
+        db=db,
+        user_id=current_user.id,
+        skip=skip,
+        limit=limit,
+    )
+    return conversation_ids
+
 @user_router.get("/{conversation_id}", response_model=List[chatlog_schema.Chatlog])
 async def get_conversation_history(
     conversation_id: str,

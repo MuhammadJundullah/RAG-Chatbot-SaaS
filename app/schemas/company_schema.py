@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from typing import Optional
 
 class CompanyBase(BaseModel):
     name: str

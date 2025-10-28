@@ -1,5 +1,4 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 from app.models import embedding_model
 from app.schemas import embedding_schema
 

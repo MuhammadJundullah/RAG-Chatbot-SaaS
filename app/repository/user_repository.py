@@ -1,7 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
-from typing import Optional
 from app.models import user_model, company_model
 
 # --- User Repository ---
@@ -56,7 +55,7 @@ async def get_pending_companies(db: AsyncSession, skip: int = 0, limit: int = 10
     # Subquery to find company IDs of inactive admin users
     inactive_admin_company_ids = (
         select(user_model.Users.company_id)
-        .filter(user_model.Users.role == 'admin', user_model.Users.is_active_in_company == False)
+        .filter(user_model.Users.role == 'admin', not user_model.Users.is_active_in_company)
         .distinct()
     )
 
