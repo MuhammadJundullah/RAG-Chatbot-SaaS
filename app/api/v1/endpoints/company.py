@@ -44,15 +44,7 @@ async def read_my_company(
         raise HTTPException(status_code=404, detail="Company not found for this admin.")
     return db_company
 
-# get all users of company
-@router.get("/", response_model=List[company_schema.Company])
-async def read_companies(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db),
-):
-    companies = await company_repository.get_active_companies(db, skip=skip, limit=limit)
-    return companies
-
-# 
+# register employee
 @router.post("/employees/register", response_model=user_schema.User, status_code=status.HTTP_201_CREATED)
 async def register_employee_by_company_admin(
     employee_data: user_schema.EmployeeRegistrationByAdmin,

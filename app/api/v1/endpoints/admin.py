@@ -12,7 +12,15 @@ router = APIRouter(
     dependencies=[Depends(get_current_super_admin)],
 )
 
+# get all active companyes
+@router.get("/companies", response_model=List[company_schema.Company])
+async def read_companies(
+    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db),
+):
+    companies = await company_repository.get_active_companies(db, skip=skip, limit=limit)
+    return companies
 
+# get pending company
 @router.get("/companies/pending", response_model=List[company_schema.Company])
 async def get_pending_companies(
     db: AsyncSession = Depends(get_db),
@@ -25,7 +33,6 @@ async def get_pending_companies(
     """
     companies = await user_repository.get_pending_companies(db, skip=skip, limit=limit)
     return companies
-
 
 @router.patch("/companies/{company_id}/approve")
 async def approve_company(
