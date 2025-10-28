@@ -52,12 +52,24 @@ async def delete_user(db: AsyncSession, user: user_model.Users):
 # --- Approval Repository ---
 
 async def get_pending_companies(db: AsyncSession, skip: int = 0, limit: int = 100):
+    # Debugging: Fetch all admin users and print their active status
+    all_admin_users_query = select(user_model.Users.company_id, user_model.Users.is_active_in_company).filter(
+        user_model.Users.role == 'admin'
+    )
+    all_admin_users_result = await db.execute(all_admin_users_query)
+    all_admin_users_data = all_admin_users_result.all()
+    print(f"[DEBUG] All admin users (company_id, is_active_in_company): {all_admin_users_data}")
+
     # Subquery to find company IDs of inactive admin users
-    inactive_admin_company_ids = (
+    inactive_admin_company_ids_query = (
         select(user_model.Users.company_id)
-        .filter(user_model.Users.role == 'admin', not user_model.Users.is_active_in_company)
+        .filter(user_model.Users.role == 'admin', user_model.Users.is_active_in_company == False)
         .distinct()
     )
+    inactive_admin_company_ids_result = await db.execute(inactive_admin_company_ids_query)
+    inactive_admin_company_ids = inactive_admin_company_ids_result.scalars().all()
+
+    print(f"[DEBUG] Inactive admin company IDs found: {inactive_admin_company_ids}")
 
     # Main query to get the company objects
     result = await db.execute(
