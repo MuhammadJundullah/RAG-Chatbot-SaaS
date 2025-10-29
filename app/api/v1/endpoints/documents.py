@@ -235,11 +235,18 @@ async def delete_document(
 
         try:
             s3 = await s3_client_manager.get_client()
-            await s3.delete_object(
+            await s3.delete_objects(
                 Bucket=settings.S3_BUCKET_NAME,
-                Key=db_document.storage_path
+                Delete={
+                    "Objects": [
+                        {"Key": db_document.storage_path}
+                    ]
+                }
             )
         except ClientError as e:
+            # delete_objects might not raise an error for non-existent keys,
+            # but rather list them in the 'Deleted' response.
+            # Keeping this general ClientError handling for other potential S3 issues.
             if e.response['Error']['Code'] not in ['404', 'NoSuchKey']:
                 raise e
             print(f"Warning: S3 object not found during deletion, proceeding. Key: {db_document.storage_path}")
