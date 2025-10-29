@@ -13,11 +13,12 @@ class DatabaseManager:
         self.engine = create_async_engine(
             settings.DATABASE_URL, 
             echo=False,
-            pool_size=20, 
-            max_overflow=10,
+            pool_size=20,
+            max_overflow=10, 
             pool_timeout=30,
-            connect_args={"statement_cache_size": 0},
+            query_cache_size=0
         )
+
         self.async_session_maker = async_sessionmaker(
             self.engine, expire_on_commit=False, class_=AsyncSession
         )
