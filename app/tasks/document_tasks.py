@@ -12,9 +12,8 @@ from app.models.document_model import DocumentStatus
 # --- Logic for failure handling ---
 
 async def _handle_task_failure(document_id: int, stage: str, exception: Exception):
-    """Helper function to update document status on final failure."""
-    local_db_manager = DatabaseManager()
-    async with local_db_manager.async_session_maker() as db:
+    from app.core.database import db_manager
+    async with db_manager.async_session_maker() as db:
         error_trace = traceback.format_exc()
         reason = f"Task failed at stage '{stage}'. Error: {str(exception)}\nTrace: {error_trace}"
         await document_repository.update_document_status_and_reason(
@@ -28,9 +27,8 @@ async def _handle_task_failure(document_id: int, stage: str, exception: Exceptio
 # --- Refactored Async Logic ---
 
 async def _run_ocr_processing(document_id: int):
-    """The actual async logic for OCR processing."""
-    local_db_manager = DatabaseManager()
-    async with local_db_manager.async_session_maker() as db:
+    from app.core.database import db_manager
+    async with db_manager.async_session_maker() as db:
         doc = await document_repository.get_document(db, document_id)
         if not doc:
             print(f"[OCR Task] Document with ID {document_id} not found.")
