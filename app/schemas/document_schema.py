@@ -5,7 +5,7 @@ class DocumentBase(BaseModel):
     """Base schema for a document, containing common fields."""
     title: str
     company_id: int
-    storage_path: str
+    s3_path: Optional[str] = None # Changed back to s3_path
     content_type: Optional[str] = None
     status: str
 
@@ -13,7 +13,7 @@ class DocumentCreate(BaseModel):
     """Schema used for creating a new document record in the database."""
     title: str
     company_id: int
-    storage_path: str
+    temp_storage_path: str # Will be provided by the endpoint internally
     content_type: Optional[str] = None
 
 class Document(DocumentBase):

@@ -122,3 +122,14 @@ async def get_unique_conversation_ids_for_user(
     )
     result = await db.execute(query.offset(skip).limit(limit))
     return result.scalars().all()
+
+async def delete_chatlogs_by_conversation_id(db: AsyncSession, conversation_id: str, user_id: int) -> int:
+    """Deletes all chatlog entries for a specific conversation ID and user ID."""
+    from sqlalchemy import delete
+    stmt = delete(chatlog_model.Chatlogs).filter(
+        chatlog_model.Chatlogs.conversation_id == conversation_id,
+        chatlog_model.Chatlogs.UsersId == user_id
+    )
+    result = await db.execute(stmt)
+    await db.commit()
+    return result.rowcount

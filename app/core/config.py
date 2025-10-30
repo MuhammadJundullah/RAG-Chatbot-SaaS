@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     S3_AWS_ACCESS_KEY_ID: str
     S3_AWS_SECRET_ACCESS_KEY: str
     S3_BUCKET_NAME: str
+    PUBLIC_S3_BASE_URL: str = "https://1xg7ah.leapcellobj.com"
 
     # Redis settings for Celery
     REDIS_URL: str = "redis://localhost:6379/0"

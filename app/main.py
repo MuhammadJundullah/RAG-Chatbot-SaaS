@@ -37,7 +37,7 @@ app.include_router(chatlogs.admin_router, prefix="/api")
 app.include_router(chatlogs.company_admin_router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 
-@app.get("/api")
+@app.get("/api/")
 async def root():
     return {"message": "Multi-Tenant Company Chatbot API is running"}
 

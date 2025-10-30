@@ -1,562 +1,764 @@
-# RAG Chatbot SaaS - Multi-Tenant AI Platform
+# Multi-Tenant Company Chatbot API
 
-A SaaS platform for company-specific AI chatbots using RAG (Retrieval-Augmented Generation) with document processing and multi-tenant architecture.
+A SaaS platform for company-specific AI chatbots using RAG (Retrieval-Augmented Generation) and Database Integration.
 
-## 🚀 Features
+## Base URL
 
-- **Multi-Tenant Architecture**: Isolated data per company
-- **RAG-Powered Chat**: AI responses based on company documents
-- **OCR Processing**: Automatic text extraction from documents
-- **Role-Based Access**: Super Admin, Company Admin, and User roles
-- **Document Management**: Upload, validate, and manage documents
-- **Conversation History**: Track and retrieve chat logs
+All API endpoints are prefixed with `/api`
 
-## 📋 Tech Stack
+- **Local Development**: `http://localhost:8000/api`
+- **Production**: `[Your Production URL]/api`
 
-- **Backend**: FastAPI (Python)
-- **Database**: PostgreSQL with SQLAlchemy
-- **Vector Store**: Pinecone
-- **Storage**: AWS S3
-- **Task Queue**: Celery with Redis
-- **AI**: Google Gemini
+## Authentication
 
-## 🔧 Installation
+This API uses JWT Bearer tokens for authentication. Include the token in the `Authorization` header:
 
-```bash
-# Clone repository
-git clone <repository-url>
-cd RAG-Chatbot-SaaS
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Setup environment variables
-cp .env.example .env
-# Edit .env with your credentials
-
-# Run migrations
-alembic upgrade head
-
-# Start application
-uvicorn app.main:app --reload
-
-# Start Celery worker (separate terminal)
-celery -A app.core.celery_app worker --loglevel=info
+```
+Authorization: Bearer <your-access-token>
 ```
 
-## 📚 API Documentation
+Tokens are obtained through the `/auth/user/token` endpoint.
 
-### Authentication
+## API Endpoints
 
-#### Register Company
-```http
-POST /api/auth/register
-Content-Type: application/json
+### 🔐 Authentication
 
-{
-  "name": "John Doe",
-  "email": "admin@company.com",
-  "password": "secure123",
-  "company_name": "Tech Corp",
-  "username": "johndoe",
-  "pic_phone_number": "+1234567890"
-}
+#### POST `/auth/register`
+**Deskripsi:** Register a new company (admin user only)
+**Akses:** Public
 
-Response: 201 Created
-{
-  "message": "Company 'Tech Corp' and admin user 'admin@company.com' registered successfully. Pending approval from a super admin."
-}
-```
-
-#### Login
-```http
-POST /api/auth/user/token
-Content-Type: application/json
-
-{
-  "email": "admin@company.com",
-  "username": "johndoe",
-  "password": "secure123"
-}
-
-Response: 200 OK
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer",
-  "expires_in": 3600,
-  "user": {
-    "id": 1,
-    "email": "admin@company.com",
-    "role": "admin",
-    "company_id": 1
-  }
-}
-```
-
-#### Get Current User
-```http
-GET /api/auth/me
-Authorization: Bearer <token>
-
-Response: 200 OK
-{
-  "id": 1,
-  "email": "admin@company.com",
-  "name": "John Doe",
-  "role": "admin",
-  "company_id": 1
-}
-```
-
----
-
-### Super Admin
-
-#### List Pending Companies
-```http
-GET /api/admin/companies/pending?skip=0&limit=100
-Authorization: Bearer <super_admin_token>
-
-Response: 200 OK
-[
-  {
-    "id": 1,
-    "name": "Tech Corp",
-    "is_active": false,
-    "created_at": "2024-01-01T00:00:00"
-  }
-]
-```
-
-#### Approve Company
-```http
-PATCH /api/admin/companies/{company_id}/approve
-Authorization: Bearer <super_admin_token>
-
-Response: 200 OK
-{
-  "message": "Company with id 1 has been approved."
-}
-```
-
-#### Reject Company
-```http
-PATCH /api/admin/companies/{company_id}/reject
-Authorization: Bearer <super_admin_token>
-
-Response: 200 OK
-{
-  "message": "Company with id 1 has been rejected and deleted."
-}
-```
-
----
-
-### Company Management
-
-#### List Company Users
-```http
-GET /api/companies/users
-Authorization: Bearer <admin_token>
-
-Response: 200 OK
-[
-  {
-    "id": 1,
-    "email": "user@company.com",
-    "name": "Jane Smith",
-    "role": "user",
-    "division_id": 1
-  }
-]
-```
-
-#### Get My Company
-```http
-GET /api/companies/me
-Authorization: Bearer <admin_token>
-
-Response: 200 OK
-{
-  "id": 1,
-  "name": "Tech Corp",
-  "is_active": true,
-  "created_at": "2024-01-01T00:00:00"
-}
-```
-
-#### Register Employee
-```http
-POST /api/companies/employees/register
-Authorization: Bearer <admin_token>
-Content-Type: application/json
-
-{
-  "name": "Jane Smith",
-  "email": "jane@company.com",
-  "password": "secure123",
-  "username": "janesmith",
-  "division_id": 1
-}
-
-Response: 201 Created
-{
-  "id": 2,
-  "email": "jane@company.com",
-  "name": "Jane Smith",
-  "role": "user",
-  "company_id": 1
-}
-```
-
----
-
-### Divisions
-
-#### Create Division
-```http
-POST /api/divisions
-Authorization: Bearer <admin_token>
-Content-Type: application/json
-
-{
-  "name": "Engineering"
-}
-
-Response: 200 OK
-{
-  "id": 1,
-  "name": "Engineering",
-  "company_id": 1
-}
-```
-
-#### List Divisions
-```http
-GET /api/divisions
-Authorization: Bearer <token>
-
-Response: 200 OK
-[
-  {
-    "id": 1,
-    "name": "Engineering",
-    "company_id": 1
-  }
-]
-```
-
----
-
-### Documents
-
-#### Upload Document
-```http
-POST /api/documents/upload
-Authorization: Bearer <admin_token>
-Content-Type: multipart/form-data
-
-file: <binary>
-
-Response: 202 Accepted
-{
-  "id": 1,
-  "title": "company_policy.pdf",
-  "status": "UPLOADED",
-  "company_id": 1,
-  "storage_path": "smartai/uploads/1/uuid-company_policy.pdf"
-}
-```
-
-#### List Documents
-```http
-GET /api/documents?skip=0&limit=100
-Authorization: Bearer <admin_token>
-
-Response: 200 OK
-[
-  {
-    "id": 1,
-    "title": "company_policy.pdf",
-    "status": "COMPLETED",
-    "extracted_text": "Policy content...",
-    "created_at": "2024-01-01T00:00:00"
-  }
-]
-```
-
-#### Get Pending Validation Documents
-```http
-GET /api/documents/pending-validation
-Authorization: Bearer <admin_token>
-
-Response: 200 OK
-[
-  {
-    "id": 1,
-    "title": "document.pdf",
-    "status": "PENDING_VALIDATION",
-    "extracted_text": "OCR extracted text..."
-  }
-]
-```
-
-#### Confirm Document (Trigger Embedding)
-```http
-POST /api/documents/{document_id}/confirm
-Authorization: Bearer <admin_token>
-Content-Type: application/json
-
-{
-  "confirmed_text": "Corrected and validated text content"
-}
-
-Response: 202 Accepted
-{
-  "id": 1,
-  "status": "EMBEDDING",
-  "extracted_text": "Corrected and validated text content"
-}
-```
-
-#### Update Document Content
-```http
-PUT /api/documents/{document_id}/content
-Authorization: Bearer <admin_token>
-Content-Type: application/json
-
-{
-  "new_content": "Updated document content",
-  "filename": "updated_doc.pdf"
-}
-
-Response: 200 OK
-{
-  "id": 1,
-  "status": "COMPLETED",
-  "extracted_text": "Updated document content"
-}
-```
-
-#### Delete Document
-```http
-DELETE /api/documents/{document_id}
-Authorization: Bearer <admin_token>
-
-Response: 204 No Content
-```
-
-#### Retry Failed Document
-```http
-POST /api/documents/{document_id}/retry
-Authorization: Bearer <admin_token>
-
-Response: 200 OK
-{
-  "id": 1,
-  "status": "UPLOADED",
-  "message": "Document re-queued for processing"
-}
-```
-
----
-
-### Chat
-
-#### Send Message
-```http
-POST /api/chat
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "message": "What is our company policy on remote work?",
-  "conversation_id": "uuid-string" // optional
-}
-
-Response: 200 OK
-{
-  "response": "According to company policy document, remote work is allowed 3 days per week...",
-  "conversation_id": "uuid-string"
-}
-```
-
----
-
-### Chat Logs
-
-#### Get User Conversations
-```http
-GET /api/chatlogs/conversations?skip=0&limit=100
-Authorization: Bearer <token>
-
-Response: 200 OK
-[
-  "conversation-uuid-1",
-  "conversation-uuid-2"
-]
-```
-
-#### Get Conversation History
-```http
-GET /api/chatlogs/{conversation_id}?skip=0&limit=100
-Authorization: Bearer <token>
-
-Response: 200 OK
-[
-  {
-    "id": 1,
-    "question": "What is our policy?",
-    "answer": "Our policy states...",
-    "created_at": "2024-01-01T10:00:00",
-    "conversation_id": "uuid"
-  }
-]
-```
-
-#### Get User Chat Logs
-```http
-GET /api/chatlogs?skip=0&limit=100&start_date=2024-01-01&end_date=2024-12-31
-Authorization: Bearer <token>
-
-Response: 200 OK
-[
-  {
-    "id": 1,
-    "question": "Question text",
-    "answer": "Answer text",
-    "created_at": "2024-01-01T00:00:00"
-  }
-]
-```
-
-#### Get Company Chat Logs (Admin)
-```http
-GET /api/company/chatlogs?division_id=1&user_id=2&skip=0&limit=100
-Authorization: Bearer <admin_token>
-
-Response: 200 OK
-[
-  {
-    "id": 1,
-    "question": "Question",
-    "answer": "Answer",
-    "user_id": 2,
-    "division_id": 1
-  }
-]
-```
-
-#### Get All Chat Logs (Super Admin)
-```http
-GET /api/admin/chatlogs?company_id=1&division_id=1&user_id=2
-Authorization: Bearer <super_admin_token>
-
-Response: 200 OK
-[
-  {
-    "id": 1,
-    "question": "Question",
-    "answer": "Answer",
-    "company_id": 1,
-    "user_id": 2
-  }
-]
-```
-
----
-
-## 🔐 Authentication
-
-All endpoints (except `/auth/register` and `/auth/user/token`) require Bearer token:
-
-```http
-Authorization: Bearer <your_access_token>
-```
-
-## 👥 User Roles
-
-- **Super Admin**: Full system access, approve/reject companies
-- **Company Admin**: Manage company users, documents, divisions
-- **User**: Chat with AI, view own chat history
-
-## 📊 Document Processing Flow
-
-1. **Upload** → Document uploaded to S3, status: `UPLOADED`
-2. **OCR Processing** → Background task extracts text, status: `PENDING_VALIDATION`
-3. **Validation** → Admin confirms/corrects text, status: `EMBEDDING`
-4. **Embedding** → Background task creates vector embeddings, status: `COMPLETED`
-5. **Available for RAG** → Document used in AI responses
-
-## ⚡ Background Tasks
-
-- **OCR Processing**: Extracts text from uploaded documents
-- **Embedding Generation**: Creates vector embeddings for RAG
-- Processed asynchronously using Celery
-
-## 🛠️ Environment Variables
-
-```env
-# Database
-DATABASE_URL=postgresql+asyncpg://user:pass@localhost/dbname
-
-# JWT
-SECRET_KEY=your-secret-key
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=60
-
-# AWS S3
-AWS_ACCESS_KEY_ID=your-key
-AWS_SECRET_ACCESS_KEY=your-secret
-S3_BUCKET_NAME=your-bucket
-AWS_REGION=us-east-1
-
-# Pinecone
-PINECONE_API_KEY=your-key
-PINECONE_INDEX_NAME=your-index
-
-# Google Gemini
-GOOGLE_API_KEY=your-key
-
-# Redis (Celery)
-REDIS_URL=redis://localhost:6379/0
-```
-
-## 📝 Error Responses
-
-All errors follow this format:
-
+**Request Body:**
 ```json
 {
-  "detail": "Error message description"
+  "name": "string",
+  "email": "string",
+  "password": "string",
+  "company_name": "string",
+  "pic_phone_number": "string (optional)",
+  "username": "string (optional)"
 }
 ```
 
-Common status codes:
-- `400` - Bad Request
-- `401` - Unauthorized
-- `403` - Forbidden
-- `404` - Not Found
-- `500` - Internal Server Error
-
-## 🧪 Testing
-
-```bash
-# Run tests
-pytest
-
-# With coverage
-pytest --cov=app tests/
+**Response:** `201 Created`
+```json
+{
+  "message": "Company 'company_name' and admin user 'email' registered successfully. Pending approval from a super admin."
+}
 ```
 
-## 📄 License
+#### POST `/auth/user/token`
+**Deskripsi:** Login and get access token
+**Akses:** Public
 
-MIT License
+**Request Body:**
+```json
+{
+  "email": "string (optional if username provided)",
+  "username": "string (optional if email provided)",
+  "password": "string"
+}
+```
 
-## 🤝 Contributing
+**Response:** `200 OK`
+```json
+{
+  "access_token": "string",
+  "token_type": "bearer",
+  "expires_in": "integer",
+  "user": {
+    "id": "integer",
+    "email": "string",
+    "username": "string",
+    "name": "string",
+    "role": "string",
+    "company_id": "integer",
+    "is_active": "boolean"
+  }
+}
+```
 
-Pull requests are welcome. For major changes, please open an issue first.
+#### GET `/auth/me`
+**Deskripsi:** Get current logged-in user information
+**Akses:** Authenticated Users
 
----
+**Response:** `200 OK`
+```json
+{
+  "id": "integer",
+  "email": "string",
+  "username": "string",
+  "name": "string",
+  "role": "string",
+  "company_id": "integer",
+  "is_active": "boolean"
+}
+```
 
-**Built with ❤️ using FastAPI, Pinecone, and Google Gemini**
+### 🏢 Companies (Admin Only)
+
+#### GET `/companies/me`
+**Deskripsi:** Get current admin's company data
+**Akses:** Company Admin
+
+**Response:** `200 OK`
+```json
+{
+  "id": "integer",
+  "name": "string",
+  "is_active": "boolean",
+  "created_at": "datetime"
+}
+```
+
+#### GET `/companies/users`
+**Deskripsi:** Get all users in the admin's company
+**Akses:** Company Admin
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": "integer",
+    "email": "string",
+    "username": "string",
+    "name": "string",
+    "role": "string",
+    "company_id": "integer",
+    "division_id": "integer (nullable)",
+    "is_active": "boolean"
+  }
+]
+```
+
+#### PUT `/companies/me`
+**Deskripsi:** Update the current admin's company data, including logo upload to S3.
+**Akses:** Company Admin
+
+**Form Data:**
+- `company_update`: JSON object (required) - Contains fields to update (e.g., `name`, `address`).
+  ```json
+  {
+    "name": "string (optional)",
+    "code": "string (optional)",
+    "address": "string (optional)"
+  }
+  ```
+- `logo_file`: file (optional) - The new logo file to upload.
+
+**Response:** `200 OK`
+```json
+{
+  "id": "integer",
+  "name": "string",
+  "is_active": "boolean",
+  "created_at": "datetime",
+  "logo_s3_path": "string (nullable)"
+}
+```
+
+#### POST `/companies/employees/register`
+**Deskripsi:** Register a new employee for the company
+**Akses:** Company Admin
+
+**Request Body:**
+```json
+{
+  "name": "string",
+  "email": "string",
+  "password": "string",
+  "username": "string (optional)",
+  "division_id": "integer (optional)"
+}
+```
+
+**Response:** `201 Created`
+```json
+{
+  "id": "integer",
+  "email": "string",
+  "username": "string",
+  "name": "string",
+  "role": "employee",
+  "company_id": "integer",
+  "division_id": "integer (nullable)",
+  "is_active": "boolean"
+}
+```
+
+### 🏢 Divisions
+
+#### POST `/divisions`
+**Deskripsi:** Create a new division within the admin's company
+**Akses:** Company Admin
+
+**Request Body:**
+```json
+{
+  "name": "string"
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "id": "integer",
+  "name": "string",
+  "company_id": "integer"
+}
+```
+
+#### GET `/divisions`
+**Deskripsi:** Get all divisions for the current user's company
+**Akses:** Authenticated Users
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": "integer",
+    "name": "string",
+    "company_id": "integer"
+  }
+]
+```
+
+#### GET `/divisions/public/{company_id}`
+**Deskripsi:** Get all divisions for a specific company (public endpoint)
+**Akses:** Public
+
+**Path Parameters:**
+- `company_id`: integer
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": "integer",
+    "name": "string",
+    "company_id": "integer"
+  }
+]
+```
+
+### 📄 Documents (Admin Only)
+
+#### POST `/documents/upload`
+**Deskripsi:** Upload a document for processing. This endpoint accepts a file, saves it temporarily, creates a DB record with 'UPLOADING' status, and triggers a background task to upload to S3.
+**Akses:** Company Admin
+
+**Form Data:**
+- `file`: file (required)
+
+**Response:** `202 Accepted`
+```json
+{
+  "id": "integer",
+  "title": "string",
+  "company_id": "integer",
+  "content_type": "string",
+  "status": "UPLOADING",
+  "s3_path": "string (nullable)",
+  "temp_storage_path": "string",
+  "text": "string (nullable)",
+  "failed_reason": "string (nullable)",
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
+```
+
+#### PUT `/documents/{document_id}/retry`
+**Deskripsi:** Retry a failed document upload. Allows retrying the upload process for a document that previously failed to upload.
+**Akses:** Company Admin
+
+**Path Parameters:**
+- `document_id`: integer
+
+**Response:** `200 OK`
+```json
+{
+  "id": "integer",
+  "title": "string",
+  "company_id": "integer",
+  "content_type": "string",
+  "status": "UPLOADING",
+  "s3_path": "string (nullable)",
+  "temp_storage_path": "string",
+  "text": "string (nullable)",
+  "failed_reason": "string (nullable)",
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
+```
+
+#### GET `/documents`
+**Deskripsi:** Get all documents for the company, regardless of status.
+**Akses:** Company Admin
+
+**Query Parameters:**
+- `skip`: integer (default: 0)
+- `limit`: integer (default: 100)
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": "integer",
+    "title": "string",
+    "company_id": "integer",
+    "content_type": "string",
+    "status": "string",
+    "s3_path": "string (nullable)",
+    "temp_storage_path": "string (nullable)",
+    "text": "string (nullable)",
+    "failed_reason": "string (nullable)",
+    "created_at": "datetime",
+    "updated_at": "datetime"
+  }
+]
+```
+
+#### GET `/documents/pending-validation`
+**Deskripsi:** Get documents awaiting user validation after OCR. Gets a list of documents that have been OCR'd and are awaiting user validation.
+**Akses:** Company Admin
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": "integer",
+    "title": "string",
+    "company_id": "integer",
+    "content_type": "string",
+    "status": "PENDING_VALIDATION",
+    "s3_path": "string",
+    "temp_storage_path": "string (nullable)",
+    "text": "string (OCR extracted text)",
+    "failed_reason": "string (nullable)",
+    "created_at": "datetime",
+    "updated_at": "datetime"
+  }
+]
+```
+
+#### POST `/documents/{document_id}/confirm`
+**Deskripsi:** Confirm OCR text and trigger embedding process. Receives user-confirmed text and triggers the embedding background task.
+**Akses:** Company Admin
+
+**Path Parameters:**
+- `document_id`: integer
+
+**Request Body:**
+```json
+{
+  "confirmed_text": "string"
+}
+```
+
+**Response:** `202 Accepted`
+```json
+{
+  "id": "integer",
+  "title": "string",
+  "company_id": "integer",
+  "content_type": "string",
+  "status": "EMBEDDING",
+  "s3_path": "string",
+  "temp_storage_path": "string (nullable)",
+  "text": "string (confirmed text)",
+  "failed_reason": "string (nullable)",
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
+```
+
+#### GET `/documents/failed`
+**Deskripsi:** Get documents that failed during processing or upload.
+**Akses:** Company Admin
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": "integer",
+    "title": "string",
+    "company_id": "integer",
+    "content_type": "string",
+    "status": "string",
+    "s3_path": "string (nullable)",
+    "temp_storage_path": "string (nullable)",
+    "text": "string (nullable)",
+    "failed_reason": "string",
+    "created_at": "datetime",
+    "updated_at": "datetime"
+  }
+]
+```
+
+#### POST `/documents/{document_id}/retry-processing`
+**Deskripsi:** Retry failed document processing (OCR or Embedding). Manually triggers a retry for a document that failed during OCR or Embedding.
+**Akses:** Company Admin
+
+**Path Parameters:**
+- `document_id`: integer
+
+**Response:** `200 OK`
+```json
+{
+  "id": "integer",
+  "title": "string",
+  "company_id": "integer",
+  "content_type": "string",
+  "status": "string",
+  "s3_path": "string (nullable)",
+  "temp_storage_path": "string (nullable)",
+  "text": "string (nullable)",
+  "failed_reason": "string (nullable)",
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
+```
+
+#### PUT `/documents/{document_id}/content`
+**Deskripsi:** Update document content and re-generate embeddings. Updates the text content of an existing document and re-generates its embeddings.
+**Akses:** Company Admin
+
+**Path Parameters:**
+- `document_id`: integer
+
+**Request Body:**
+```json
+{
+  "new_content": "string",
+  "filename": "string"
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "id": "integer",
+  "title": "string",
+  "company_id": "integer",
+  "content_type": "string",
+  "status": "COMPLETED",
+  "s3_path": "string",
+  "temp_storage_path": "string (nullable)",
+  "text": "string (updated content)",
+  "failed_reason": "string (nullable)",
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
+```
+
+#### GET `/documents/{document_id}`
+**Deskripsi:** Get a single document by ID, checking for appropriate permissions.
+**Akses:** Authenticated Users (Must belong to same company or be super admin)
+
+**Path Parameters:**
+- `document_id`: integer
+
+**Response:** `200 OK`
+```json
+{
+  "id": "integer",
+  "title": "string",
+  "company_id": "integer",
+  "content_type": "string",
+  "status": "string",
+  "s3_path": "string (nullable)",
+  "temp_storage_path": "string (nullable)",
+  "text": "string (nullable)",
+  "failed_reason": "string (nullable)",
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
+```
+
+#### DELETE `/documents/{document_id}`
+**Deskripsi:** Delete a document (from database, S3, and RAG service). This endpoint deletes the document from the database, S3, and the RAG service.
+**Akses:** Company Admin
+
+**Path Parameters:**
+- `document_id`: integer
+
+**Response:** `204 No Content`
+
+### 💬 Chat
+
+#### POST `/chat`
+**Deskripsi:** Send a message to the AI chatbot. This endpoint processes the user's message, retrieves relevant context from the RAG service, generates a response using the AI model, and saves the chat to the database.
+**Akses:** Authenticated Users
+
+**Request Body:**
+```json
+{
+  "message": "string",
+  "conversation_id": "string (optional)"
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "response": "string",
+  "conversation_id": "string"
+}
+```
+
+### 📝 Chatlogs
+
+#### GET `/chatlogs`
+**Deskripsi:** Get current user's chat logs. Retrieve chatlogs for the current user, filtered by their company.
+**Akses:** Authenticated Users
+
+**Query Parameters:**
+- `skip`: integer (default: 0)
+- `limit`: integer (default: 100)
+- `start_date`: date (optional)
+- `end_date`: date (optional)
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": "integer",
+    "question": "string",
+    "answer": "string",
+    "UsersId": "integer",
+    "company_id": "integer",
+    "conversation_id": "string",
+    "created_at": "datetime"
+  }
+]
+```
+
+#### GET `/chatlogs/conversations`
+**Deskripsi:** Get unique conversation IDs for the current user. Retrieve a list of unique conversation IDs for the current user.
+**Akses:** Authenticated Users
+
+**Query Parameters:**
+- `skip`: integer (default: 0)
+- `limit`: integer (default: 100)
+
+**Response:** `200 OK`
+```json
+["conversation_id_1", "conversation_id_2", ...]
+```
+
+#### GET `/chatlogs/{conversation_id}`
+**Deskripsi:** Get chat history for a specific conversation. Retrieve chat history for a specific conversation ID for the current user.
+**Akses:** Authenticated Users
+
+**Path Parameters:**
+- `conversation_id`: string
+
+**Query Parameters:**
+- `skip`: integer (default: 0)
+- `limit`: integer (default: 100)
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": "integer",
+    "question": "string",
+    "answer": "string",
+    "UsersId": "integer",
+    "company_id": "integer",
+    "conversation_id": "string",
+    "created_at": "datetime"
+  }
+]
+```
+
+### 👨‍💼 Company Admin Chatlogs
+
+#### GET `/company/chatlogs`
+**Deskripsi:** Get chat logs for the current company (admin only). Retrieve chatlogs for the current company admin, filtered by their company.
+**Akses:** Company Admin
+
+**Query Parameters:**
+- `skip`: integer (default: 0)
+- `limit`: integer (default: 100)
+- `division_id`: integer (optional)
+- `user_id`: integer (optional)
+- `start_date`: date (optional)
+- `end_date`: date (optional)
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": "integer",
+    "question": "string",
+    "answer": "string",
+    "UsersId": "integer",
+    "company_id": "integer",
+    "conversation_id": "string",
+    "created_at": "datetime"
+  }
+]
+```
+
+### 👑 Super Admin Endpoints
+
+#### GET `/admin/companies`
+**Deskripsi:** Get all active companies
+**Akses:** Super Admin
+
+**Query Parameters:**
+- `skip`: integer (default: 0)
+- `limit`: integer (default: 100)
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": "integer",
+    "name": "string",
+    "is_active": "boolean",
+    "created_at": "datetime"
+  }
+]
+```
+
+#### GET `/admin/companies/pending`
+**Deskripsi:** Get companies awaiting approval. Get a list of companies awaiting approval (accessible only by super admins).
+**Akses:** Super Admin
+
+**Query Parameters:**
+- `skip`: integer (default: 0)
+- `limit`: integer (default: 100)
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": "integer",
+    "name": "string",
+    "is_active": "boolean",
+    "created_at": "datetime"
+  }
+]
+```
+
+#### PATCH `/admin/companies/{company_id}/approve`
+**Deskripsi:** Approve a pending company. Approve a company registration (accessible only by super admins).
+**Akses:** Super Admin
+
+**Path Parameters:**
+- `company_id`: integer
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Company with id {company_id} has been approved."
+}
+```
+
+#### PATCH `/admin/companies/{company_id}/reject`
+**Deskripsi:** Reject a pending company. Reject a company registration (accessible only by super admins).
+**Akses:** Super Admin
+
+**Path Parameters:**
+- `company_id`: integer
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Company with id {company_id} has been rejected and deleted."
+}
+```
+
+#### GET `/admin/chatlogs`
+**Deskripsi:** Get all chat logs (super admin only). Retrieve all chatlogs for super admin with optional filtering.
+**Akses:** Super Admin
+
+**Query Parameters:**
+- `skip`: integer (default: 0)
+- `limit`: integer (default: 100)
+- `company_id`: integer (optional)
+- `division_id`: integer (optional)
+- `user_id`: integer (optional)
+- `start_date`: date (optional)
+- `end_date`: date (optional)
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": "integer",
+    "question": "string",
+    "answer": "string",
+    "UsersId": "integer",
+    "company_id": "integer",
+    "conversation_id": "string",
+    "created_at": "datetime"
+  }
+]
+```
+
+### 🏥 Health Check
+
+#### GET `/`
+**Deskripsi:** API root endpoint
+**Akses:** Public
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Multi-Tenant Company Chatbot API is running"
+}
+```
+
+#### GET `/health`
+**Deskripsi:** Health check endpoint
+**Akses:** Public
+
+**Response:** `200 OK`
+```json
+{
+  "status": "healthy"
+}
+```
+
+## Document Status Flow
+
+Documents go through the following status states:
+
+1. **UPLOADING** → File is being uploaded to S3
+2. **UPLOADED** → File successfully uploaded to S3
+3. **PROCESSING** → OCR processing in progress
+4. **PENDING_VALIDATION** → OCR complete, awaiting user confirmation
+5. **EMBEDDING** → Generating embeddings for RAG
+6. **COMPLETED** → Document fully processed and ready for chat
+7. **UPLOAD_FAILED** → Upload to S3 failed
+8. **PROCESSING_FAILED** → OCR or embedding process failed
+
+## User Roles
+
+- **super_admin**: Full system access, can approve/reject companies
+- **admin**: Company administrator, can manage employees and documents
+- **employee**: Regular user, can chat and view their own chat logs
+
+## Error Handling
+
+The API returns standard HTTP status codes:
+
+- `200 OK`: Successful request
+- `201 Created`: Resource created successfully
+- `202 Accepted`: Request accepted for processing
+- `204 No Content`: Resource deleted successfully
+- `400 Bad Request`: Invalid request data
+- `401 Unauthorized`: Authentication required or invalid token
+- `403 Forbidden`: Insufficient permissions
+- `404 Not Found`: Resource not found
+- `500 Internal Server Error`: Server error
+
+## CORS
+
+The API allows all origins, methods, and headers for development purposes. In production, configure appropriate CORS policies.
+
+## License
+
+This project is proprietary and confidential.

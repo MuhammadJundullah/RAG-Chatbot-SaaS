@@ -61,9 +61,9 @@ async def get_current_super_admin(current_user: user_model.Users = Depends(get_c
 
 async def get_current_company_admin(current_user: user_model.Users = Depends(get_current_user)) -> user_model.Users:
     """Dependency to ensure the user is a company admin and the company is approved."""
-    if not current_user.role == 'admin' or not current_user.is_active_in_company:
+    if not current_user.company or not current_user.company.is_active or not current_user.role == 'admin':
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User is not an active admin for the company",
+            detail="User is not an active admin for an approved company",
         )
     return current_user

@@ -26,7 +26,6 @@ class UserUpdate(BaseModel):
 class User(UserBase):
     id: int
     pic_phone_number: Optional[str] = None
-    is_active_in_company: bool
     role: str
     company_id: Optional[int] = None
     class Config:

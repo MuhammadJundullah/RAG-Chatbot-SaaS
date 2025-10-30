@@ -142,3 +142,21 @@ async def get_conversation_history(
         limit=limit,
     )
     return chat_history
+
+@user_router.delete("/{conversation_id}", status_code=204)
+async def delete_conversation(
+    conversation_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+):
+    """
+    Delete all chatlogs for a specific conversation ID for the current user.
+    """
+    deleted_count = await chatlog_repository.delete_chatlogs_by_conversation_id(
+        db=db,
+        conversation_id=conversation_id,
+        user_id=current_user.id,
+    )
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Conversation not found or user does not have permission.")
+    return {"message": f"Successfully deleted {deleted_count} chatlogs for conversation ID {conversation_id}."}

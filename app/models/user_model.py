@@ -17,7 +17,6 @@ class Users(Base):
     email = Column(String(255), unique=True, index=True, nullable=True)
     password = Column(String(255))
     pic_phone_number = Column(String(20), nullable=True)
-    is_active_in_company = Column(Boolean, default=False)
     role = Column(String(50), nullable=False)
     company_id = Column(Integer, ForeignKey("Company.id"), nullable=True)
     Divisionid = Column(Integer, ForeignKey("Division.id"), nullable=True)

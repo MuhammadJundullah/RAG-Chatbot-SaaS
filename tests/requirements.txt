@@ -1,0 +1,11 @@
+pytest
+pytest-asyncio
+pytest-cov
+httpx
+requests
+fastapi
+SQLAlchemy
+pytest-mock
+unittest-mock
+python-multipart
+async-asgi-testclient

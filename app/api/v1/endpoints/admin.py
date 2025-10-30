@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
-from app.repository import company_repository, user_repository
+from app.repository import company_repository
 from app.core.dependencies import get_current_super_admin, get_db
 from app.schemas import company_schema
 
@@ -31,7 +31,7 @@ async def get_pending_companies(
     Get a list of companies awaiting approval.
     Accessible only by super admins.
     """
-    companies = await user_repository.get_pending_companies(db, skip=skip, limit=limit)
+    companies = await company_repository.get_pending_companies(db, skip=skip, limit=limit)
     return companies
 
 @router.patch("/companies/{company_id}/approve")
@@ -55,7 +55,7 @@ async def approve_company(
     else:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Company with id {company_id} not found or no admin user associated."
+            detail=f"Company with id {company_id} not found."
         )
 
 @router.patch("/companies/{company_id}/reject")
@@ -74,7 +74,7 @@ async def reject_company(
             detail=f"Company with id {company_id} not found."
         )
 
-    if await company_repository.is_company_active(db, company_id=company_id):
+    if company_to_reject.is_active: # Check company's active status directly
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot reject an active company."

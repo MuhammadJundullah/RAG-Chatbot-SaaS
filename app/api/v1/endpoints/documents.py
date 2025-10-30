@@ -1,5 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
 from typing import List
+import os
+import pathlib
 import uuid
 from pydantic import BaseModel
 from botocore.exceptions import ClientError
@@ -13,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.s3_client import s3_client_manager
 from app.core.config import settings
 from app.services.rag_service import rag_service
-from app.tasks.document_tasks import process_ocr_task, process_embedding_task
+from app.tasks.document_tasks import upload_document_to_s3, process_ocr_task, process_embedding_task
 
 router = APIRouter(
     prefix="/documents",
@@ -22,6 +24,98 @@ router = APIRouter(
 
 class DocumentConfirmRequest(BaseModel):
     confirmed_text: str
+
+# --- NEW ASYNC UPLOAD ENDPOINT ---
+@router.post("/upload", response_model=document_schema.Document, status_code=status.HTTP_202_ACCEPTED)
+async def upload_document(
+    file: UploadFile = File(...),
+    current_user: Users = Depends(get_current_company_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Accepts a file, saves it temporarily, creates a DB record with 'UPLOADING' status,
+    and triggers a background task to upload to S3.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file name provided.")
+
+    # Create a temporary directory if it doesn't exist within the project
+    temp_dir = pathlib.Path("tmp/smartai_uploads")
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
+    # Generate a unique filename to avoid collisions
+    safe_filename = "".join(c for c in file.filename if c.isalnum() or c in ('.', '-', '_')).rstrip()
+    unique_id = uuid.uuid4()
+    temp_file_path = temp_dir / f"{unique_id}-{safe_filename}"
+
+    # Save the file to the temporary location
+    try:
+        with open(temp_file_path, "wb") as buffer:
+            buffer.write(await file.read())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save temporary file: {e}")
+
+    # Create a document record in the database
+    doc_create = document_schema.DocumentCreate(
+        title=file.filename,
+        company_id=current_user.company_id,
+        content_type=file.content_type,
+        temp_storage_path=str(temp_file_path)
+    )
+    db_document = await document_repository.create_document(db=db, document=doc_create)
+    print(f"[Upload Endpoint] Document {db_document.id} created with temp_storage_path: {db_document.temp_storage_path}")
+
+    # Trigger the background task for S3 upload
+    upload_document_to_s3.delay(db_document.id)
+
+    return db_document
+
+# --- NEW RETRY ENDPOINT ---
+@router.put("/{document_id}/retry", response_model=document_schema.Document)
+async def retry_document_upload(
+    document_id: int,
+    current_user: Users = Depends(get_current_company_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Allows retrying the upload process for a document that previously failed to upload.
+    """
+    db_document = await document_repository.get_document(db, document_id=document_id)
+
+    if not db_document or db_document.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    if db_document.status != DocumentStatus.UPLOAD_FAILED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Document is not in a failed upload state. Current status: {db_document.status.value}"
+        )
+    
+    # Case 1: S3 path exists, meaning upload was successful at some point, proceed to OCR
+    if db_document.s3_path:
+        updated_doc = await document_repository.update_document_status_and_reason(
+            db, document_id=document_id, status=DocumentStatus.UPLOADED, reason=None
+        )
+        process_ocr_task.delay(document_id)
+        print(f"Document {document_id} has been re-queued for OCR processing (S3 path found).")
+        return updated_doc
+
+    # Case 2: No S3 path, but temp file exists, retry upload
+    if db_document.temp_storage_path and os.path.exists(db_document.temp_storage_path):
+        # Reset status to UPLOADING and clear failure reason
+        updated_doc = await document_repository.update_document_status_and_reason(
+            db, document_id=document_id, status=DocumentStatus.UPLOADING, reason=None
+        )
+        # Re-queue the upload task
+        upload_document_to_s3.delay(document_id)
+        print(f"Document {document_id} has been re-queued for S3 upload (temp file found).")
+        return updated_doc
+
+    # Case 3: Neither S3 path nor temp file exists, document is unrecoverable
+    raise HTTPException(
+        status_code=400,
+        detail="Cannot retry: The temporary file for this document no longer exists and no S3 path was recorded. Document is unrecoverable."
+    )
 
 
 @router.get("/", response_model=List[document_schema.Document])
@@ -37,43 +131,6 @@ async def read_all_company_documents(
     )
     return documents
 
-
-@router.post("/upload", response_model=document_schema.Document, status_code=status.HTTP_202_ACCEPTED)
-async def upload_document(
-    file: UploadFile = File(...),
-    current_user: Users = Depends(get_current_company_admin),
-    db: AsyncSession = Depends(get_db)
-):
-    """Accepts a file, uploads it to S3, creates a DB record, and triggers an OCR task."""
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No file name provided.")
-
-    file_content = await file.read()
-    safe_filename = "".join(c for c in file.filename if c.isalnum() or c in ('.', '-', '_')).rstrip()
-    s3_key = f"smartai/uploads/{current_user.company_id}/{uuid.uuid4()}-{safe_filename}"
-
-    try:
-        s3 = await s3_client_manager.get_client()
-        await s3.put_object(
-            Bucket=settings.S3_BUCKET_NAME,
-            Key=s3_key,
-            Body=file_content
-        )
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to upload file to storage.")
-
-    doc_create = document_schema.DocumentCreate(
-        title=file.filename,
-        storage_path=s3_key,
-        company_id=current_user.company_id,
-        content_type=file.content_type
-    )
-    db_document = await document_repository.create_document(db=db, document=doc_create)
-
-    process_ocr_task.delay(db_document.id)
-
-    return db_document
-
 @router.get("/pending-validation", response_model=List[document_schema.Document])
 async def get_documents_pending_validation(
     current_user: Users = Depends(get_current_company_admin),
@@ -81,7 +138,7 @@ async def get_documents_pending_validation(
 ):
     """Gets a list of documents that have been OCR'd and are awaiting user validation."""
     documents = await document_repository.get_documents_by_status(
-        db, status="PENDING_VALIDATION", company_id=current_user.company_id
+        db, status=DocumentStatus.PENDING_VALIDATION, company_id=current_user.company_id
     )
     return documents
 
@@ -104,31 +161,20 @@ async def confirm_document_and_trigger_embedding(
         db, 
         document_id=document_id, 
         text=request.confirmed_text, 
-        status="EMBEDDING"
+        status=DocumentStatus.EMBEDDING
     )
 
     process_embedding_task.delay(document_id)
 
     return updated_doc
 
-@router.get("/failed", response_model=List[document_schema.Document])
-async def get_failed_documents(
-    current_user: Users = Depends(get_current_company_admin),
-    db: AsyncSession = Depends(get_db)
-):
-    """Gets a list of documents that failed during processing."""
-    documents = await document_repository.get_documents_by_status(
-        db, status="PROCESSING_FAILED", company_id=current_user.company_id
-    )
-    return documents
-
-@router.post("/{document_id}/retry", response_model=document_schema.Document)
+@router.post("/{document_id}/retry-processing", response_model=document_schema.Document)
 async def retry_failed_document_processing(
     document_id: int,
     current_user: Users = Depends(get_current_company_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Manually triggers a retry for a document that failed during processing."""
+    """Manually triggers a retry for a document that failed during OCR or Embedding."""
     db_document = await document_repository.get_document(db, document_id=document_id)
 
     if not db_document or db_document.company_id != current_user.company_id:
@@ -137,26 +183,23 @@ async def retry_failed_document_processing(
     if db_document.status != DocumentStatus.PROCESSING_FAILED:
         raise HTTPException(
             status_code=400,
-            detail=f"Document is not in a failed state. Current status: {db_document.status.value}"
+            detail=f"Document is not in a failed processing state. Current status: {db_document.status.value}"
         )
 
     # Smart retry based on which stage it failed
     if db_document.failed_reason and "OCR" in db_document.failed_reason:
-        # If OCR failed, we restart from the beginning
         updated_doc = await document_repository.update_document_status_and_reason(
-            db, document_id=document_id, status=DocumentStatus.UPLOADED
+            db, document_id=document_id, status=DocumentStatus.UPLOADED, reason=None
         )
         process_ocr_task.delay(document_id)
         print(f"Document {document_id} has been re-queued for OCR processing.")
     elif db_document.failed_reason and "Embedding" in db_document.failed_reason:
-        # If Embedding failed, we restart from the embedding step
         updated_doc = await document_repository.update_document_status_and_reason(
-            db, document_id=document_id, status=DocumentStatus.PENDING_VALIDATION
+            db, document_id=document_id, status=DocumentStatus.PENDING_VALIDATION, reason=None
         )
         process_embedding_task.delay(document_id)
         print(f"Document {document_id} has been re-queued for embedding.")
     else:
-        # Fallback for unknown failure reason
         raise HTTPException(status_code=400, detail="Unknown failure reason, cannot determine retry step.")
 
     return updated_doc
@@ -173,7 +216,6 @@ async def update_document_content(
     if not db_document or db_document.company_id != current_user.company_id:
         raise HTTPException(status_code=404, detail="Document not found.")
 
-    # Update the document's extracted text in the database
     await document_repository.update_document_text_and_status(
         db, 
         document_id=document_id, 
@@ -181,7 +223,6 @@ async def update_document_content(
         status=DocumentStatus.EMBEDDING
     )
 
-    # Update embeddings in Pinecone
     rag_update_result = await rag_service.update_document_content(
         document_id=str(document_id), 
         new_text_content=request.new_content,
@@ -192,7 +233,6 @@ async def update_document_content(
     if rag_update_result.get("status") == "failed":
         raise HTTPException(status_code=500, detail=f"Failed to update RAG embeddings: {rag_update_result.get('message')}")
 
-    # After successful RAG update, set status to COMPLETED
     final_updated_doc = await document_repository.update_document_status_and_reason(
         db, document_id=document_id, status=DocumentStatus.COMPLETED
     )
@@ -227,29 +267,39 @@ async def delete_document(
         raise HTTPException(status_code=404, detail="Document not found.")
 
     try:
-        # Use the new delete_document_by_id which filters by document_id
         await rag_service.delete_document_by_id(
             document_id=str(document_id), 
             company_id=db_document.company_id
         )
 
-        try:
-            s3 = await s3_client_manager.get_client()
-            await s3.delete_objects(
-                Bucket=settings.S3_BUCKET_NAME,
-                Delete={
-                    "Objects": [
-                        {"Key": db_document.storage_path}
-                    ]
-                }
-            )
-        except ClientError as e:
-            # delete_objects might not raise an error for non-existent keys,
-            # but rather list them in the 'Deleted' response.
-            # Keeping this general ClientError handling for other potential S3 issues.
-            if e.response['Error']['Code'] not in ['404', 'NoSuchKey']:
-                raise e
-            print(f"Warning: S3 object not found during deletion, proceeding. Key: {db_document.storage_path}")
+        if db_document.s3_path: # Check if s3_path exists
+            try:
+                s3 = await s3_client_manager.get_client()
+                await s3.delete_objects(
+                    Bucket=settings.S3_BUCKET_NAME,
+                    Delete={
+                        "Objects": [
+                            {"Key": db_document.s3_path}
+                        ]
+                    }
+                )
+            except ClientError as e:
+                # delete_objects might return errors for individual objects in the 'Errors' list
+                # For a single object, a ClientError on the call itself is still relevant.
+                if e.response['Error']['Code'] not in ['404', 'NoSuchKey']:
+                    raise e
+                print(f"Warning: S3 object not found during deletion, proceeding. Key: {db_document.s3_path}")
+
+        # Also ensure the temporary file is deleted if it still exists
+        if db_document.temp_storage_path and os.path.exists(db_document.temp_storage_path):
+            print("[Delete Document] Entering temporary file cleanup block.")
+            try:
+                print(f"[Delete Document] Attempting to remove temporary file: {db_document.temp_storage_path}")
+                os.remove(db_document.temp_storage_path)
+                print(f"[Delete Document] Removed temporary file: {db_document.temp_storage_path}")
+                print(f"[Delete Document] After os.remove: File exists? {os.path.exists(db_document.temp_storage_path)}")
+            except OSError as e:
+                print(f"[Delete Document] Error: Failed to remove temporary file {db_document.temp_storage_path}: {e}")
 
         await document_repository.delete_document(db=db, document_id=document_id)
 

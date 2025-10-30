@@ -59,8 +59,7 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
             password=hashed_password,
             pic_phone_number=user_data.pic_phone_number,
             role="admin",
-            company_id=new_company_obj.id,
-            is_active_in_company=False
+            company_id=new_company_obj.id
         )
     else:
         raise UserRegistrationError("Invalid registration data: only new company registration is allowed via this endpoint.")
@@ -86,7 +85,6 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
         password=hashed_password,
         role="employee",
         company_id=company_id,
-        is_active_in_company=True,
         Divisionid=employee_data.division_id
     )
 
@@ -117,7 +115,8 @@ async def authenticate_user(db: AsyncSession, password: str, email: Optional[str
 
     # Company admin/employee specific checks
     if user.role in ['admin', 'employee']:
-        if not user.is_active_in_company:
+        # Ensure company relationship is loaded for the user
+        if not user.company or not user.company.is_active:
             return None
         return user
         

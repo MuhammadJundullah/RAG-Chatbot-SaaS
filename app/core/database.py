@@ -12,9 +12,10 @@ class DatabaseManager:
         """Initializes the database engine and session maker upon creation."""
         self.engine = create_async_engine(
             settings.DATABASE_URL, 
+            connect_args={"statement_cache_size":0},
             echo=False,
             pool_size=20,
-            max_overflow=10, 
+            max_overflow=10,
             pool_timeout=30,
             query_cache_size=0
         )
@@ -60,7 +61,6 @@ async def create_super_admin(db_session):
         email=None,
         password=hashed_password,
         role="super_admin",
-        is_active_in_company=True,
         company_id=None
     )
     db_session.add(super_admin)

@@ -1,7 +1,8 @@
 from sqlalchemy import (
     Column,
     Integer,
-    String
+    String,
+    Boolean # Added Boolean import
 )
 from sqlalchemy.orm import relationship
 from app.models.base import Base
@@ -12,7 +13,8 @@ class Company(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(100))
     code = Column(String(10))
-    logo = Column(String(255), nullable=True)
+    logo_s3_path = Column(String(255), nullable=True)
+    is_active = Column(Boolean, default=False) # New column for company active status
     users = relationship("Users", back_populates="company")
     documents = relationship("Documents", back_populates="company")
     chatlogs = relationship("Chatlogs", back_populates="company")

@@ -7,7 +7,13 @@ from app.schemas import document_schema
 
 async def create_document(db: AsyncSession, document: document_schema.DocumentCreate) -> document_model.Documents:
     """Creates a new document record in the database."""
-    db_document = document_model.Documents(**document.model_dump())
+    # Note: The status will default to UPLOADING as per the model definition
+    db_document = document_model.Documents(
+        title=document.title,
+        company_id=document.company_id,
+        temp_storage_path=document.temp_storage_path,
+        content_type=document.content_type
+    )
     db.add(db_document)
     await db.commit()
     await db.refresh(db_document)
@@ -41,12 +47,24 @@ async def get_documents_by_company(db: AsyncSession, company_id: int, skip: int,
     )
     return result.scalars().all()
 
-async def update_document_text_and_status(db: AsyncSession, document_id: int, text: str, status: str) -> document_model.Documents | None:
+async def update_document_text_and_status(db: AsyncSession, document_id: int, text: str, status: document_model.DocumentStatus) -> document_model.Documents | None:
     """Updates the extracted_text and status of a document."""
     db_document = await get_document(db, document_id=document_id)
     if db_document:
         db_document.extracted_text = text
         db_document.status = status
+        await db.commit()
+        await db.refresh(db_document)
+    return db_document
+
+async def update_document_after_upload(db: AsyncSession, document_id: int, s3_path: str, status: document_model.DocumentStatus) -> document_model.Documents | None:
+    """Updates a document's status and S3 path after a successful upload."""
+    db_document = await get_document(db, document_id=document_id)
+    if db_document:
+        db_document.s3_path = s3_path
+        db_document.status = status
+        db_document.temp_storage_path = None # Clear the temp path
+        db_document.failed_reason = None # Clear any previous failure reason
         await db.commit()
         await db.refresh(db_document)
     return db_document
@@ -57,8 +75,8 @@ async def update_document_status_and_reason(db: AsyncSession, document_id: int, 
     if db_document:
         db_document.status = status
         db_document.failed_reason = reason
-        # Clear reason if status is not failed
-        if status != document_model.DocumentStatus.PROCESSING_FAILED:
+        # Clear reason if status is not a failed one
+        if status not in [document_model.DocumentStatus.PROCESSING_FAILED, document_model.DocumentStatus.UPLOAD_FAILED]:
             db_document.failed_reason = None
         await db.commit()
         await db.refresh(db_document)
