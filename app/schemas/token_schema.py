@@ -13,3 +13,4 @@ class TokenData(BaseModel):
     role: Optional[str] = None
     company_id: Optional[int] = None
     division_id: Optional[int] = None
+    name: Optional[str] = None

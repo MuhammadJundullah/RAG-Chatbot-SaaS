@@ -55,6 +55,7 @@ async def login_for_access_token(
     token_data_payload = {
         "sub": str(user.id),
         "role": user.role,
+        "name": user.name,
     }
     if user.company_id:
         token_data_payload["company_id"] = user.company_id

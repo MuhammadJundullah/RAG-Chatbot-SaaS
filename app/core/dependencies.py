@@ -8,10 +8,10 @@ from fastapi.security import OAuth2PasswordBearer
 from app.core.config import settings
 from app.models import user_model
 from app.schemas import token_schema
-from app.repository import user_repository
+from app.repository.user_repository import user_repository
 
 # The tokenUrl should point to a generic token endpoint
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/user/token")
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async for session in db_manager.get_db_session():
@@ -38,7 +38,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
         token_data = token_schema.TokenData(
             sub=user_id, 
             role=payload.get("role"), 
-            company_id=payload.get("company_id")
+            company_id=payload.get("company_id"),
+            division_id=payload.get("division_id"),
+            name=payload.get("name")
         )
 
     except JWTError:
@@ -51,7 +53,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     return user
 
 async def get_current_super_admin(current_user: user_model.Users = Depends(get_current_user)) -> user_model.Users:
-    """Dependency to ensure the user is a super admin."""
+    """
+    Dependency to ensure the user is a super admin.
+    """
     if current_user.role != 'super_admin':
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -60,7 +64,9 @@ async def get_current_super_admin(current_user: user_model.Users = Depends(get_c
     return current_user
 
 async def get_current_company_admin(current_user: user_model.Users = Depends(get_current_user)) -> user_model.Users:
-    """Dependency to ensure the user is a company admin and the company is approved."""
+    """
+    Dependency to ensure the user is a company admin and the company is approved.
+    """
     if not current_user.company or not current_user.company.is_active or not current_user.role == 'admin':
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
