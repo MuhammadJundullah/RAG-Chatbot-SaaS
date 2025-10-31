@@ -28,6 +28,8 @@ class User(UserBase):
     pic_phone_number: Optional[str] = None
     role: str
     company_id: Optional[int] = None
+    division_id: Optional[int] = None
+    is_active: Optional[bool] = None
     class Config:
         from_attributes = True
         

@@ -1,5 +1,5 @@
 import pytest
-from app.schemas.user_schema import UserRegistration, UserLogin, User
+from app.schemas.user_schema import UserRegistration, UserLoginCombined, User
 from app.schemas.company_schema import Company
 from app.schemas.document_schema import DocumentCreate, Document
 from app.schemas.division_schema import DivisionCreate, Division
@@ -24,11 +24,10 @@ def test_user_registration_schema():
 
 
 def test_user_login_schema():
-    login_data = UserLogin(
+    login_data = UserLoginCombined(
         email="test@example.com",
         password="password123"
     )
-    
     assert login_data.email == "test@example.com"
     assert login_data.password == "password123"
 
@@ -59,9 +58,9 @@ def test_company_schema():
     company = Company(
         id=1,
         name="Test Company",
+        code="TESTCO",
         is_active=True
     )
-    
     assert company.id == 1
     assert company.name == "Test Company"
     assert company.is_active == True
@@ -71,9 +70,9 @@ def test_document_create_schema():
     doc_create = DocumentCreate(
         title="Test Document",
         company_id=1,
+        temp_storage_path="/tmp/test_document.pdf",
         content_type="application/pdf"
     )
-    
     assert doc_create.title == "Test Document"
     assert doc_create.company_id == 1
     assert doc_create.content_type == "application/pdf"
@@ -152,9 +151,22 @@ def test_chatlog_schema():
 
 
 def test_token_schema():
+    user_mock = User(
+        id=1,
+        name="Test User",
+        email="test@example.com",
+        username="testuser",
+        role="employee",
+        company_id=1,
+        division_id=1,
+        is_active=True
+    )
+
     token = Token(
         access_token="test_access_token",
-        token_type="bearer"
+        token_type="bearer",
+        expires_in=3600,
+        user=user_mock
     )
     
     assert token.access_token == "test_access_token"

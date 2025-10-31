@@ -3,7 +3,8 @@ from typing import Optional
 import secrets
 import string
 from app.schemas import user_schema
-from app.repository import user_repository, company_repository
+from app.repository.user_repository import user_repository
+from app.repository.company_repository import company_repository
 from app.utils.security import get_password_hash, verify_password
 from app.models import user_model, company_model
 
@@ -85,8 +86,7 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
         password=hashed_password,
         role="employee",
         company_id=company_id,
-        Divisionid=employee_data.division_id
-    )
+                    division_id=employee_data.division_id    )
 
     return await user_repository.create_user(db, user=db_user)
 

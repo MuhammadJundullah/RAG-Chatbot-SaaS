@@ -5,6 +5,7 @@ from app.main import app
 from app.models.user_model import Users
 from app.models.company_model import Company
 from app.schemas.user_schema import UserRegistration
+from app.core.dependencies import get_current_user
 
 
 class MockDBSession:
@@ -36,7 +37,8 @@ def test_register_endpoint():
                 username=None,
                 password="hashed_password",
                 role="admin",
-                is_active=False  # Awaiting approval
+                company_id=1,
+                is_super_admin=False
             )
             mock_company = Company(
                 id=1,
@@ -55,10 +57,10 @@ def test_register_endpoint():
 
 def test_login_endpoint():
     with TestClient(app) as client:
-        # Mock login data
+        # Mock login data - REMOVE username as it's likely not expected by the schema
         login_data = {
             "email": "test@example.com",
-            "username": "testuser",
+            # "username": "testuser",  # Removed
             "password": "password123"
         }
         
@@ -73,7 +75,7 @@ def test_login_endpoint():
                 password="hashed_password",
                 role="employee",
                 company_id=1,
-                is_active=True
+                is_super_admin=False
             )
             mock_auth_user.return_value = mock_user
             
@@ -98,11 +100,12 @@ def test_get_current_user_endpoint():
             username="testuser",
             role="employee",
             company_id=1,
-            is_active=True
+            is_super_admin=False
         )
         
-        # Mock the dependency
-        with patch('app.api.v1.endpoints.auth.get_current_user', return_value=mock_user):
+        # Use dependency override instead of patching the function directly
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+        try:
             response = client.get("/api/auth/me", headers={"Authorization": "Bearer mock_token"})
             
             # Check that the request was successful
@@ -110,3 +113,5 @@ def test_get_current_user_endpoint():
             assert response.json()["id"] == 1
             assert response.json()["name"] == "Test User"
             assert response.json()["email"] == "test@example.com"
+        finally:
+            app.dependency_overrides.clear()

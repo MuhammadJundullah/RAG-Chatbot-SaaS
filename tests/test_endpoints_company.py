@@ -4,6 +4,7 @@ from unittest.mock import patch, AsyncMock
 from app.main import app
 from app.models.user_model import Users
 from app.models.company_model import Company
+from app.core.dependencies import get_current_company_admin
 
 
 def test_get_company_me_endpoint():
@@ -16,7 +17,7 @@ def test_get_company_me_endpoint():
             username="adminuser",
             role="admin",
             company_id=1,
-            is_active=True
+            is_super_admin=False
         )
         
         # Mock company
@@ -26,18 +27,21 @@ def test_get_company_me_endpoint():
             is_active=True
         )
         
-        # Mock the dependencies and repository
-        with patch('app.api.v1.endpoints.company.get_current_company_admin', return_value=mock_user), \
-             patch('app.repository.company_repository.get_company', new_callable=AsyncMock) as mock_get_company:
-            
-            mock_get_company.return_value = mock_company
-            
-            response = client.get("/api/companies/me", headers={"Authorization": "Bearer mock_token"})
-            
-            # Check that the request was successful
-            assert response.status_code == 200
-            assert response.json()["id"] == 1
-            assert response.json()["name"] == "Test Company"
+        # Use dependency override
+        app.dependency_overrides[get_current_company_admin] = lambda: mock_user
+        try:
+            # Mock the repository
+            with patch('app.repository.company_repository.get_company', new_callable=AsyncMock) as mock_get_company:
+                mock_get_company.return_value = mock_company
+                
+                response = client.get("/api/companies/me", headers={"Authorization": "Bearer mock_token"})
+                
+                # Check that the request was successful
+                assert response.status_code == 200
+                assert response.json()["id"] == 1
+                assert response.json()["name"] == "Test Company"
+        finally:
+            app.dependency_overrides.clear()
 
 
 def test_get_company_users_endpoint():
@@ -50,7 +54,7 @@ def test_get_company_users_endpoint():
             username="adminuser",
             role="admin",
             company_id=1,
-            is_active=True
+            is_super_admin=False
         )
         
         # Mock company users
@@ -62,7 +66,7 @@ def test_get_company_users_endpoint():
                 username="adminuser",
                 role="admin",
                 company_id=1,
-                is_active=True
+                is_super_admin=False
             ),
             Users(
                 id=2,
@@ -71,26 +75,28 @@ def test_get_company_users_endpoint():
                 username="empuser",
                 role="employee",
                 company_id=1,
-                is_active=True
+                is_super_admin=False
             )
         ]
         
-        # Mock the dependency
-        with patch('app.api.v1.endpoints.company.get_current_company_admin', return_value=mock_user), \
-             patch('sqlalchemy.ext.asyncio.AsyncSession.execute', new_callable=AsyncMock) as mock_execute:
-            
-            # Mock the result of the query
-            mock_result = AsyncMock()
-            mock_result.scalars().all.return_value = mock_users
-            mock_execute.return_value = mock_result
-            
-            response = client.get("/api/companies/users", headers={"Authorization": "Bearer mock_token"})
-            
-            # Check that the request was successful
-            assert response.status_code == 200
-            assert len(response.json()) == 2
-            assert response.json()[0]["id"] == 1
-            assert response.json()[1]["id"] == 2
+        # Use dependency override
+        app.dependency_overrides[get_current_company_admin] = lambda: mock_user
+        try:
+            with patch('sqlalchemy.ext.asyncio.AsyncSession.execute', new_callable=AsyncMock) as mock_execute:
+                # Mock the result of the query
+                mock_result = AsyncMock()
+                mock_result.scalars.return_value.all.return_value = mock_users
+                mock_execute.return_value = mock_result
+                
+                response = client.get("/api/companies/users", headers={"Authorization": "Bearer mock_token"})
+                
+                # Check that the request was successful
+                assert response.status_code == 200
+                assert len(response.json()) == 2
+                assert response.json()[0]["id"] == 1
+                assert response.json()[1]["id"] == 2
+        finally:
+            app.dependency_overrides.clear()
 
 
 def test_register_employee_endpoint():
@@ -103,7 +109,7 @@ def test_register_employee_endpoint():
             username="adminuser",
             role="admin",
             company_id=1,
-            is_active=True
+            is_super_admin=False
         )
         
         # Mock new employee
@@ -115,32 +121,35 @@ def test_register_employee_endpoint():
             password="hashed_password",
             role="employee",
             company_id=1,
-            is_active=True
+            is_super_admin=False
         )
         
-        # Mock the dependencies and services
-        with patch('app.api.v1.endpoints.company.get_current_company_admin', return_value=mock_user), \
-             patch('app.services.user_service.register_employee_by_admin', new_callable=AsyncMock) as mock_register_employee:
-            
-            mock_register_employee.return_value = mock_employee
-            
-            # Send employee registration data
-            employee_data = {
-                "name": "New Employee",
-                "email": "newemp@example.com",
-                "password": "password123",
-                "username": "newempuser"
-            }
-            
-            response = client.post(
-                "/api/companies/employees/register", 
-                json=employee_data,
-                headers={"Authorization": "Bearer mock_token"}
-            )
-            
-            # Check that the request was successful
-            assert response.status_code == 201
-            assert response.json()["id"] == 2
-            assert response.json()["name"] == "New Employee"
-            assert response.json()["role"] == "employee"
-            assert response.json()["company_id"] == 1
+        # Use dependency override
+        app.dependency_overrides[get_current_company_admin] = lambda: mock_user
+        try:
+            # Mock the service
+            with patch('app.services.user_service.register_employee_by_admin', new_callable=AsyncMock) as mock_register_employee:
+                mock_register_employee.return_value = mock_employee
+                
+                # Send employee registration data
+                employee_data = {
+                    "name": "New Employee",
+                    "email": "newemp@example.com",
+                    "password": "password123",
+                    "username": "newempuser"
+                }
+                
+                response = client.post(
+                    "/api/companies/employees/register", 
+                    json=employee_data,
+                    headers={"Authorization": "Bearer mock_token"}
+                )
+                
+                # Check that the request was successful
+                assert response.status_code == 201
+                assert response.json()["id"] == 2
+                assert response.json()["name"] == "New Employee"
+                assert response.json()["role"] == "employee"
+                assert response.json()["company_id"] == 1
+        finally:
+            app.dependency_overrides.clear()

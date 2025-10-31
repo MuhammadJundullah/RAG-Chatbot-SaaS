@@ -8,9 +8,9 @@ from app.repository.chatlog_repository import create_chatlog
 from app.models.user_model import Users
 from app.models.company_model import Company
 from app.models.document_model import Documents
-from app.models.division_model import Divisions
+from app.models.division_model import Division
 from app.models.chatlog_model import Chatlogs
-from app.schemas.user_schema import UserCreate
+from app.schemas.user_schema import UserRegistration
 from app.schemas.company_schema import CompanyCreate
 from app.schemas.document_schema import DocumentCreate
 from app.schemas.division_schema import DivisionCreate

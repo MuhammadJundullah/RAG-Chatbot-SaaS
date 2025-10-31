@@ -102,16 +102,16 @@ async def test_register_user(mock_db_session):
         id=1,
         name=user_data.name,
         email=user_data.email,
-        username=None,  # Will be generated
+        username=None, 
         password="hashed_password",
-        role="admin",  # New company registration creates admin
-        is_active=False  # Awaiting approval
+        role="admin", 
+        is_active=False
     )
     
     new_company = Company(
         id=1,
         name=user_data.company_name,
-        is_active=False  # Awaiting approval
+        is_active=False 
     )
     
     with patch('app.services.user_service.user_repository.get_user_by_email', return_value=None), \

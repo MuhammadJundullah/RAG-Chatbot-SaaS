@@ -3,7 +3,8 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock
 from app.main import app
 from app.models.user_model import Users
-from app.models.division_model import Divisions
+from app.models.division_model import Division
+from app.core.dependencies import get_current_user, get_current_company_admin
 
 
 def test_create_division_endpoint():
@@ -16,38 +17,41 @@ def test_create_division_endpoint():
             username="adminuser",
             role="admin",
             company_id=1,
-            is_active=True
+            is_super_admin=False
         )
         
         # Mock new division
-        mock_division = Divisions(
+        mock_division = Division(
             id=1,
             name="New Division",
             company_id=1
         )
         
-        # Mock the dependencies and repository
-        with patch('app.api.v1.endpoints.divisions.get_current_company_admin', return_value=mock_user), \
-             patch('app.repository.division_repository.create_division', new_callable=AsyncMock) as mock_create_division:
-            
-            mock_create_division.return_value = mock_division
-            
-            # Send division creation data
-            division_data = {
-                "name": "New Division"
-            }
-            
-            response = client.post(
-                "/api/divisions/", 
-                json=division_data,
-                headers={"Authorization": "Bearer mock_token"}
-            )
-            
-            # Check that the request was successful
-            assert response.status_code == 200
-            assert response.json()["id"] == 1
-            assert response.json()["name"] == "New Division"
-            assert response.json()["company_id"] == 1
+        # Use dependency override for admin
+        app.dependency_overrides[get_current_company_admin] = lambda: mock_user
+        try:
+            # Mock the repository
+            with patch('app.repository.division_repository.create_division', new_callable=AsyncMock) as mock_create_division:
+                mock_create_division.return_value = mock_division
+                
+                # Send division creation data
+                division_data = {
+                    "name": "New Division"
+                }
+                
+                response = client.post(
+                    "/api/divisions/", 
+                    json=division_data,
+                    headers={"Authorization": "Bearer mock_token"}
+                )
+                
+                # Check that the request was successful
+                assert response.status_code == 200
+                assert response.json()["id"] == 1
+                assert response.json()["name"] == "New Division"
+                assert response.json()["company_id"] == 1
+        finally:
+            app.dependency_overrides.clear()
 
 
 def test_get_divisions_endpoint():
@@ -60,57 +64,59 @@ def test_get_divisions_endpoint():
             username="testuser",
             role="employee",
             company_id=1,
-            is_active=True
+            is_super_admin=False
         )
         
         # Mock divisions
         mock_divisions = [
-            Divisions(
+            Division(
                 id=1,
                 name="Division 1",
                 company_id=1
             ),
-            Divisions(
+            Division(
                 id=2,
                 name="Division 2",
                 company_id=1
             )
         ]
         
-        # Mock the dependencies and repository
-        with patch('app.api.v1.endpoints.divisions.get_current_user', return_value=mock_user), \
-             patch('app.repository.division_repository.get_divisions_by_company', new_callable=AsyncMock) as mock_get_divisions:
-            
-            mock_get_divisions.return_value = mock_divisions
-            
-            response = client.get("/api/divisions/", headers={"Authorization": "Bearer mock_token"})
-            
-            # Check that the request was successful
-            assert response.status_code == 200
-            assert len(response.json()) == 2
-            assert response.json()[0]["id"] == 1
-            assert response.json()[1]["id"] == 2
+        # Use dependency override for regular user
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+        try:
+            # Mock the repository
+            with patch('app.repository.division_repository.get_divisions_by_company', new_callable=AsyncMock) as mock_get_divisions:
+                mock_get_divisions.return_value = mock_divisions
+                
+                response = client.get("/api/divisions/", headers={"Authorization": "Bearer mock_token"})
+                
+                # Check that the request was successful
+                assert response.status_code == 200
+                assert len(response.json()) == 2
+                assert response.json()[0]["id"] == 1
+                assert response.json()[1]["id"] == 2
+        finally:
+            app.dependency_overrides.clear()
 
 
 def test_get_public_divisions_endpoint():
     with TestClient(app) as client:
         # Mock divisions
         mock_divisions = [
-            Divisions(
+            Division(
                 id=1,
                 name="Public Division 1",
                 company_id=1
             ),
-            Divisions(
+            Division(
                 id=2,
                 name="Public Division 2",
                 company_id=1
             )
         ]
         
-        # Mock the repository
+        # Mock the repository (no auth needed for public endpoint)
         with patch('app.repository.division_repository.get_divisions_by_company', new_callable=AsyncMock) as mock_get_divisions:
-            
             mock_get_divisions.return_value = mock_divisions
             
             response = client.get("/api/divisions/public/1")  # Public endpoint, no auth required

@@ -4,6 +4,7 @@ from unittest.mock import patch, AsyncMock
 from app.main import app
 from app.models.user_model import Users
 from app.models.chatlog_model import Chatlogs
+from app.core.dependencies import get_current_user
 
 
 def test_chat_endpoint():
@@ -16,7 +17,7 @@ def test_chat_endpoint():
             username="testuser",
             role="employee",
             company_id=1,
-            is_active=True
+            is_super_admin=False
         )
         
         # Mock chatlog
@@ -29,42 +30,46 @@ def test_chat_endpoint():
             conversation_id="test_conversation"
         )
         
-        # Mock the dependencies and services
-        with patch('app.api.v1.endpoints.chat.get_current_user', return_value=mock_user), \
-             patch('app.services.rag_service.rag_service.get_relevant_context', new_callable=AsyncMock) as mock_get_context, \
-             patch('app.services.gemini_service.gemini_service.generate_chat_response') as mock_gen_response, \
-             patch('app.repository.chatlog_repository.create_chatlog', new_callable=AsyncMock) as mock_create_chatlog:
-            
-            # Mock the RAG service response
-            mock_get_context.return_value = "Relevant context from RAG"
-            
-            # Mock the Gemini service response
-            async def mock_response_generator():
-                yield "I'm doing well, thank you for asking!"
-            
-            mock_gen_response.return_value = mock_response_generator()
-            
-            # Mock the chatlog repository
-            mock_create_chatlog.return_value = mock_chatlog
-            
-            # Send a chat request
-            chat_data = {
-                "message": "Hello, how are you?",
-                "conversation_id": "test_conversation"
-            }
-            
-            response = client.post(
-                "/api/chat", 
-                json=chat_data,
-                headers={"Authorization": "Bearer mock_token"}
-            )
-            
-            # Check that the request was successful
-            assert response.status_code == 200
-            assert "response" in response.json()
-            assert "conversation_id" in response.json()
-            assert response.json()["response"] == "I'm doing well, thank you for asking!"
-            assert response.json()["conversation_id"] == "test_conversation"
+        # Use dependency override
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+        try:
+            # Mock the dependencies and services
+            with patch('app.services.rag_service.rag_service.get_relevant_context', new_callable=AsyncMock) as mock_get_context, \
+                 patch('app.services.gemini_service.gemini_service.generate_chat_response') as mock_gen_response, \
+                 patch('app.repository.chatlog_repository.create_chatlog', new_callable=AsyncMock) as mock_create_chatlog:
+                
+                # Mock the RAG service response
+                mock_get_context.return_value = "Relevant context from RAG"
+                
+                # Mock the Gemini service response
+                async def mock_response_generator():
+                    yield "I'm doing well, thank you for asking!"
+                
+                mock_gen_response.return_value = mock_response_generator()
+                
+                # Mock the chatlog repository
+                mock_create_chatlog.return_value = mock_chatlog
+                
+                # Send a chat request
+                chat_data = {
+                    "message": "Hello, how are you?",
+                    "conversation_id": "test_conversation"
+                }
+                
+                response = client.post(
+                    "/api/chat", 
+                    json=chat_data,
+                    headers={"Authorization": "Bearer mock_token"}
+                )
+                
+                # Check that the request was successful
+                assert response.status_code == 200
+                assert "response" in response.json()
+                assert "conversation_id" in response.json()
+                assert response.json()["response"] == "I'm doing well, thank you for asking!"
+                assert response.json()["conversation_id"] == "test_conversation"
+        finally:
+            app.dependency_overrides.clear()
 
 
 def test_chat_endpoint_without_conversation_id():
@@ -77,7 +82,7 @@ def test_chat_endpoint_without_conversation_id():
             username="testuser",
             role="employee",
             company_id=1,
-            is_active=True
+            is_super_admin=False
         )
         
         # Mock chatlog
@@ -90,39 +95,43 @@ def test_chat_endpoint_without_conversation_id():
             conversation_id="new_conversation"
         )
         
-        # Mock the dependencies and services
-        with patch('app.api.v1.endpoints.chat.get_current_user', return_value=mock_user), \
-             patch('app.services.rag_service.rag_service.get_relevant_context', new_callable=AsyncMock) as mock_get_context, \
-             patch('app.services.gemini_service.gemini_service.generate_chat_response') as mock_gen_response, \
-             patch('app.repository.chatlog_repository.create_chatlog', new_callable=AsyncMock) as mock_create_chatlog:
-            
-            # Mock the RAG service response
-            mock_get_context.return_value = "Relevant context from RAG"
-            
-            # Mock the Gemini service response
-            async def mock_response_generator():
-                yield "I can answer questions based on your company documents!"
-            
-            mock_gen_response.return_value = mock_response_generator()
-            
-            # Mock the chatlog repository
-            mock_create_chatlog.return_value = mock_chatlog
-            
-            # Send a chat request without conversation_id
-            chat_data = {
-                "message": "What can you do?"
-            }
-            
-            response = client.post(
-                "/api/chat", 
-                json=chat_data,
-                headers={"Authorization": "Bearer mock_token"}
-            )
-            
-            # Check that the request was successful
-            assert response.status_code == 200
-            assert "response" in response.json()
-            assert "conversation_id" in response.json()
-            assert response.json()["response"] == "I can answer questions based on your company documents!"
-            # The conversation_id should be generated
-            assert len(response.json()["conversation_id"]) > 0
+        # Use dependency override
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+        try:
+            # Mock the dependencies and services
+            with patch('app.services.rag_service.rag_service.get_relevant_context', new_callable=AsyncMock) as mock_get_context, \
+                 patch('app.services.gemini_service.gemini_service.generate_chat_response') as mock_gen_response, \
+                 patch('app.repository.chatlog_repository.create_chatlog', new_callable=AsyncMock) as mock_create_chatlog:
+                
+                # Mock the RAG service response
+                mock_get_context.return_value = "Relevant context from RAG"
+                
+                # Mock the Gemini service response
+                async def mock_response_generator():
+                    yield "I can answer questions based on your company documents!"
+                
+                mock_gen_response.return_value = mock_response_generator()
+                
+                # Mock the chatlog repository
+                mock_create_chatlog.return_value = mock_chatlog
+                
+                # Send a chat request without conversation_id
+                chat_data = {
+                    "message": "What can you do?"
+                }
+                
+                response = client.post(
+                    "/api/chat", 
+                    json=chat_data,
+                    headers={"Authorization": "Bearer mock_token"}
+                )
+                
+                # Check that the request was successful
+                assert response.status_code == 200
+                assert "response" in response.json()
+                assert "conversation_id" in response.json()
+                assert response.json()["response"] == "I can answer questions based on your company documents!"
+                # The conversation_id should be generated
+                assert len(response.json()["conversation_id"]) > 0
+        finally:
+            app.dependency_overrides.clear()

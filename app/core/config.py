@@ -1,9 +1,11 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Optional
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='.env', extra='ignore')
 
     DATABASE_URL: str
+    TEST_DATABASE_URL: Optional[str] = None
     GEMINI_API_KEY: str
     GEMINI_MODEL: str
     EMBEDDING_MODEL_NAME: str

@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
-from app.repository import company_repository
 from app.core.dependencies import get_current_super_admin, get_db
 from app.schemas import company_schema
+from app.services import admin_service
 
 router = APIRouter(
     prefix="/admin",
@@ -17,7 +17,7 @@ router = APIRouter(
 async def read_companies(
     skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db),
 ):
-    companies = await company_repository.get_active_companies(db, skip=skip, limit=limit)
+    companies = await admin_service.get_all_active_companies_service(db, skip=skip, limit=limit)
     return companies
 
 # get pending company
@@ -31,7 +31,7 @@ async def get_pending_companies(
     Get a list of companies awaiting approval.
     Accessible only by super admins.
     """
-    companies = await company_repository.get_pending_companies(db, skip=skip, limit=limit)
+    companies = await admin_service.get_pending_companies_service(db, skip=skip, limit=limit)
     return companies
 
 @router.patch("/companies/{company_id}/approve")
@@ -43,42 +43,24 @@ async def approve_company(
     Approve a company registration.
     Accessible only by super admins.
     """
-    approval_status = await company_repository.approve_company(db, company_id=company_id)
-    
-    if approval_status == "approved":
-        return {"message": f"Company with id {company_id} has been approved."}
-    elif approval_status == "already_active":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Company with id {company_id} is already active."
-        )
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Company with id {company_id} not found."
-        )
+    return await admin_service.approve_company_service(db, company_id=company_id)
 
 @router.patch("/companies/{company_id}/reject")
+
 async def reject_company(
+
     company_id: int,
+
     db: AsyncSession = Depends(get_db)
+
 ):
+
     """
+
     Reject a company registration.
+
     Accessible only by super admins.
+
     """
-    company_to_reject = await company_repository.get_company(db, company_id=company_id)
-    if not company_to_reject:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Company with id {company_id} not found."
-        )
 
-    if company_to_reject.is_active: # Check company's active status directly
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot reject an active company."
-        )
-
-    await company_repository.reject_company(db, company_id=company_id)
-    return {"message": f"Company with id {company_id} has been rejected and deleted."}
+    return await admin_service.reject_company_service(db, company_id=company_id)

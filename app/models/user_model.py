@@ -19,7 +19,9 @@ class Users(Base):
     pic_phone_number = Column(String(20), nullable=True)
     role = Column(String(50), nullable=False)
     company_id = Column(Integer, ForeignKey("Company.id"), nullable=True)
-    Divisionid = Column(Integer, ForeignKey("Division.id"), nullable=True)
+    division_id = Column(Integer, ForeignKey("Division.id"), nullable=True)
+    is_active = Column(Boolean, default=True)
+
 
     company = relationship("Company", back_populates="users")
     division = relationship("Division", back_populates="users")

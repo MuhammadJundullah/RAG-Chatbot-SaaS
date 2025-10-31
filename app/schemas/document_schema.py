@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
+from app.models.document_model import DocumentStatus
 
 class DocumentBase(BaseModel):
     """Base schema for a document, containing common fields."""
@@ -7,7 +8,7 @@ class DocumentBase(BaseModel):
     company_id: int
     s3_path: Optional[str] = None # Changed back to s3_path
     content_type: Optional[str] = None
-    status: str
+    status: DocumentStatus
 
 class DocumentCreate(BaseModel):
     """Schema used for creating a new document record in the database."""

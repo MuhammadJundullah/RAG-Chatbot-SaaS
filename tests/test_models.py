@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from app.models.user_model import Users
 from app.models.company_model import Company
 from app.models.document_model import Documents, DocumentStatus
-from app.models.division_model import Divisions
+from app.models.division_model import Division
 from app.models.chatlog_model import Chatlogs
 from app.models.embedding_model import Embeddings
 from app.models.base import Base
@@ -69,7 +69,7 @@ def test_document_model():
 
 def test_division_model():
     # Create a test division instance
-    division = Divisions(
+    division = Division(
         name="Test Division",
         company_id=1
     )
@@ -99,10 +99,8 @@ def test_embedding_model():
     # Create a test embedding instance
     embedding = Embeddings(
         document_id=1,
-        text_chunk="Test text chunk",
-        embedding_vector="[0.1, 0.2, 0.3]"
+        vector_id="test_vector_id"
     )
     
     assert embedding.document_id == 1
-    assert embedding.text_chunk == "Test text chunk"
-    assert embedding.embedding_vector == "[0.1, 0.2, 0.3]"
+    assert embedding.vector_id == "test_vector_id"
