@@ -3,7 +3,7 @@ import traceback
 import os
 from app.core.celery_app import celery_app
 from app.core.database import DatabaseManager
-from app.repository import document_repository
+import app.repository.document_repository as doc_repo_module
 from app.services import ocr_service
 from app.services.rag_service import RAGService
 from app.core.s3_client import s3_client_manager
@@ -19,7 +19,7 @@ async def _handle_task_failure(document_id: int, stage: str, exception: Exceptio
         # Determine the correct failed status based on the stage
         failed_status = DocumentStatus.UPLOAD_FAILED if stage == 'Upload' else DocumentStatus.PROCESSING_FAILED
         reason = f"Task failed at stage '{stage}'. Error: {str(exception)}\nTrace: {error_trace}"
-        await document_repository.update_document_status_and_reason(
+        await doc_repo_module.document_repository.update_document_status_and_reason(
             db,
             document_id=document_id,
             status=failed_status,
@@ -33,7 +33,7 @@ async def _run_upload_processing(document_id: int):
     """The actual async logic for uploading a file to S3."""
     from app.core.database import db_manager
     async with db_manager.async_session_maker() as db:
-        doc = await document_repository.get_document(db, document_id)
+        doc = await doc_repo_module.document_repository.get_document(db, document_id)
         if not doc or not doc.temp_storage_path:
             print(f"[Upload Task] Document {document_id} not found or has no temp path.")
             return
@@ -61,7 +61,7 @@ async def _run_upload_processing(document_id: int):
             local_temp_path = doc.temp_storage_path
 
             # Update database with S3 path and new status
-            await document_repository.update_document_after_upload(
+            await doc_repo_module.document_repository.update_document_after_upload(
                 db,
                 document_id=document_id,
                 s3_path=s3_path,
@@ -81,32 +81,20 @@ async def _run_upload_processing(document_id: int):
             # If any part of the process fails, re-raise to be caught by Celery
             print(f"[Upload Task] Error during upload process for doc {document_id}: {e}")
             raise e
-        finally:
-            # Ensure temporary file is cleaned up even if upload fails
-            if doc and doc.temp_storage_path:
-                print(f"[Upload Task] Finally block: Checking temp file {doc.temp_storage_path}. Exists: {os.path.exists(doc.temp_storage_path)}")
-                if os.path.exists(doc.temp_storage_path):
-                    try:
-                        print(f"[Upload Task] Attempting to remove temporary file: {doc.temp_storage_path}")
-                        os.remove(doc.temp_storage_path)
-                        print(f"[Upload Task] Ensured temporary file removed: {doc.temp_storage_path}")
-                        print(f"[Upload Task] After os.remove: File exists? {os.path.exists(doc.temp_storage_path)}")
-                    except OSError as e:
-                        print(f"[Upload Task] Error: Failed to remove temporary file {doc.temp_storage_path} in finally block: {e}")
 
 # --- Refactored Async Logic ---
 
 async def _run_ocr_processing(document_id: int):
     from app.core.database import db_manager
     async with db_manager.async_session_maker() as db:
-        doc = await document_repository.get_document(db, document_id)
+        doc = await doc_repo_module.document_repository.get_document(db, document_id)
         if not doc or not doc.s3_path: # Check for s3_path now
             print(f"[OCR Task] Document with ID {document_id} not found or has no S3 path.")
             return
 
         print(f"[OCR Task] Starting OCR for document: {doc.title} (ID: {document_id})")
         
-        await document_repository.update_document_status_and_reason(db, document_id, DocumentStatus.OCR_PROCESSING)
+        await doc_repo_module.document_repository.update_document_status_and_reason(db, document_id, DocumentStatus.OCR_PROCESSING)
 
         s3 = await s3_client_manager.get_client()
         response = await s3.get_object(Bucket=settings.S3_BUCKET_NAME, Key=doc.s3_path) # Use s3_path
@@ -120,7 +108,7 @@ async def _run_ocr_processing(document_id: int):
             traceback.print_exc()
             raise e
 
-        await document_repository.update_document_text_and_status(
+        await doc_repo_module.document_repository.update_document_text_and_status(
             db,
             document_id=document_id,
             text=extracted_text,
@@ -133,14 +121,14 @@ async def _run_embedding_processing(document_id: int):
     rag_service = RAGService()
     local_db_manager = DatabaseManager()
     async with local_db_manager.async_session_maker() as db:
-        doc = await document_repository.get_document(db, document_id)
+        doc = await doc_repo_module.document_repository.get_document(db, document_id)
         if not doc or not doc.extracted_text:
             print(f"[Embedding Task] Document {document_id} not found or has no text.")
             return
 
         print(f"[Embedding Task] Starting embedding for document: {doc.title} (ID: {document_id})")
         
-        await document_repository.update_document_status_and_reason(db, document_id, DocumentStatus.EMBEDDING)
+        await doc_repo_module.document_repository.update_document_status_and_reason(db, document_id, DocumentStatus.EMBEDDING)
 
         result = await rag_service.add_text_as_document(
             text_content=doc.extracted_text,
@@ -151,7 +139,7 @@ async def _run_embedding_processing(document_id: int):
         if result.get("status") == "failed":
             raise ValueError(f"RAG service failed: {result.get('message')}")
 
-        await document_repository.update_document_status_and_reason(
+        await doc_repo_module.document_repository.update_document_status_and_reason(
             db,
             document_id=document_id,
             status=DocumentStatus.COMPLETED

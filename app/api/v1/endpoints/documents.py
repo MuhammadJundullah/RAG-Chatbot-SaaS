@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status, Form
 from typing import List
 from pydantic import BaseModel
 
@@ -20,17 +20,24 @@ class DocumentConfirmRequest(BaseModel):
 @router.post("/upload", response_model=document_schema.Document, status_code=status.HTTP_202_ACCEPTED)
 async def upload_document(
     file: UploadFile = File(...),
+    name: str = Form(...), # Added name field
+    tags: str = Form(default=""), # Added tags field, default to empty string
     current_user: Users = Depends(get_current_company_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Accepts a file, saves it temporarily, creates a DB record with 'UPLOADING' status,
+    Accepts a file, name, and tags, saves it temporarily, creates a DB record with 'UPLOADING' status,
     and triggers a background task to upload to S3.
     """
+    # Parse tags string into a list
+    tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
+
     return await document_service.upload_document_service(
         db=db,
         current_user=current_user,
-        file=file
+        file=file,
+        name=name, # Pass name to service
+        tags=tag_list # Pass parsed tags to service
     )
 
 # --- NEW RETRY ENDPOINT ---

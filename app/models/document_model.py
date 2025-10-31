@@ -1,6 +1,8 @@
 import enum
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, Enum as SQLAlchemyEnum
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, Enum as SQLAlchemyEnum, DateTime
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import relationship
+from datetime import datetime
 from app.models.base import Base
 
 class DocumentStatus(enum.Enum):
@@ -26,6 +28,8 @@ class Documents(Base):
     content_type = Column(String)
     extracted_text = Column(Text, nullable=True)
     failed_reason = Column(Text, nullable=True)
+    tags = Column(ARRAY(String), nullable=True) 
+    uploaded_at = Column(DateTime, nullable=True, default=datetime.utcnow)
 
     company = relationship("Company", back_populates="documents")
     embeddings = relationship("Embeddings", back_populates="document", cascade="all, delete-orphan")

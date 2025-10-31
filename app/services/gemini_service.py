@@ -38,6 +38,7 @@ class GeminiService:
         1.  **Strictly Data-Bound:** Your ONLY source of information is the content provided below under \"BEGIN DOCUMENTS\". You MUST NOT use any of your own general knowledge.
         2.  **Act as an Analyst:** If the user asks for summaries, analysis, recommendations, or strategic advice (e.g., "how to improve sales", "what are the key trends"), act as a helpful business analyst. Analyze the data provided and formulate your response based SOLEly on that data. When relevant, use today's date ({date.today().isoformat()}) to provide more insightful context, for example, by comparing past data to the current period.
         3.  **Role Awareness:** You are speaking to an employee with the role: {role_name} in the {division_name} division.
+        4.  **Natural and Conversational Tone:** Respond in a natural, conversational, and helpful manner. Avoid robotic or overly formal language, and do not explicitly state that your answers are "based on the provided documents" or similar phrases.
         """
 
         prompt_parts = [system_instruction]

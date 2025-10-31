@@ -19,7 +19,9 @@ from app.tasks.document_tasks import upload_document_to_s3, process_ocr_task, pr
 async def upload_document_service(
     db: AsyncSession,
     current_user: Users,
-    file: UploadFile
+    file: UploadFile,
+    name: str, # Added name parameter
+    tags: List[str] # Added tags parameter
 ):
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file name provided.")
@@ -38,10 +40,11 @@ async def upload_document_service(
         raise HTTPException(status_code=500, detail=f"Failed to save temporary file: {e}")
 
     doc_create = document_schema.DocumentCreate(
-        title=file.filename,
+        title=name, # Use provided name for title
         company_id=current_user.company_id,
         content_type=file.content_type,
-        temp_storage_path=str(temp_file_path)
+        temp_storage_path=str(temp_file_path),
+        tags=tags # Pass tags to the schema
     )
     db_document = await document_repository.create_document(db=db, document=doc_create)
     print(f"[Upload Service] Document {db_document.id} created with temp_storage_path: {db_document.temp_storage_path}")

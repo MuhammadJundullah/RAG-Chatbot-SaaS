@@ -48,7 +48,7 @@ class DocumentRepository(BaseRepository[document_model.Documents]):
 
     async def update_document_after_upload(self, db: AsyncSession, document_id: int, s3_path: str, status: document_model.DocumentStatus) -> Optional[document_model.Documents]:
         """Updates a document's status and S3 path after a successful upload."""
-        db_document = await self.get(db, document_id=document_id)
+        db_document = await self.get(db, document_id)
         if db_document:
             db_document.s3_path = s3_path
             db_document.status = status
@@ -60,7 +60,7 @@ class DocumentRepository(BaseRepository[document_model.Documents]):
 
     async def update_document_status_and_reason(self, db: AsyncSession, document_id: int, status: document_model.DocumentStatus, reason: str | None = None) -> Optional[document_model.Documents]:
         """Updates the status and optionally the failure reason of a document."""
-        db_document = await self.get(db, document_id=document_id)
+        db_document = await self.get(db, document_id)
         if db_document:
             db_document.status = status
             db_document.failed_reason = reason

@@ -65,25 +65,16 @@ async def update_my_company_service(
     address: Optional[str],
     logo_file: Optional[UploadFile]
 ) -> company_schema.Company:
-    company_update = company_schema.CompanyUpdate(
-        name=name,
-        code=code,
-        address=address,
-        logo_s3_path=None
-    )
-
     db_company = await company_repository.get_company(db, company_id=current_user.company_id)
     if db_company is None:
         raise HTTPException(status_code=404, detail="Company not found for this admin.")
 
-    print(f"[DEBUG] Received company_update: {company_update.model_dump()}")
+    # Initialize logo_s3_path with the existing logo path
+    logo_s3_path_to_update = db_company.logo_s3_path
 
     s3_client = await s3_client_manager.get_client()
-    new_logo_s3_path = None
 
-    if logo_file:
-        if not logo_file.filename:
-            raise HTTPException(status_code=400, detail="No logo file name provided.")
+    if logo_file and logo_file.filename:
         
         file_extension = os.path.splitext(logo_file.filename)[1]
         logo_uuid = str(uuid.uuid4())
@@ -97,10 +88,10 @@ async def update_my_company_service(
                 Body=await logo_file.read(),
                 ContentType=logo_file.content_type
             )
-            company_update.logo_s3_path = full_public_logo_url
+            logo_s3_path_to_update = full_public_logo_url # Update with new logo path
 
             if db_company.logo_s3_path:
-                old_s3_key = db_company.logo_s3_path.replace(f"{settings.PUBLIC_S3_BASE_URL}/", "")
+                old_s3_key = db_company.logo_s3_path.replace(f"{settings.PUBLIC_S3_BASE_URL}/{settings.S3_BUCKET_NAME}/", "")
 
                 if old_s3_key != s3_key:
                     try:
@@ -120,6 +111,15 @@ async def update_my_company_service(
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to upload logo to S3: {e}")
+
+    company_update = company_schema.CompanyUpdate(
+        name=name,
+        code=code,
+        address=address,
+        logo_s3_path=logo_s3_path_to_update # Use the determined logo path
+    )
+
+    print(f"[DEBUG] Received company_update: {company_update.model_dump()}")
 
     updated_company = await company_repository.update_company(db, current_user.company_id, company_update)
     if not updated_company:
