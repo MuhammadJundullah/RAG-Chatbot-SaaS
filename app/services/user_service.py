@@ -58,7 +58,6 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
             email=user_data.email,
             username=username_to_use,
             password=hashed_password,
-            pic_phone_number=user_data.pic_phone_number,
             role="admin",
             company_id=new_company_obj.id
         )

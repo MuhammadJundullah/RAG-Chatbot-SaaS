@@ -83,11 +83,10 @@ async def read_users_me(current_user: user_model.Users = Depends(get_current_use
         name=current_user.name,
         username=current_user.username,
         email=current_user.email,
-        pic_phone_number=current_user.pic_phone_number, # User's personal phone number
         role=current_user.role,
         company_id=current_user.company_id,
         division_id=current_user.division_id,
         is_active=current_user.is_active,
-        company_pic_phone_number=company_pic_phone # Company's PIC phone number
+        company_pic_phone_number=company_pic_phone
     )
     return user_data
