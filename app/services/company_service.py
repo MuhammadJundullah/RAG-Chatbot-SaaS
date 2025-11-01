@@ -63,7 +63,8 @@ async def update_my_company_service(
     name: Optional[str],
     code: Optional[str],
     address: Optional[str],
-    logo_file: Optional[UploadFile]
+    logo_file: Optional[UploadFile],
+    pic_phone_number: Optional[str] # Added pic_phone_number
 ) -> company_schema.Company:
     db_company = await company_repository.get_company(db, company_id=current_user.company_id)
     if db_company is None:
@@ -116,7 +117,8 @@ async def update_my_company_service(
         name=name,
         code=code,
         address=address,
-        logo_s3_path=logo_s3_path_to_update # Use the determined logo path
+        logo_s3_path=logo_s3_path_to_update, # Use the determined logo path
+        pic_phone_number=pic_phone_number # Added pic_phone_number
     )
 
     print(f"[DEBUG] Received company_update: {company_update.model_dump()}")

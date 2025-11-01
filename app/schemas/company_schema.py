@@ -7,6 +7,7 @@ class CompanyBase(BaseModel):
     logo_s3_path: Optional[str] = None
     address: Optional[str] = None
     is_active: bool = False # New field for company active status
+    pic_phone_number: Optional[str] = None # Added pic_phone_number
 
 class CompanyCreate(CompanyBase):
     pass
@@ -17,6 +18,7 @@ class CompanyUpdate(BaseModel):
     address: Optional[str] = None
     logo_s3_path: Optional[str] = None
     is_active: Optional[bool] = None # Allow updating active status
+    pic_phone_number: Optional[str] = None # Added pic_phone_number
 
 class Company(CompanyBase):
     id: int

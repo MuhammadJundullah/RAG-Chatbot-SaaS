@@ -11,7 +11,6 @@ class UserRegistration(BaseModel):
     email: str
     username: Optional[str] = None
     password: str
-    pic_phone_number: Optional[str] = None
     # For new company registration
     company_name: Optional[str] = None
     # For joining an existing company
@@ -25,13 +24,13 @@ class UserUpdate(BaseModel):
 
 class User(UserBase):
     id: int
-    pic_phone_number: Optional[str] = None
     role: str
     company_id: Optional[int] = None
     division_id: Optional[int] = None
     is_active: Optional[bool] = None
     class Config:
-        from_attributes = True
+        pass
+        pass
         
 class AdminCreate(BaseModel):
     name: str

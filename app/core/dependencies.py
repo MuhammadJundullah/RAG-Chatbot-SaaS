@@ -50,6 +50,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     if user is None:
         raise credentials_exception
         
+    # Eagerly load the company relationship to ensure company details are available
+    if user.company:
+        await db.refresh(user, attribute_names=["company"])
+        
     return user
 
 async def get_current_super_admin(current_user: user_model.Users = Depends(get_current_user)) -> user_model.Users:

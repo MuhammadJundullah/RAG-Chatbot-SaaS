@@ -20,3 +20,4 @@ class Company(Base):
     chatlogs = relationship("Chatlogs", back_populates="company")
     divisions = relationship("Division", back_populates="company")
     address = Column(String(255), nullable=True)
+    pic_phone_number = Column(String(50), nullable=True) # Added pic_phone_number

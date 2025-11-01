@@ -107,12 +107,13 @@ class CompanyRepository(BaseRepository[company_model.Company]):
         # rather than a schema. If company_service is updated to pass a schema, this can be replaced
         # by super().create(db, company_schema.CompanyCreate.model_validate(company))
         db_company = self.model(
-            name=company.name,
-            code=company.code,
-            logo_s3_path=company.logo_s3_path,
-            address=company.address,
-            is_active=company.is_active
-        )
+                    name=company.name,
+                    code=company.code,
+                    logo_s3_path=company.logo_s3_path,
+                    address=company.address,
+                    is_active=company.is_active,
+                    pic_phone_number=company.pic_phone_number # Added pic_phone_number
+                    )
         db.add(db_company)
         await db.commit()
         await db.refresh(db_company)

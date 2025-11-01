@@ -131,9 +131,9 @@ async def update_document_content(
 async def read_single_document(
     document_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_user)
+    current_user: Users = Depends(get_current_company_admin)
 ):
-    """Gets a single document by its ID, checking for appropriate permissions."""
+    """Gets a single document by its ID. Accessible only by company administrators."""
     return await document_service.read_single_document_service(
         db=db,
         current_user=current_user,

@@ -1,16 +1,11 @@
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, ANY
 from app.main import app
 from app.models.user_model import Users
 from app.models.company_model import Company
-from app.schemas.user_schema import UserRegistration
-from app.core.dependencies import get_current_user
-
-
-class MockDBSession:
-    def __init__(self):
-        pass
+from app.core.dependencies import get_current_user, get_current_company_admin
+from app.schemas.user_schema import User # Import User schema for response model
 
 
 def test_register_endpoint():
@@ -23,7 +18,7 @@ def test_register_endpoint():
             "company_name": "Test Company"
         }
         
-        # Mock the user service
+        # Mock the user service and company repository
         with patch('app.services.user_service.user_repository.get_user_by_email', return_value=None), \
              patch('app.services.user_service.user_repository.create_user', new_callable=AsyncMock) as mock_create_user, \
              patch('app.services.user_service.company_repository.create_company', new_callable=AsyncMock) as mock_create_company, \
@@ -53,14 +48,14 @@ def test_register_endpoint():
             # Check that the request was successful
             assert response.status_code == 201
             assert "message" in response.json()
+            assert "Company 'Test Company' and admin user 'test@example.com' registered successfully." in response.json()["message"]
 
 
 def test_login_endpoint():
     with TestClient(app) as client:
-        # Mock login data - REMOVE username as it's likely not expected by the schema
+        # Mock login data
         login_data = {
             "email": "test@example.com",
-            # "username": "testuser",  # Removed
             "password": "password123"
         }
         
@@ -88,6 +83,8 @@ def test_login_endpoint():
                 assert "access_token" in response.json()
                 assert response.json()["token_type"] == "bearer"
                 assert "user" in response.json()
+                assert response.json()["user"]["id"] == 1
+                assert response.json()["user"]["name"] == "Test User"
 
 
 def test_get_current_user_endpoint():
@@ -103,7 +100,16 @@ def test_get_current_user_endpoint():
             is_super_admin=False
         )
         
-        # Use dependency override instead of patching the function directly
+        # Mock company data for the user
+        mock_company = Company(
+            id=1,
+            name="Test Company",
+            is_active=True,
+            pic_phone_number="+1234567890" # Company PIC phone number
+        )
+        mock_user.company = mock_company # Associate company with user
+
+        # Use dependency override
         app.dependency_overrides[get_current_user] = lambda: mock_user
         try:
             response = client.get("/api/auth/me", headers={"Authorization": "Bearer mock_token"})
@@ -113,5 +119,10 @@ def test_get_current_user_endpoint():
             assert response.json()["id"] == 1
             assert response.json()["name"] == "Test User"
             assert response.json()["email"] == "test@example.com"
+            # Assert that the user's personal pic_phone_number is NOT present
+            assert "pic_phone_number" not in response.json() 
+            # Assert that the company's pic_phone_number IS present
+            assert response.json()["company_pic_phone_number"] == "+1234567890"
+            assert response.json()["company_id"] == 1
         finally:
             app.dependency_overrides.clear()

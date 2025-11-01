@@ -5,6 +5,7 @@ from app.services.user_service import UserRegistrationError
 from app.core.dependencies import get_db, get_current_user
 from app.schemas import user_schema, token_schema
 from app.utils import auth
+from app.models import user_model # Added import for user_model
 
 router = APIRouter(
     prefix="/auth",
@@ -69,8 +70,24 @@ async def login_for_access_token(
     }
 
 @router.get("/me", response_model=user_schema.User)
-async def read_users_me(current_user: user_schema.User = Depends(get_current_user)):
+async def read_users_me(current_user: user_model.Users = Depends(get_current_user)):
     """
-    Get the current logged in user.
+    Get the current logged in user, including their company's PIC phone number.
     """
-    return current_user
+    company_pic_phone = None
+    if current_user.company and current_user.company.pic_phone_number:
+        company_pic_phone = current_user.company.pic_phone_number
+
+    user_data = user_schema.User(
+        id=current_user.id,
+        name=current_user.name,
+        username=current_user.username,
+        email=current_user.email,
+        pic_phone_number=current_user.pic_phone_number, # User's personal phone number
+        role=current_user.role,
+        company_id=current_user.company_id,
+        division_id=current_user.division_id,
+        is_active=current_user.is_active,
+        company_pic_phone_number=company_pic_phone # Company's PIC phone number
+    )
+    return user_data

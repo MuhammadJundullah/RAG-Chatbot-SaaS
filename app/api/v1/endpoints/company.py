@@ -64,8 +64,7 @@ async def update_my_company(
     code: Optional[str] = Form(None),
     address: Optional[str] = Form(None),
     logo_file: UploadFile = File(None),
-    current_user: user_model.Users = Depends(get_current_company_admin),
-    db: AsyncSession = Depends(get_db)
+    pic_phone_number: Optional[str] = Form(None) # Added pic_phone_number
 ):
     """
     Update the current admin's company data, including logo upload to S3.
@@ -77,5 +76,6 @@ async def update_my_company(
         name=name,
         code=code,
         address=address,
-        logo_file=logo_file
+        logo_file=logo_file,
+        pic_phone_number=pic_phone_number # Added pic_phone_number
     )

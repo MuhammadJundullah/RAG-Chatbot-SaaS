@@ -13,7 +13,6 @@ class DocumentStatus(enum.Enum):
     PENDING_VALIDATION = "PENDING_VALIDATION"
     EMBEDDING = "EMBEDDING"
     COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
     PROCESSING_FAILED = "PROCESSING_FAILED"
 
 class Documents(Base):

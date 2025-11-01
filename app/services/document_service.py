@@ -210,7 +210,7 @@ async def read_single_document_service(
     if db_document is None:
         raise HTTPException(status_code=404, detail="Document not found")
     
-    if not current_user.is_super_admin and db_document.company_id != current_user.company_id:
+    if db_document.company_id != current_user.company_id:
         raise HTTPException(status_code=403, detail="You do not have permission to access this document.")
         
     return db_document
