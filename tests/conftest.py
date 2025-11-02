@@ -1,117 +1,66 @@
-import sys
-import os
 import pytest
-from typing import Generator
 from fastapi.testclient import TestClient
-
-# Add the project root to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
+from unittest.mock import patch, AsyncMock
 from app.main import app
-from app.core.config import settings
-from app.core.database import db_manager
-from app.models.base import Base
 from app.models.user_model import Users
-from app.core.dependencies import get_current_user, get_current_company_admin
+from app.core.dependencies import get_current_user, get_current_company_admin, get_current_super_admin
+from sqlalchemy.ext.asyncio import AsyncSession
 
-# Use an in-memory SQLite database for testing
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
-# Create a synchronous engine for testing
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+@pytest.fixture
+def mock_db_session():
+    return AsyncMock(spec=AsyncSession)
 
-@pytest.fixture(name="db_session")
-def db_session_fixture() -> Generator:
-    """
-    Create a clean SQLAlchemy session for each test.
-    """
-    Base.metadata.create_all(bind=engine)  # Create tables
-    connection = engine.connect()
-    transaction = connection.begin()
-    session = TestingSessionLocal(bind=connection)
 
-    yield session
-
-    session.close()
-    transaction.rollback()
-    connection.close()
-    Base.metadata.drop_all(bind=engine)  # Drop tables
-
-@pytest.fixture(name="client")
-def client_fixture(db_session: Generator) -> TestClient:
-    """
-    Create a TestClient that uses the overridden get_db fixture.
-    """
-    async def override_get_db():
-        yield db_session
-
-    app.dependency_overrides[db_manager.get_db_session] = override_get_db
-    with TestClient(app) as client:
-        yield client
-    app.dependency_overrides.clear()
-
-@pytest.fixture(name="authenticated_client")
-def authenticated_client_fixture(db_session: Generator) -> TestClient:
-    """
-    Create a TestClient with authenticated user dependencies overridden.
-    """
-    async def override_get_db():
-        yield db_session
-
+@pytest.fixture(scope="module")
+def authenticated_client():
+    """Provide an authenticated client for testing (as regular user)."""
     mock_user = Users(
         id=1,
         name="Test User",
         email="test@example.com",
         username="testuser",
-        role="admin",
+        role="employee",
         company_id=1,
-        is_super_admin=False
+        is_active=True
     )
-
-    async def override_get_current_user():
-        return mock_user
-
-    async def override_get_current_company_admin():
-        return mock_user
-
-    app.dependency_overrides[db_manager.get_db_session] = override_get_db
-    app.dependency_overrides[get_current_user] = override_get_current_user
-    app.dependency_overrides[get_current_company_admin] = override_get_current_company_admin
-
+    app.dependency_overrides[get_current_user] = lambda: mock_user
     with TestClient(app) as client:
         yield client
-
     app.dependency_overrides.clear()
 
-# Mock database session for unit testing services
-from unittest.mock import MagicMock, AsyncMock
 
-@pytest.fixture
-def mock_db_session():
-    session = MagicMock()
-    session.add = MagicMock()
-    session.commit = AsyncMock()
-    session.refresh = AsyncMock()
-    return session
+@pytest.fixture(scope="module")
+def admin_client():
+    """Provide an authenticated client as company admin."""
+    mock_admin = Users(
+        id=2,
+        name="Admin User",
+        email="admin@example.com",
+        username="adminuser",
+        role="admin",
+        company_id=1,
+        is_active=True
+    )
+    app.dependency_overrides[get_current_company_admin] = lambda: mock_admin
+    with TestClient(app) as client:
+        yield client
+    app.dependency_overrides.clear()
 
 
-# Override settings for tests
-@pytest.fixture(autouse=True)
-def override_settings():
-    settings.DATABASE_URL = SQLALCHEMY_DATABASE_URL
-    settings.TEST_DATABASE_URL = SQLALCHEMY_DATABASE_URL
-    # You might want to mock other settings like API keys if they are used in tests
-    # settings.GEMINI_API_KEY = "mock_gemini_key"
-    # settings.PINECONE_API_KEY = "mock_pinecone_key"
-    # settings.S3_AWS_ACCESS_KEY_ID = "mock_s3_key"
-    # settings.S3_AWS_SECRET_ACCESS_KEY = "mock_s3_secret"
-    # settings.S3_BUCKET_NAME = "mock_s3_bucket"
-    # settings.REDIS_URL = "redis://localhost:6379/1" # Use a different Redis DB for tests
+@pytest.fixture(scope="module")
+def super_admin_client():
+    """Provide an authenticated client as super admin."""
+    mock_super_admin = Users(
+        id=3,
+        name="Super Admin",
+        email="superadmin@example.com",
+        username="superadmin",
+        role="super_admin",
+        company_id=None,
+        is_active=True
+    )
+    app.dependency_overrides[get_current_super_admin] = lambda: mock_super_admin
+    with TestClient(app) as client:
+        yield client
+    app.dependency_overrides.clear()

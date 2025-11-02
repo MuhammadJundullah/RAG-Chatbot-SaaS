@@ -1,7 +1,6 @@
 from typing import TypeVar, Type, List, Optional, Generic
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import update as sa_update, delete as sa_delete
 from pydantic import BaseModel # Asumsi skema adalah model Pydantic
 from app.models.base import Base # Asumsi 'Base' adalah deklarasi dasar SQLAlchemy Anda
 

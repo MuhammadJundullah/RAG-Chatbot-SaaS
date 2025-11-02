@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import UploadFile, HTTPException, status
+from fastapi import UploadFile, HTTPException
 from typing import List, Optional
 import os
 import pathlib

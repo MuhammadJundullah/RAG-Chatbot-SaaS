@@ -1,4 +1,3 @@
-import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock
 from app.main import app
@@ -16,8 +15,7 @@ def test_create_division_endpoint():
             email="admin@example.com",
             username="adminuser",
             role="admin",
-            company_id=1,
-            is_super_admin=False
+            company_id=1
         )
         
         # Mock new division
@@ -31,7 +29,7 @@ def test_create_division_endpoint():
         app.dependency_overrides[get_current_company_admin] = lambda: mock_user
         try:
             # Mock the repository
-            with patch('app.repository.division_repository.create_division', new_callable=AsyncMock) as mock_create_division:
+            with patch('app.repository.division_repository.division_repository.create_division', new_callable=AsyncMock) as mock_create_division:
                 mock_create_division.return_value = mock_division
                 
                 # Send division creation data
@@ -63,8 +61,7 @@ def test_get_divisions_endpoint():
             email="test@example.com",
             username="testuser",
             role="employee",
-            company_id=1,
-            is_super_admin=False
+            company_id=1
         )
         
         # Mock divisions
@@ -85,7 +82,7 @@ def test_get_divisions_endpoint():
         app.dependency_overrides[get_current_user] = lambda: mock_user
         try:
             # Mock the repository
-            with patch('app.repository.division_repository.get_divisions_by_company', new_callable=AsyncMock) as mock_get_divisions:
+            with patch('app.services.division_service.read_divisions_service', new_callable=AsyncMock) as mock_get_divisions:
                 mock_get_divisions.return_value = mock_divisions
                 
                 response = client.get("/api/divisions/", headers={"Authorization": "Bearer mock_token"})
@@ -116,7 +113,7 @@ def test_get_public_divisions_endpoint():
         ]
         
         # Mock the repository (no auth needed for public endpoint)
-        with patch('app.repository.division_repository.get_divisions_by_company', new_callable=AsyncMock) as mock_get_divisions:
+        with patch('app.services.division_service.read_public_divisions_service', new_callable=AsyncMock) as mock_get_divisions:
             mock_get_divisions.return_value = mock_divisions
             
             response = client.get("/api/divisions/public/1")  # Public endpoint, no auth required

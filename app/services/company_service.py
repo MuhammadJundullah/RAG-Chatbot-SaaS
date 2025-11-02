@@ -30,7 +30,7 @@ async def get_my_company_service(
 ) -> company_schema.Company:
     db_company = await company_repository.get_company(db, company_id=current_user.company_id)
     if db_company is None:
-        raise HTTPException(status_code=404, detail="Company not found for this admin.")
+        raise HTTPException(status_code=404, detail="Company not found for this user.")
     return db_company
 
 async def register_employee_by_company_admin_service(

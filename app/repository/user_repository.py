@@ -1,10 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
-from app.models import user_model, company_model
-from app.repository.base_repository import BaseRepository, ModelType, CreateSchemaType, UpdateSchemaType
-from app.schemas import user_schema
-from typing import Optional, List, Type
+from app.models import user_model
+from app.repository.base_repository import BaseRepository
+from typing import Optional, List
 
 class UserRepository(BaseRepository[user_model.Users]):
     def __init__(self):

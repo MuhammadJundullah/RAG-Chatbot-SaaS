@@ -1,10 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import distinct
 from app.models import company_model, user_model
 from app.schemas import company_schema
-from app.repository.base_repository import BaseRepository, ModelType, CreateSchemaType, UpdateSchemaType
-from typing import Optional, List, Type
+from app.repository.base_repository import BaseRepository
+from typing import Optional, List
 
 class CompanyRepository(BaseRepository[company_model.Company]):
     def __init__(self):
@@ -27,7 +26,7 @@ class CompanyRepository(BaseRepository[company_model.Company]):
     async def get_active_companies(self, db: AsyncSession, skip: int = 0, limit: int = 100) -> List[company_model.Company]:
         """Gets a list of companies that are active."""
         result = await db.execute(
-            select(self.model).filter(self.model.is_active == True).offset(skip).limit(limit)
+            select(self.model).filter(self.model.is_active).offset(skip).limit(limit)
         )
         return result.scalars().all()
 
@@ -39,10 +38,9 @@ class CompanyRepository(BaseRepository[company_model.Company]):
     async def get_pending_companies(self, db: AsyncSession, skip: int = 0, limit: int = 100) -> List[company_model.Company]:
         """Gets a list of companies that are not active (pending approval)."""
         result = await db.execute(
-            select(self.model).filter(self.model.is_active == False).offset(skip).limit(limit)
+            select(self.model).filter(self.model.is_active == False).offset(skip).limit(limit)  # noqa: E712
         )
         pending_companies = result.scalars().all()
-        print(f"[DEBUG get_pending_companies] Pending companies found: {[c.id for c in pending_companies]}")
         return pending_companies
 
     async def approve_company(self, db: AsyncSession, company_id: int):

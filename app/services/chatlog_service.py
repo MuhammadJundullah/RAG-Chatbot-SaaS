@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import date
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 
 from app.repository.chatlog_repository import chatlog_repository
 from app.schemas import chatlog_schema

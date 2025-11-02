@@ -4,7 +4,7 @@ from typing import Optional, List
 from datetime import date
 from app.models import chatlog_model
 from app.schemas import chatlog_schema
-from app.repository.base_repository import BaseRepository, ModelType, CreateSchemaType, UpdateSchemaType
+from app.repository.base_repository import BaseRepository
 from sqlalchemy import delete
 
 class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
@@ -114,7 +114,6 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
         skip: int = 0,
         limit: int = 100,
     ) -> List[str]:
-        from sqlalchemy import distinct
         # Subquery to find the latest created_at for each conversation_id
         latest_chat_per_conversation = select(
             self.model.conversation_id,

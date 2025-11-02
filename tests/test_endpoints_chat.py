@@ -1,4 +1,3 @@
-import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock
 from app.main import app
@@ -16,8 +15,7 @@ def test_chat_endpoint():
             email="test@example.com",
             username="testuser",
             role="employee",
-            company_id=1,
-            is_super_admin=False
+            company_id=1
         )
         
         # Mock chatlog
@@ -36,7 +34,7 @@ def test_chat_endpoint():
             # Mock the dependencies and services
             with patch('app.services.rag_service.rag_service.get_relevant_context', new_callable=AsyncMock) as mock_get_context, \
                  patch('app.services.gemini_service.gemini_service.generate_chat_response') as mock_gen_response, \
-                 patch('app.repository.chatlog_repository.create_chatlog', new_callable=AsyncMock) as mock_create_chatlog:
+                 patch('app.repository.chatlog_repository.chatlog_repository.create_chatlog', new_callable=AsyncMock) as mock_create_chatlog:
                 
                 # Mock the RAG service response
                 mock_get_context.return_value = "Relevant context from RAG"
@@ -81,8 +79,7 @@ def test_chat_endpoint_without_conversation_id():
             email="test@example.com",
             username="testuser",
             role="employee",
-            company_id=1,
-            is_super_admin=False
+            company_id=1
         )
         
         # Mock chatlog
@@ -101,7 +98,7 @@ def test_chat_endpoint_without_conversation_id():
             # Mock the dependencies and services
             with patch('app.services.rag_service.rag_service.get_relevant_context', new_callable=AsyncMock) as mock_get_context, \
                  patch('app.services.gemini_service.gemini_service.generate_chat_response') as mock_gen_response, \
-                 patch('app.repository.chatlog_repository.create_chatlog', new_callable=AsyncMock) as mock_create_chatlog:
+                 patch('app.repository.chatlog_repository.chatlog_repository.create_chatlog', new_callable=AsyncMock) as mock_create_chatlog:
                 
                 # Mock the RAG service response
                 mock_get_context.return_value = "Relevant context from RAG"

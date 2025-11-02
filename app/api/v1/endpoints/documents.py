@@ -1,9 +1,9 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status, Form
-from typing import List, Any
+from fastapi import APIRouter, UploadFile, File, Depends, status, Form
+from typing import List
 from math import ceil
 from pydantic import BaseModel
 
-from app.core.dependencies import get_current_user, get_db, get_current_company_admin
+from app.core.dependencies import get_db, get_current_company_admin
 from app.models.user_model import Users
 from app.schemas import document_schema
 from sqlalchemy.ext.asyncio import AsyncSession

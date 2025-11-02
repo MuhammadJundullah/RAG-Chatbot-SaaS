@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 from app.services.rag_service import RAGService
 from app.services.gemini_service import GeminiService
 from app.services.user_service import authenticate_user, register_user
@@ -80,4 +80,4 @@ async def test_register_user(mock_db_session):
         result = await register_user(mock_db_session, user_data=user_data)
         assert result.email == user_data.email
         assert result.role == "admin"
-        assert result.is_active == False
+        assert not result.is_active

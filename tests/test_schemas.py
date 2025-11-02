@@ -1,4 +1,3 @@
-import pytest
 from app.schemas.user_schema import UserRegistration, UserLoginCombined, User
 from app.schemas.company_schema import Company
 from app.schemas.document_schema import DocumentCreate, Document
@@ -51,7 +50,7 @@ def test_user_schema():
     assert user.role == "employee"
     assert user.company_id == 1
     assert user.division_id == 1
-    assert user.is_active == True
+    assert user.is_active
 
 
 def test_company_schema():
@@ -63,7 +62,7 @@ def test_company_schema():
     )
     assert company.id == 1
     assert company.name == "Test Company"
-    assert company.is_active == True
+    assert company.is_active
 
 
 def test_document_create_schema():

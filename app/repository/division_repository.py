@@ -2,8 +2,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.models import division_model
 from app.schemas import division_schema
-from app.repository.base_repository import BaseRepository, ModelType, CreateSchemaType, UpdateSchemaType
-from typing import Optional, List, Type
+from app.repository.base_repository import BaseRepository
+from typing import Optional, List
 
 class DivisionRepository(BaseRepository[division_model.Division]):
     def __init__(self):

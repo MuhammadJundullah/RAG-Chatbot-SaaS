@@ -1,20 +1,20 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
-from app.repository.user_repository import get_user, get_user_by_email, create_user
-from app.repository.company_repository import get_company, create_company
-from app.repository.document_repository import get_document, create_document
-from app.repository.division_repository import get_division, create_division
-from app.repository.chatlog_repository import create_chatlog
+from unittest.mock import AsyncMock, MagicMock, patch
+from app.repository.user_repository import user_repository
+from app.repository.company_repository import company_repository
+from app.repository.document_repository import document_repository
+from app.repository.division_repository import division_repository
+from app.repository.chatlog_repository import chatlog_repository
 from app.models.user_model import Users
 from app.models.company_model import Company
 from app.models.document_model import Documents
-from app.models.division_model import Division
+from app.models.division_model import Division # Added import for Divisions
 from app.models.chatlog_model import Chatlogs
-from app.schemas.user_schema import UserRegistration
 from app.schemas.company_schema import CompanyCreate
 from app.schemas.document_schema import DocumentCreate
 from app.schemas.division_schema import DivisionCreate
 from app.schemas.chatlog_schema import ChatlogCreate
+from app.schemas.user_schema import UserRegistration 
 
 
 class MockDBSession:
@@ -28,7 +28,6 @@ class MockDBSession:
         self.companies = []
         self.documents = []
         self.divisions = []
-        self.chatlogs = []
 
 
 @pytest.mark.asyncio
@@ -42,7 +41,7 @@ async def test_get_user():
         mock_result.scalar_one_or_none.return_value = user
         mock_execute.return_value = mock_result
         
-        result = await get_user(db, user_id=1)
+        result = await user_repository.get_user(db, user_id=1)
         assert result.id == 1
         assert result.name == "Test User"
 
@@ -58,14 +57,14 @@ async def test_get_user_by_email():
         mock_result.scalar_one_or_none.return_value = user
         mock_execute.return_value = mock_result
         
-        result = await get_user_by_email(db, email="test@example.com")
+        result = await user_repository.get_user_by_email(db, email="test@example.com")
         assert result.email == "test@example.com"
 
 
 @pytest.mark.asyncio
 async def test_create_user():
     db = MockDBSession()
-    user_create = UserCreate(
+    user_create = UserRegistration(
         name="New User",
         email="new@example.com",
         password="hashed_password",
@@ -79,7 +78,7 @@ async def test_create_user():
     )
     
     with patch('app.repository.user_repository.Users', return_value=new_user):
-        result = await create_user(db, user_create)
+        result = await user_repository.create_user(db, new_user)
         assert result.name == "New User"
         assert result.email == "new@example.com"
         assert result.role == "employee"
@@ -96,7 +95,7 @@ async def test_get_company():
         mock_result.scalar_one_or_none.return_value = company
         mock_execute.return_value = mock_result
         
-        result = await get_company(db, company_id=1)
+        result = await company_repository.get_company(db, company_id=1)
         assert result.id == 1
         assert result.name == "Test Company"
 
@@ -112,7 +111,7 @@ async def test_create_company():
     )
     
     with patch('app.repository.company_repository.Company', return_value=new_company):
-        result = await create_company(db, company_create)
+        result = await company_repository.create_company(db, new_company)
         assert result.name == "New Company"
 
 
@@ -127,7 +126,7 @@ async def test_get_document():
         mock_result.scalar_one_or_none.return_value = document
         mock_execute.return_value = mock_result
         
-        result = await get_document(db, document_id=1)
+        result = await document_repository.get_document(db, document_id=1)
         assert result.id == 1
         assert result.title == "Test Document"
 
@@ -147,7 +146,7 @@ async def test_create_document():
     )
     
     with patch('app.repository.document_repository.Documents', return_value=new_document):
-        result = await create_document(db, document_create)
+        result = await document_repository.create_document(db, new_document)
         assert result.title == "New Document"
         assert result.company_id == 1
 
@@ -155,7 +154,7 @@ async def test_create_document():
 @pytest.mark.asyncio
 async def test_get_division():
     db = MockDBSession()
-    division = Divisions(id=1, name="Test Division", company_id=1)
+    division = Division(id=1, name="Test Division", company_id=1)
     db.divisions.append(division)
     
     with patch('sqlalchemy.ext.asyncio.AsyncSession.execute', new_callable=AsyncMock) as mock_execute:
@@ -163,7 +162,7 @@ async def test_get_division():
         mock_result.scalar_one_or_none.return_value = division
         mock_execute.return_value = mock_result
         
-        result = await get_division(db, division_id=1)
+        result = await division_repository.get_division(db, division_id=1)
         assert result.id == 1
         assert result.name == "Test Division"
 
@@ -176,13 +175,13 @@ async def test_create_division():
         company_id=1
     )
     
-    new_division = Divisions(
+    new_division = Division(
         id=1,
         **division_create.dict()
     )
     
-    with patch('app.repository.division_repository.Divisions', return_value=new_division):
-        result = await create_division(db, division_create)
+    with patch('app.repository.division_repository.Division', return_value=new_division):
+        result = await division_repository.create_division(db, new_division)
         assert result.name == "New Division"
         assert result.company_id == 1
 
@@ -204,9 +203,7 @@ async def test_create_chatlog():
     )
     
     with patch('app.repository.chatlog_repository.Chatlogs', return_value=new_chatlog):
-        result = await create_chatlog(db, chatlog_create)
+        result = await chatlog_repository.create_chatlog(db, new_chatlog)
         assert result.question == "Test question?"
         assert result.answer == "Test answer."
         assert result.conversation_id == "test_conversation"
-
-from unittest.mock import patch

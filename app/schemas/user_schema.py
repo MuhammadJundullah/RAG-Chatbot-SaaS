@@ -29,8 +29,7 @@ class User(UserBase):
     division_id: Optional[int] = None
     is_active: Optional[bool] = None
     class Config:
-        pass
-        pass
+        from_attributes = True
         
 class AdminCreate(BaseModel):
     name: str

@@ -1,4 +1,3 @@
-import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.models.user_model import Users
@@ -38,7 +37,7 @@ def test_user_model():
     assert user.role == "employee"
     assert user.company_id == 1
     assert user.division_id == 1
-    assert user.is_active == True
+    assert user.is_active
 
 
 def test_company_model():
@@ -49,7 +48,7 @@ def test_company_model():
     )
     
     assert company.name == "Test Company"
-    assert company.is_active == True
+    assert company.is_active
 
 
 def test_document_model():

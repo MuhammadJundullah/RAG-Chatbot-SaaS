@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from app.models import document_model
 from app.schemas import document_schema
-from app.repository.base_repository import BaseRepository, ModelType, CreateSchemaType, UpdateSchemaType
+from app.repository.base_repository import BaseRepository
 
 class DocumentRepository(BaseRepository[document_model.Documents]):
     def __init__(self):
