@@ -59,20 +59,22 @@ async def retry_document_upload(
 
 @router.get("/", response_model=List[document_schema.Document])
 async def read_all_company_documents(
-    skip: int = 0,
+    page: int = 1,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_company_admin)
 ):
     """
     Gets all documents for the user's company, regardless of status.
-    Supports pagination via 'skip' (number of items to skip) and 'limit' (number of items to return) query parameters.
-    Example: /api/documents/?skip=10&limit=20
+    Supports pagination via 'page' (page number) and 'limit' (number of items per page) query parameters.
+    Example: /api/documents/?page=1&limit=20
     """
+    # Calculate skip based on page and limit
+    skip_calculated = (page - 1) * limit
     return await document_service.get_all_company_documents_service(
         db=db,
         current_user=current_user,
-        skip=skip,
+        skip=skip_calculated,  # Use calculated skip
         limit=limit
     )
 

@@ -1,764 +1,346 @@
-# Multi-Tenant Company Chatbot API
+# RAG Chatbot SaaS - Dokumentasi API Lengkap
 
-A SaaS platform for company-specific AI chatbots using RAG (Retrieval-Augmented Generation) and Database Integration.
+## Alur Bisnis Utama
 
-## Base URL
+### 1. Pendaftaran & Persetujuan Perusahaan
+- **Perusahaan baru** mendaftar melalui `/auth/register` dengan data perusahaan dan admin
+- **Super Admin** meninjau permohonan di `/admin/companies/pending` dan dapat menyetujui/menolak
+- Setelah **disetujui**, status perusahaan menjadi aktif dan Admin Perusahaan dapat login
 
-All API endpoints are prefixed with `/api`
+### 2. Pengelolaan Internal Perusahaan
+- **Admin Perusahaan** dapat:
+  - Membuat divisi melalui `/divisions`
+  - Mendaftarkan karyawan melalui `/companies/employees/register`
+  - Mengunggah dokumen melalui `/documents/upload`
+- **Dokumen** diproses secara asinkron melalui pipeline: Upload → OCR → Validasi → Embedding → Siap digunakan
+- **Karyawan** dapat berinteraksi dengan chatbot menggunakan dokumen perusahaan melalui `/chat`
 
-- **Local Development**: `http://localhost:8000/api`
-- **Production**: `[Your Production URL]/api`
+### 3. Interaksi Chat & Pelacakan
+- Pengguna mengirim pesan ke `/chat` dan menerima respons dari sistem RAG
+- Semua interaksi disimpan dalam **Chatlog** dengan `conversation_id` untuk melacak percakapan
+- **Admin Perusahaan** dapat melihat riwayat chat pengguna di perusahaannya
+- **Super Admin** dapat melihat semua riwayat chat dengan berbagai filter
 
-## Authentication
+---
 
-This API uses JWT Bearer tokens for authentication. Include the token in the `Authorization` header:
+## Dokumentasi Endpoint API
 
-```
-Authorization: Bearer <your-access-token>
-```
+### 🔐 Autentikasi (`/api/v1/auth`)
 
-Tokens are obtained through the `/auth/user/token` endpoint.
+#### POST `/auth/register` - Daftar Perusahaan Baru
+**Deskripsi**: Mendaftarkan perusahaan baru beserta admin pertama. Perusahaan akan menunggu persetujuan Super Admin.
 
-## API Endpoints
-
-### 🔐 Authentication
-
-#### POST `/auth/register`
-**Deskripsi:** Register a new company (admin user only)
-**Akses:** Public
-
-**Request Body:**
+**Request Body**:
 ```json
 {
-  "name": "string",
-  "email": "string",
-  "password": "string",
-  "company_name": "string",
-  "pic_phone_number": "string (optional)",
-  "username": "string (optional)"
+  "name": "Admin Perusahaan",
+  "email": "admin@perusahaan.com",
+  "username": "adminperusahaan",
+  "password": "password123",
+  "company_name": "PT Perusahaan Baru"
 }
 ```
 
-**Response:** `201 Created`
+**Response Sukses (201 Created)**:
 ```json
 {
-  "message": "Company 'company_name' and admin user 'email' registered successfully. Pending approval from a super admin."
+  "message": "Company 'PT Perusahaan Baru' and admin user 'admin@perusahaan.com' registered successfully. Pending approval from a super admin."
 }
 ```
 
-#### POST `/auth/user/token`
-**Deskripsi:** Login and get access token
-**Akses:** Public
+**Response Error**:
+- `400 Bad Request`: Data tidak valid atau perusahaan sudah ada
+- `409 Conflict`: Email/username sudah digunakan
 
-**Request Body:**
+---
+
+#### POST `/auth/user/token` - Login & Dapatkan Token
+**Deskripsi**: Mendapatkan token akses untuk autentikasi. Bisa login dengan email atau username.
+
+**Request Body**:
 ```json
 {
-  "email": "string (optional if username provided)",
-  "username": "string (optional if email provided)",
-  "password": "string"
+  "email": "admin@perusahaan.com",
+  "password": "password123"
+}
+```
+*ATAU*
+```json
+{
+  "username": "adminperusahaan", 
+  "password": "password123"
 }
 ```
 
-**Response:** `200 OK`
+**Response Sukses (200 OK)**:
 ```json
 {
-  "access_token": "string",
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "token_type": "bearer",
-  "expires_in": "integer",
+  "expires_in": 3600,
   "user": {
-    "id": "integer",
-    "email": "string",
-    "username": "string",
-    "name": "string",
-    "role": "string",
-    "company_id": "integer",
-    "is_active": "boolean"
+    "id": 1,
+    "name": "Admin Perusahaan",
+    "username": "adminperusahaan",
+    "email": "admin@perusahaan.com",
+    "role": "admin",
+    "company_id": 1,
+    "division_id": null,
+    "is_active": true,
+    "company_pic_phone_number": "+628123456789"
   }
 }
 ```
 
-#### GET `/auth/me`
-**Deskripsi:** Get current logged-in user information
-**Akses:** Authenticated Users
+**Response Error**:
+- `401 Unauthorized`: Kredensial salah atau user tidak aktif
 
-**Response:** `200 OK`
+---
+
+#### GET `/auth/me` - Dapatkan Data Pengguna Saat Ini
+**Deskripsi**: Mengembalikan data pengguna yang sedang login termasuk informasi perusahaan.
+
+**Response Sukses (200 OK)**:
 ```json
 {
-  "id": "integer",
-  "email": "string",
-  "username": "string",
-  "name": "string",
-  "role": "string",
-  "company_id": "integer",
-  "is_active": "boolean"
+  "id": 1,
+  "name": "Admin Perusahaan",
+  "username": "adminperusahaan",
+  "email": "admin@perusahaan.com",
+  "role": "admin",
+  "company_id": 1,
+  "division_id": null,
+  "is_active": true,
+  "company_pic_phone_number": "+628123456789"
 }
 ```
 
-### 🏢 Companies (Admin Only)
+---
 
-#### GET `/companies/me`
-**Deskripsi:** Get current admin's company data
-**Akses:** Company Admin
+### 👑 Super Admin (`/api/v1/admin`)
 
-**Response:** `200 OK`
-```json
-{
-  "id": "integer",
-  "name": "string",
-  "is_active": "boolean",
-  "created_at": "datetime"
-}
-```
+#### GET `/admin/companies/pending` - Lihat Perusahaan Menunggu Persetujuan
+**Deskripsi**: Mendapatkan daftar perusahaan yang menunggu persetujuan Super Admin.
 
-#### GET `/companies/users`
-**Deskripsi:** Get all users in the admin's company
-**Akses:** Company Admin
-
-**Response:** `200 OK`
+**Response Sukses (200 OK)**:
 ```json
 [
   {
-    "id": "integer",
-    "email": "string",
-    "username": "string",
-    "name": "string",
-    "role": "string",
-    "company_id": "integer",
-    "division_id": "integer (nullable)",
-    "is_active": "boolean"
+    "id": 1,
+    "name": "PT Perusahaan Baru",
+    "code": "PTPB",
+    "logo_s3_path": null,
+    "address": null,
+    "is_active": false,
+    "pic_phone_number": null
   }
 ]
 ```
 
-#### PUT `/companies/me`
-**Deskripsi:** Update the current admin's company data, including logo upload to S3.
-**Akses:** Company Admin
+---
 
-**Form Data:**
-- `company_update`: JSON object (required) - Contains fields to update (e.g., `name`, `address`).
-  ```json
-  {
-    "name": "string (optional)",
-    "code": "string (optional)",
-    "address": "string (optional)"
-  }
-  ```
-- `logo_file`: file (optional) - The new logo file to upload.
+#### PATCH `/admin/companies/{company_id}/approve` - Setujui Perusahaan
+**Deskripsi**: Menyetujui pendaftaran perusahaan dan mengaktifkannya.
 
-**Response:** `200 OK`
+**Path Parameters**:
+- `company_id`: ID perusahaan yang akan disetujui
+
+**Response Sukses (200 OK)**:
 ```json
 {
-  "id": "integer",
-  "name": "string",
-  "is_active": "boolean",
-  "created_at": "datetime",
-  "logo_s3_path": "string (nullable)"
+  "message": "Company PT Perusahaan Baru has been approved and is now active."
 }
 ```
 
-#### POST `/companies/employees/register`
-**Deskripsi:** Register a new employee for the company
-**Akses:** Company Admin
+---
 
-**Request Body:**
+### 🏢 Perusahaan (`/api/v1/companies`)
+
+#### POST `/companies/employees/register` - Daftar Karyawan Baru
+**Deskripsi**: Admin perusahaan mendaftarkan karyawan baru.
+
+**Request Body**:
 ```json
 {
-  "name": "string",
-  "email": "string",
-  "password": "string",
-  "username": "string (optional)",
-  "division_id": "integer (optional)"
+  "name": "Karyawan Baru",
+  "email": "karyawan@perusahaan.com",
+  "username": "karyawanbaru",
+  "password": "password123",
+  "division_id": 1
 }
 ```
 
-**Response:** `201 Created`
+**Response Sukses (201 Created)**:
 ```json
 {
-  "id": "integer",
-  "email": "string",
-  "username": "string",
-  "name": "string",
-  "role": "employee",
-  "company_id": "integer",
-  "division_id": "integer (nullable)",
-  "is_active": "boolean"
+  "id": 2,
+  "name": "Karyawan Baru",
+  "username": "karyawanbaru",
+  "email": "karyawan@perusahaan.com",
+  "role": "user",
+  "company_id": 1,
+  "division_id": 1,
+  "is_active": true,
+  "company_pic_phone_number": "+628123456789"
 }
 ```
 
-### 🏢 Divisions
+---
 
-#### POST `/divisions`
-**Deskripsi:** Create a new division within the admin's company
-**Akses:** Company Admin
+### 📁 Dokumen (`/api/v1/documents`)
 
-**Request Body:**
+#### POST `/documents/upload` - Upload Dokumen Baru
+**Deskripsi**: Mengupload dokumen baru untuk diproses oleh sistem RAG. Dokumen akan melalui pipeline OCR → Validasi → Embedding.
+
+**Form Data**:
+- `file`: File dokumen (PDF, DOC, TXT, dll)
+- `name`: Nama dokumen
+- `tags`: Tag dokumen (opsional, dipisahkan koma)
+
+**Response Sukses (202 Accepted)**:
 ```json
 {
-  "name": "string"
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "id": "integer",
-  "name": "string",
-  "company_id": "integer"
-}
-```
-
-#### GET `/divisions`
-**Deskripsi:** Get all divisions for the current user's company
-**Akses:** Authenticated Users
-
-**Response:** `200 OK`
-```json
-[
-  {
-    "id": "integer",
-    "name": "string",
-    "company_id": "integer"
-  }
-]
-```
-
-#### GET `/divisions/public/{company_id}`
-**Deskripsi:** Get all divisions for a specific company (public endpoint)
-**Akses:** Public
-
-**Path Parameters:**
-- `company_id`: integer
-
-**Response:** `200 OK`
-```json
-[
-  {
-    "id": "integer",
-    "name": "string",
-    "company_id": "integer"
-  }
-]
-```
-
-### 📄 Documents (Admin Only)
-
-#### POST `/documents/upload`
-**Deskripsi:** Upload a document for processing. This endpoint accepts a file, saves it temporarily, creates a DB record with 'UPLOADING' status, and triggers a background task to upload to S3.
-**Akses:** Company Admin
-
-**Form Data:**
-- `file`: file (required)
-
-**Response:** `202 Accepted`
-```json
-{
-  "id": "integer",
-  "title": "string",
-  "company_id": "integer",
-  "content_type": "string",
+  "id": 1,
+  "title": "Dokumen Perusahaan",
+  "company_id": 1,
+  "s3_path": null,
+  "content_type": "application/pdf",
   "status": "UPLOADING",
-  "s3_path": "string (nullable)",
-  "temp_storage_path": "string",
-  "text": "string (nullable)",
-  "failed_reason": "string (nullable)",
-  "created_at": "datetime",
-  "updated_at": "datetime"
+  "tags": ["kebijakan", "internal"],
+  "uploaded_at": "2025-11-02T10:30:00",
+  "extracted_text": null
 }
 ```
 
-#### PUT `/documents/{document_id}/retry`
-**Deskripsi:** Retry a failed document upload. Allows retrying the upload process for a document that previously failed to upload.
-**Akses:** Company Admin
+**Status Dokumen**:
+- `UPLOADING`: Sedang diupload ke S3
+- `UPLOADED`: Berhasil diupload, siap untuk OCR
+- `OCR_PROCESSING`: Sedang diproses OCR
+- `PENDING_VALIDATION`: Menunggu validasi teks oleh admin
+- `EMBEDDING`: Sedang membuat embedding
+- `COMPLETED`: Siap digunakan oleh chatbot
+- `UPLOAD_FAILED`/`PROCESSING_FAILED`: Gagal, bisa di-retry
 
-**Path Parameters:**
-- `document_id`: integer
+---
 
-**Response:** `200 OK`
+#### POST `/documents/{document_id}/confirm` - Konfirmasi Teks OCR
+**Deskripsi**: Admin mengkonfirmasi teks hasil OCR dan memicu proses embedding.
+
+**Path Parameters**:
+- `document_id`: ID dokumen yang akan dikonfirmasi
+
+**Request Body**:
 ```json
 {
-  "id": "integer",
-  "title": "string",
-  "company_id": "integer",
-  "content_type": "string",
-  "status": "UPLOADING",
-  "s3_path": "string (nullable)",
-  "temp_storage_path": "string",
-  "text": "string (nullable)",
-  "failed_reason": "string (nullable)",
-  "created_at": "datetime",
-  "updated_at": "datetime"
+  "confirmed_text": "Ini adalah teks yang sudah dikoreksi oleh admin..."
 }
 ```
 
-#### GET `/documents`
-**Deskripsi:** Get all documents for the company, regardless of status.
-**Akses:** Company Admin
-
-**Query Parameters:**
-- `skip`: integer (default: 0)
-- `limit`: integer (default: 100)
-
-**Response:** `200 OK`
-```json
-[
-  {
-    "id": "integer",
-    "title": "string",
-    "company_id": "integer",
-    "content_type": "string",
-    "status": "string",
-    "s3_path": "string (nullable)",
-    "temp_storage_path": "string (nullable)",
-    "text": "string (nullable)",
-    "failed_reason": "string (nullable)",
-    "created_at": "datetime",
-    "updated_at": "datetime"
-  }
-]
-```
-
-#### GET `/documents/pending-validation`
-**Deskripsi:** Get documents awaiting user validation after OCR. Gets a list of documents that have been OCR'd and are awaiting user validation.
-**Akses:** Company Admin
-
-**Response:** `200 OK`
-```json
-[
-  {
-    "id": "integer",
-    "title": "string",
-    "company_id": "integer",
-    "content_type": "string",
-    "status": "PENDING_VALIDATION",
-    "s3_path": "string",
-    "temp_storage_path": "string (nullable)",
-    "text": "string (OCR extracted text)",
-    "failed_reason": "string (nullable)",
-    "created_at": "datetime",
-    "updated_at": "datetime"
-  }
-]
-```
-
-#### POST `/documents/{document_id}/confirm`
-**Deskripsi:** Confirm OCR text and trigger embedding process. Receives user-confirmed text and triggers the embedding background task.
-**Akses:** Company Admin
-
-**Path Parameters:**
-- `document_id`: integer
-
-**Request Body:**
+**Response Sukses (202 Accepted)**:
 ```json
 {
-  "confirmed_text": "string"
-}
-```
-
-**Response:** `202 Accepted`
-```json
-{
-  "id": "integer",
-  "title": "string",
-  "company_id": "integer",
-  "content_type": "string",
+  "id": 1,
+  "title": "Dokumen Perusahaan",
+  "company_id": 1,
+  "s3_path": "s3://bucket/documents/1.pdf",
+  "content_type": "application/pdf",
   "status": "EMBEDDING",
-  "s3_path": "string",
-  "temp_storage_path": "string (nullable)",
-  "text": "string (confirmed text)",
-  "failed_reason": "string (nullable)",
-  "created_at": "datetime",
-  "updated_at": "datetime"
+  "tags": ["kebijakan", "internal"],
+  "uploaded_at": "2025-11-02T10:30:00",
+  "extracted_text": "Ini adalah teks yang sudah dikoreksi oleh admin..."
 }
 ```
 
-#### GET `/documents/failed`
-**Deskripsi:** Get documents that failed during processing or upload.
-**Akses:** Company Admin
+---
 
-**Response:** `200 OK`
+### 💬 Chat (`/api/v1/chat`)
+
+#### POST `/chat` - Kirim Pesan ke Chatbot
+**Deskripsi**: Mengirim pesan ke chatbot RAG dan mendapatkan respons berdasarkan dokumen perusahaan.
+
+**Request Body**:
+```json
+{
+  "message": "Apa kebijakan cuti perusahaan?",
+  "conversation_id": "conv-12345" // Opsional, untuk melanjutkan percakapan
+}
+```
+
+**Response Sukses (200 OK)**:
+```json
+{
+  "reply": "Berdasarkan dokumen kebijakan perusahaan, karyawan berhak mendapatkan cuti tahunan sebanyak 12 hari kerja...",
+  "conversation_id": "conv-12345"
+}
+```
+
+---
+
+### 📝 Chatlog (`/api/v1/chatlogs`)
+
+#### GET `/chatlogs` - Lihat Riwayat Chat Sendiri
+**Deskripsi**: Mendapatkan riwayat percakapan pengguna saat ini.
+
+**Query Parameters**:
+- `skip`: Jumlah data yang dilewati (default: 0)
+- `limit`: Jumlah data yang dikembalikan (default: 100)
+- `start_date`: Tanggal mulai filter (format: YYYY-MM-DD)
+- `end_date`: Tanggal akhir filter (format: YYYY-MM-DD)
+
+**Response Sukses (200 OK)**:
 ```json
 [
   {
-    "id": "integer",
-    "title": "string",
-    "company_id": "integer",
-    "content_type": "string",
-    "status": "string",
-    "s3_path": "string (nullable)",
-    "temp_storage_path": "string (nullable)",
-    "text": "string (nullable)",
-    "failed_reason": "string",
-    "created_at": "datetime",
-    "updated_at": "datetime"
+    "id": 1,
+    "question": "Apa kebijakan cuti perusahaan?",
+    "answer": "Berdasarkan dokumen kebijakan perusahaan, karyawan berhak mendapatkan cuti tahunan sebanyak 12 hari kerja...",
+    "UsersId": 2,
+    "company_id": 1,
+    "conversation_id": "conv-12345"
   }
 ]
 ```
 
-#### POST `/documents/{document_id}/retry-processing`
-**Deskripsi:** Retry failed document processing (OCR or Embedding). Manually triggers a retry for a document that failed during OCR or Embedding.
-**Akses:** Company Admin
+---
 
-**Path Parameters:**
-- `document_id`: integer
+#### GET `/chatlogs/conversations` - Lihat Daftar ID Percakapan
+**Deskripsi**: Mendapatkan daftar unique conversation ID untuk pengguna saat ini.
 
-**Response:** `200 OK`
-```json
-{
-  "id": "integer",
-  "title": "string",
-  "company_id": "integer",
-  "content_type": "string",
-  "status": "string",
-  "s3_path": "string (nullable)",
-  "temp_storage_path": "string (nullable)",
-  "text": "string (nullable)",
-  "failed_reason": "string (nullable)",
-  "created_at": "datetime",
-  "updated_at": "datetime"
-}
-```
-
-#### PUT `/documents/{document_id}/content`
-**Deskripsi:** Update document content and re-generate embeddings. Updates the text content of an existing document and re-generates its embeddings.
-**Akses:** Company Admin
-
-**Path Parameters:**
-- `document_id`: integer
-
-**Request Body:**
-```json
-{
-  "new_content": "string",
-  "filename": "string"
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "id": "integer",
-  "title": "string",
-  "company_id": "integer",
-  "content_type": "string",
-  "status": "COMPLETED",
-  "s3_path": "string",
-  "temp_storage_path": "string (nullable)",
-  "text": "string (updated content)",
-  "failed_reason": "string (nullable)",
-  "created_at": "datetime",
-  "updated_at": "datetime"
-}
-```
-
-#### GET `/documents/{document_id}`
-**Deskripsi:** Get a single document by ID, checking for appropriate permissions.
-**Akses:** Authenticated Users (Must belong to same company or be super admin)
-
-**Path Parameters:**
-- `document_id`: integer
-
-**Response:** `200 OK`
-```json
-{
-  "id": "integer",
-  "title": "string",
-  "company_id": "integer",
-  "content_type": "string",
-  "status": "string",
-  "s3_path": "string (nullable)",
-  "temp_storage_path": "string (nullable)",
-  "text": "string (nullable)",
-  "failed_reason": "string (nullable)",
-  "created_at": "datetime",
-  "updated_at": "datetime"
-}
-```
-
-#### DELETE `/documents/{document_id}`
-**Deskripsi:** Delete a document (from database, S3, and RAG service). This endpoint deletes the document from the database, S3, and the RAG service.
-**Akses:** Company Admin
-
-**Path Parameters:**
-- `document_id`: integer
-
-**Response:** `204 No Content`
-
-### 💬 Chat
-
-#### POST `/chat`
-**Deskripsi:** Send a message to the AI chatbot. This endpoint processes the user's message, retrieves relevant context from the RAG service, generates a response using the AI model, and saves the chat to the database.
-**Akses:** Authenticated Users
-
-**Request Body:**
-```json
-{
-  "message": "string",
-  "conversation_id": "string (optional)"
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "response": "string",
-  "conversation_id": "string"
-}
-```
-
-### 📝 Chatlogs
-
-#### GET `/chatlogs`
-**Deskripsi:** Get current user's chat logs. Retrieve chatlogs for the current user, filtered by their company.
-**Akses:** Authenticated Users
-
-**Query Parameters:**
-- `skip`: integer (default: 0)
-- `limit`: integer (default: 100)
-- `start_date`: date (optional)
-- `end_date`: date (optional)
-
-**Response:** `200 OK`
+**Response Sukses (200 OK)**:
 ```json
 [
-  {
-    "id": "integer",
-    "question": "string",
-    "answer": "string",
-    "UsersId": "integer",
-    "company_id": "integer",
-    "conversation_id": "string",
-    "created_at": "datetime"
-  }
+  "conv-12345",
+  "conv-67890"
 ]
 ```
 
-#### GET `/chatlogs/conversations`
-**Deskripsi:** Get unique conversation IDs for the current user. Retrieve a list of unique conversation IDs for the current user.
-**Akses:** Authenticated Users
+---
 
-**Query Parameters:**
-- `skip`: integer (default: 0)
-- `limit`: integer (default: 100)
+### 🏢 Chatlog Admin Perusahaan (`/api/v1/company/chatlogs`)
 
-**Response:** `200 OK`
-```json
-["conversation_id_1", "conversation_id_2", ...]
-```
+#### GET `/company/chatlogs` - Lihat Riwayat Chat Perusahaan
+**Deskripsi**: Admin perusahaan melihat riwayat chat semua pengguna di perusahaannya.
 
-#### GET `/chatlogs/{conversation_id}`
-**Deskripsi:** Get chat history for a specific conversation. Retrieve chat history for a specific conversation ID for the current user.
-**Akses:** Authenticated Users
+**Query Parameters**:
+- `skip`, `limit`: Pagination
+- `division_id`: Filter berdasarkan divisi
+- `user_id`: Filter berdasarkan user spesifik
+- `start_date`, `end_date`: Filter berdasarkan tanggal
 
-**Path Parameters:**
-- `conversation_id`: string
+**Response**: Sama seperti endpoint chatlog user biasa, tapi mencakup semua pengguna di perusahaan.
 
-**Query Parameters:**
-- `skip`: integer (default: 0)
-- `limit`: integer (default: 100)
+---
 
-**Response:** `200 OK`
-```json
-[
-  {
-    "id": "integer",
-    "question": "string",
-    "answer": "string",
-    "UsersId": "integer",
-    "company_id": "integer",
-    "conversation_id": "string",
-    "created_at": "datetime"
-  }
-]
-```
+### 👑 Chatlog Super Admin (`/api/v1/admin/chatlogs`)
 
-### 👨‍💼 Company Admin Chatlogs
+#### GET `/admin/chatlogs` - Lihat Semua Riwayat Chat
+**Deskripsi**: Super Admin melihat semua riwayat chat di seluruh sistem.
 
-#### GET `/company/chatlogs`
-**Deskripsi:** Get chat logs for the current company (admin only). Retrieve chatlogs for the current company admin, filtered by their company.
-**Akses:** Company Admin
+**Query Parameters**:
+- `skip`, `limit`: Pagination
+- `company_id`: Filter berdasarkan perusahaan
+- `division_id`: Filter berdasarkan divisi  
+- `user_id`: Filter berdasarkan user spesifik
+- `start_date`, `end_date`: Filter berdasarkan tanggal
 
-**Query Parameters:**
-- `skip`: integer (default: 0)
-- `limit`: integer (default: 100)
-- `division_id`: integer (optional)
-- `user_id`: integer (optional)
-- `start_date`: date (optional)
-- `end_date`: date (optional)
-
-**Response:** `200 OK`
-```json
-[
-  {
-    "id": "integer",
-    "question": "string",
-    "answer": "string",
-    "UsersId": "integer",
-    "company_id": "integer",
-    "conversation_id": "string",
-    "created_at": "datetime"
-  }
-]
-```
-
-### 👑 Super Admin Endpoints
-
-#### GET `/admin/companies`
-**Deskripsi:** Get all active companies
-**Akses:** Super Admin
-
-**Query Parameters:**
-- `skip`: integer (default: 0)
-- `limit`: integer (default: 100)
-
-**Response:** `200 OK`
-```json
-[
-  {
-    "id": "integer",
-    "name": "string",
-    "is_active": "boolean",
-    "created_at": "datetime"
-  }
-]
-```
-
-#### GET `/admin/companies/pending`
-**Deskripsi:** Get companies awaiting approval. Get a list of companies awaiting approval (accessible only by super admins).
-**Akses:** Super Admin
-
-**Query Parameters:**
-- `skip`: integer (default: 0)
-- `limit`: integer (default: 100)
-
-**Response:** `200 OK`
-```json
-[
-  {
-    "id": "integer",
-    "name": "string",
-    "is_active": "boolean",
-    "created_at": "datetime"
-  }
-]
-```
-
-#### PATCH `/admin/companies/{company_id}/approve`
-**Deskripsi:** Approve a pending company. Approve a company registration (accessible only by super admins).
-**Akses:** Super Admin
-
-**Path Parameters:**
-- `company_id`: integer
-
-**Response:** `200 OK`
-```json
-{
-  "message": "Company with id {company_id} has been approved."
-}
-```
-
-#### PATCH `/admin/companies/{company_id}/reject`
-**Deskripsi:** Reject a pending company. Reject a company registration (accessible only by super admins).
-**Akses:** Super Admin
-
-**Path Parameters:**
-- `company_id`: integer
-
-**Response:** `200 OK`
-```json
-{
-  "message": "Company with id {company_id} has been rejected and deleted."
-}
-```
-
-#### GET `/admin/chatlogs`
-**Deskripsi:** Get all chat logs (super admin only). Retrieve all chatlogs for super admin with optional filtering.
-**Akses:** Super Admin
-
-**Query Parameters:**
-- `skip`: integer (default: 0)
-- `limit`: integer (default: 100)
-- `company_id`: integer (optional)
-- `division_id`: integer (optional)
-- `user_id`: integer (optional)
-- `start_date`: date (optional)
-- `end_date`: date (optional)
-
-**Response:** `200 OK`
-```json
-[
-  {
-    "id": "integer",
-    "question": "string",
-    "answer": "string",
-    "UsersId": "integer",
-    "company_id": "integer",
-    "conversation_id": "string",
-    "created_at": "datetime"
-  }
-]
-```
-
-### 🏥 Health Check
-
-#### GET `/`
-**Deskripsi:** API root endpoint
-**Akses:** Public
-
-**Response:** `200 OK`
-```json
-{
-  "message": "Multi-Tenant Company Chatbot API is running"
-}
-```
-
-#### GET `/health`
-**Deskripsi:** Health check endpoint
-**Akses:** Public
-
-**Response:** `200 OK`
-```json
-{
-  "status": "healthy"
-}
-```
-
-## Document Status Flow
-
-Documents go through the following status states:
-
-1. **UPLOADING** → File is being uploaded to S3
-2. **UPLOADED** → File successfully uploaded to S3
-3. **PROCESSING** → OCR processing in progress
-4. **PENDING_VALIDATION** → OCR complete, awaiting user confirmation
-5. **EMBEDDING** → Generating embeddings for RAG
-6. **COMPLETED** → Document fully processed and ready for chat
-7. **UPLOAD_FAILED** → Upload to S3 failed
-8. **PROCESSING_FAILED** → OCR or embedding process failed
-
-## User Roles
-
-- **super_admin**: Full system access, can approve/reject companies
-- **admin**: Company administrator, can manage employees and documents
-- **employee**: Regular user, can chat and view their own chat logs
-
-## Error Handling
-
-The API returns standard HTTP status codes:
-
-- `200 OK`: Successful request
-- `201 Created`: Resource created successfully
-- `202 Accepted`: Request accepted for processing
-- `204 No Content`: Resource deleted successfully
-- `400 Bad Request`: Invalid request data
-- `401 Unauthorized`: Authentication required or invalid token
-- `403 Forbidden`: Insufficient permissions
-- `404 Not Found`: Resource not found
-- `500 Internal Server Error`: Server error
-
-## CORS
-
-The API allows all origins, methods, and headers for development purposes. In production, configure appropriate CORS policies.
-
-## License
-
-This project is proprietary and confidential.
+**Response**: Sama seperti endpoint chatlog lainnya, tapi mencakup seluruh sistem.
