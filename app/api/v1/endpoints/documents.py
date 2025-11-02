@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status, Form
-from typing import List
+from typing import List, Any
+from math import ceil
 from pydantic import BaseModel
 
 from app.core.dependencies import get_current_user, get_db, get_current_company_admin
@@ -15,6 +16,13 @@ router = APIRouter(
 
 class DocumentConfirmRequest(BaseModel):
     confirmed_text: str
+
+# --- New Pydantic model for paginated response ---
+class PaginatedDocumentsResponse(BaseModel):
+    documents: List[document_schema.Document]
+    total_pages: int
+    current_page: int
+    total_documents: int
 
 # --- NEW ASYNC UPLOAD ENDPOINT ---
 @router.post("/upload", response_model=document_schema.Document, status_code=status.HTTP_202_ACCEPTED)
@@ -57,7 +65,7 @@ async def retry_document_upload(
     )
 
 
-@router.get("/", response_model=List[document_schema.Document])
+@router.get("/", response_model=PaginatedDocumentsResponse) # Changed response_model
 async def read_all_company_documents(
     page: int = 1,
     limit: int = 100,
@@ -67,15 +75,41 @@ async def read_all_company_documents(
     """
     Gets all documents for the user's company, regardless of status.
     Supports pagination via 'page' (page number) and 'limit' (number of items per page) query parameters.
+    Returns a list of documents and pagination details.
     Example: /api/documents/?page=1&limit=20
     """
     # Calculate skip based on page and limit
     skip_calculated = (page - 1) * limit
-    return await document_service.get_all_company_documents_service(
+
+    # First call: get paginated documents for the current page
+    documents = await document_service.get_all_company_documents_service(
         db=db,
         current_user=current_user,
-        skip=skip_calculated,  # Use calculated skip
+        skip=skip_calculated,
         limit=limit
+    )
+
+    # Second call: get all documents to count them.
+    # This is inefficient as it fetches all documents, but it's a workaround
+    # because the service does not directly return the total count as an integer.
+    # A more efficient solution would involve a dedicated count method in the service/repository
+    # or modifying the service to return (documents, total_count).
+    all_documents_for_count = await document_service.get_all_company_documents_service(
+        db=db,
+        current_user=current_user,
+        skip=0,
+        limit=1000000 # Use a large limit to get all documents
+    )
+    total_count = len(all_documents_for_count)
+
+    # Calculate total pages
+    total_pages = ceil(total_count / limit) if limit > 0 else 0
+
+    return PaginatedDocumentsResponse(
+        documents=documents,
+        total_pages=total_pages,
+        current_page=page,
+        total_documents=total_count
     )
 
 @router.get("/pending-validation", response_model=List[document_schema.Document])
