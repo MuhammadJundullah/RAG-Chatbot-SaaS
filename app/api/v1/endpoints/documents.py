@@ -128,7 +128,7 @@ async def update_document_content(
         current_user=current_user,
         document_id=document_id,
         new_content=request.new_content,
-        title=request.title, # Pass title to service
+        title=request.title,
         tags=request.tags
     )
 

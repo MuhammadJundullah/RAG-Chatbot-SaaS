@@ -175,7 +175,10 @@ async def update_document_content_service(
     title: Optional[str] = None, # Added title parameter, removed filename
     tags: Optional[List[str]] = None # Added tags parameter
 ):
-    """Updates the text content, title, and tags of an existing document and re-generates its embeddings."""
+    """
+    Updates the text content, title, and tags of an existing document.
+    Triggers a Celery task to re-generate its embeddings.
+    """
     db_document = await document_repository.get_document(db, document_id=document_id)
     if not db_document or db_document.company_id != current_user.company_id:
         raise HTTPException(status_code=404, detail="Document not found.")
@@ -185,33 +188,17 @@ async def update_document_content_service(
         db, 
         document_id=document_id, 
         text=new_content, 
-        status=DocumentStatus.EMBEDDING,
-        tags=tags, # Pass tags
-        title=title # Pass title
+        status=DocumentStatus.EMBEDDING, 
+        tags=tags,
+        title=title
     )
 
-    # Update document content in the RAG service, using title as source_filename
-    rag_update_result = await rag_service.update_document_content(
-        document_id=str(document_id), 
-        new_text_content=new_content,
-        company_id=current_user.company_id,
-        title=title if title else db_document.title, # Use new title as source_filename, fallback to old title if new title is None
-        tags=tags # Pass tags
-    )
+    # Trigger the Celery task for embedding processing
+    process_embedding_task.delay(document_id)
+    print(f"[Service] Queued embedding task for document ID: {document_id}")
 
-    if rag_update_result.get("status") == "failed":
-        # If RAG update fails, update document status to indicate failure
-        await document_repository.update_document_status_and_reason(
-            db, document_id=document_id, status=DocumentStatus.PROCESSING_FAILED, reason=f"RAG Embedding Update Failed: {rag_update_result.get('message')}"
-        )
-        raise HTTPException(status_code=500, detail=f"Failed to update RAG embeddings: {rag_update_result.get('message')}")
-
-    # If RAG update is successful, mark document as completed
-    final_updated_doc = await document_repository.update_document_status_and_reason(
-        db, document_id=document_id, status=DocumentStatus.COMPLETED, reason=None
-    )
-
-    return final_updated_doc
+    # Return the document with status EMBEDDING, Celery task will update final status
+    return updated_doc_repo
 
 async def read_single_document_service(
     db: AsyncSession,

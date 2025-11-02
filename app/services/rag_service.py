@@ -45,9 +45,8 @@ class RAGService:
 
     async def update_document_content(self, document_id: str, new_text_content: str, company_id: int, title: Optional[str] = None, tags: Optional[List[str]] = None) -> Dict[str, Any]:
         """
-        Updates the content of a document in the RAG index.
-        Deletes existing embeddings for the document and adds new ones based on the updated content.
-        Uses the document's title as the source filename for metadata.
+        Deletes existing embeddings for a document in the RAG index.
+        The re-embedding process is handled by a separate Celery task.
         """
         # First, delete existing embeddings for the document
         # We use document_id for deletion as it's the primary identifier.
@@ -55,10 +54,9 @@ class RAGService:
         if delete_result.get("status") == "failed":
             return delete_result # Or handle error appropriately
 
-        # Then, add the new content as a document
-        # Use the provided title as the source_filename for metadata
-        add_result = await self.add_text_as_document(new_text_content, title if title else f"document_{document_id}", company_id, document_id, tags=tags)
-        return add_result
+        # The actual embedding and upserting will be handled by a Celery task.
+        # This function now only handles the deletion part.
+        return {"status": "success", "message": "Old embeddings deleted. Embedding task will be triggered separately."}
 
     async def get_relevant_context(self, query: str, company_id: int, n_results: int = 5) -> str:
         namespace = self._get_namespace(company_id)

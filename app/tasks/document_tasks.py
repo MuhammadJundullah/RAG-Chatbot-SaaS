@@ -117,34 +117,71 @@ async def _run_ocr_processing(document_id: int):
         print(f"[OCR Task] Finished OCR for document ID: {document_id}. Status set to PENDING_VALIDATION.")
 
 async def _run_embedding_processing(document_id: int):
-    """The actual async logic for embedding processing."""
+    """
+    The actual async logic for embedding processing, including deletion of old embeddings
+    and addition of new ones via Celery.
+    """
     rag_service = RAGService()
     local_db_manager = DatabaseManager()
     async with local_db_manager.async_session_maker() as db:
         doc = await doc_repo_module.document_repository.get_document(db, document_id)
         if not doc or not doc.extracted_text:
-            print(f"[Embedding Task] Document {document_id} not found or has no text.")
+            print(f"[Embedding Task] Document {document_id} not found or has no extracted text.")
+            await doc_repo_module.document_repository.update_document_status_and_reason(
+                db, document_id, DocumentStatus.PROCESSING_FAILED, "Document not found or has no extracted text."
+            )
             return
 
         print(f"[Embedding Task] Starting embedding for document: {doc.title} (ID: {document_id})")
         
+        # Update status to EMBEDDING before starting
         await doc_repo_module.document_repository.update_document_status_and_reason(db, document_id, DocumentStatus.EMBEDDING)
 
-        result = await rag_service.add_text_as_document(
-            text_content=doc.extracted_text,
-            file_name=doc.title,
-            company_id=doc.company_id,
-            document_id=str(document_id)
-        )
-        if result.get("status") == "failed":
-            raise ValueError(f"RAG service failed: {result.get('message')}")
+        try:
+            # 1. Delete old embeddings using the rag_service update_document_content method
+            print(f"[Embedding Task] Calling rag_service.update_document_content for document ID: {document_id} to delete old embeddings.")
+            delete_result = await rag_service.update_document_content(
+                document_id=str(document_id),
+                new_text_content="", # Not used for deletion, but required by signature
+                company_id=doc.company_id,
+                title=doc.title, # Pass title for metadata if needed by delete_document_by_id
+                tags=doc.tags # Pass tags if needed by delete_document_by_id
+            )
+            print(f"[Embedding Task] Result from rag_service.update_document_content for document ID {document_id}: {delete_result}") # Log the result
 
-        await doc_repo_module.document_repository.update_document_status_and_reason(
-            db,
-            document_id=document_id,
-            status=DocumentStatus.COMPLETED
-        )
-        print(f"[Embedding Task] Finished embedding for document ID: {document_id}. Status set to COMPLETED.")
+            # Check if deletion was marked as failed.
+            if delete_result.get("status") == "failed":
+                error_message = delete_result.get("message", "Unknown error during deletion.")
+                print(f"[Embedding Task] Deletion of old embeddings failed for document ID {document_id}: {error_message}")
+                # Raise an exception to fail the task and trigger Celery retries/failure handling
+                raise RuntimeError(f"Failed to delete old embeddings for document {document_id}: {error_message}")
+            
+            print(f"[Embedding Task] Old embeddings deletion process completed for document ID: {document_id}. Status: {delete_result.get('status')}")
+
+            # 2. Add new embeddings using the add_text_as_document method
+            add_result = await rag_service.add_text_as_document(
+                text_content=doc.extracted_text,
+                file_name=doc.title,
+                company_id=doc.company_id,
+                document_id=str(document_id),
+                tags=doc.tags # Pass tags to add_text_as_document
+            )
+            if add_result.get("status") == "failed":
+                raise ValueError(f"RAG service failed to add document: {add_result.get('message')}")
+
+            # 3. Update status to COMPLETED if successful
+            await doc_repo_module.document_repository.update_document_status_and_reason(
+                db,
+                document_id=document_id,
+                status=DocumentStatus.COMPLETED
+            )
+            print(f"[Embedding Task] Finished embedding for document ID: {document_id}. Status set to COMPLETED.")
+
+        except Exception as e:
+            # Handle any exceptions during deletion or addition
+            print(f"[Embedding Task] Error during embedding processing for doc {document_id}: {e}")
+            # Re-raise to trigger Celery's retry mechanism and _handle_task_failure
+            raise e
 
 # --- Celery Task Definitions with Retry Logic ---
 
@@ -193,7 +230,7 @@ def process_ocr_task(self, document_id: int):
     retry_jitter=True
 )
 def process_embedding_task(self, document_id: int):
-    """Celery task to chunk and embed confirmed text."""
+    """Celery task to chunk, embed, and upsert document text, including deletion of old embeddings."""
     try:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(_run_embedding_processing(document_id))

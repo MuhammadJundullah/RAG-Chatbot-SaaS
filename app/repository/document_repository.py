@@ -42,9 +42,9 @@ class DocumentRepository(BaseRepository[document_model.Documents]):
         if db_document:
             db_document.extracted_text = text
             db_document.status = status
-            if tags is not None: # Update tags if provided
+            if tags is not None:
                 db_document.tags = tags
-            if title is not None: # Update title if provided
+            if title is not None:
                 db_document.title = title
             await db.commit()
             await db.refresh(db_document)
