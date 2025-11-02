@@ -64,7 +64,11 @@ async def read_all_company_documents(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_company_admin)
 ):
-    """Gets all documents for the user's company, regardless of status."""
+    """
+    Gets all documents for the user's company, regardless of status.
+    Supports pagination via 'skip' (number of items to skip) and 'limit' (number of items to return) query parameters.
+    Example: /api/documents/?skip=10&limit=20
+    """
     return await document_service.get_all_company_documents_service(
         db=db,
         current_user=current_user,
@@ -118,13 +122,14 @@ async def update_document_content(
     current_user: Users = Depends(get_current_company_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Updates the text content of an existing document and re-generates its embeddings."""
+    """Updates the text content, title, and tags of an existing document and re-generates its embeddings."""
     return await document_service.update_document_content_service(
         db=db,
         current_user=current_user,
         document_id=document_id,
         new_content=request.new_content,
-        filename=request.filename
+        title=request.title, # Pass title to service
+        tags=request.tags
     )
 
 @router.get("/{document_id}", response_model=document_schema.Document)

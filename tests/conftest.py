@@ -91,6 +91,18 @@ def authenticated_client_fixture(db_session: Generator) -> TestClient:
 
     app.dependency_overrides.clear()
 
+# Mock database session for unit testing services
+from unittest.mock import MagicMock, AsyncMock
+
+@pytest.fixture
+def mock_db_session():
+    session = MagicMock()
+    session.add = MagicMock()
+    session.commit = AsyncMock()
+    session.refresh = AsyncMock()
+    return session
+
+
 # Override settings for tests
 @pytest.fixture(autouse=True)
 def override_settings():

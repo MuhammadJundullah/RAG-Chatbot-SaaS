@@ -39,4 +39,6 @@ class Document(DocumentBase):
 
 class DocumentUpdateContentRequest(BaseModel):
     new_content: str
-    filename: str
+    # Reverted to strictly accept 'title'
+    title: Optional[str] = None
+    tags: Optional[List[str]] = None

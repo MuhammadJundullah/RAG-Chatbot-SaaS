@@ -18,48 +18,6 @@ def test_gemini_service_initialization():
     assert gemini_service is not None
 
 
-# Mock database session for testing
-@pytest.fixture
-def mock_db_session():
-    session = MagicMock()
-    session.add = MagicMock()
-    session.commit = AsyncMock()
-    session.refresh = AsyncMock()
-    return session
-
-
-class TestUserRepository:
-    @staticmethod
-    async def get_user_by_email(db, email):
-        # Mock user that exists
-        if email == "existing@example.com":
-            user = Users(
-                id=1,
-                name="Existing User",
-                email="existing@example.com",
-                username="existinguser",
-                password="hashed_password",
-                role="employee",
-                company_id=1,
-                is_active=True
-            )
-            return user
-        return None
-    
-    @staticmethod
-    async def create_user(db, user):
-        # Return the same user object with id set
-        user.id = 1
-        return user
-
-
-class TestCompanyRepository:
-    @staticmethod
-    async def create_company(db, company):
-        company.id = 1
-        return company
-
-
 @pytest.mark.asyncio
 async def test_authenticate_user_success(mock_db_session):
     # Mock user data

@@ -25,7 +25,7 @@ def test_register_endpoint():
              patch('app.utils.security.get_password_hash', return_value="hashed_password"):
             
             # Set up mock return values
-            mock_user = Users(
+            user_instance = Users(
                 id=1,
                 name=registration_data["name"],
                 email=registration_data["email"],
@@ -40,15 +40,15 @@ def test_register_endpoint():
                 name=registration_data["company_name"],
                 is_active=False  # Awaiting approval
             )
-            mock_create_user.return_value = mock_user
+            mock_create_user.return_value = user_instance
             mock_create_company.return_value = mock_company
             
             response = client.post("/api/auth/register", json=registration_data)
             
             # Check that the request was successful
             assert response.status_code == 201
-            assert "message" in response.json()
-            assert "Company 'Test Company' and admin user 'test@example.com' registered successfully." in response.json()["message"]
+            expected_message = "Company 'Test Company' and admin user 'test@example.com' registered successfully."
+            assert response.json()["message"] == expected_message
 
 
 def test_login_endpoint():
@@ -61,8 +61,8 @@ def test_login_endpoint():
         
         # Mock the user service
         with patch('app.services.user_service.authenticate_user', new_callable=AsyncMock) as mock_auth_user:
-            # Create a mock user
-            mock_user = Users(
+            # Create a mock user instance
+            user_instance = Users(
                 id=1,
                 name="Test User",
                 email="test@example.com",
@@ -72,7 +72,7 @@ def test_login_endpoint():
                 company_id=1,
                 is_super_admin=False
             )
-            mock_auth_user.return_value = mock_user
+            mock_auth_user.return_value = user_instance
             
             # Mock the token creation
             with patch('app.utils.auth.create_access_token', return_value={"access_token": "mock_token", "expires_in": 3600}):
@@ -89,8 +89,8 @@ def test_login_endpoint():
 
 def test_get_current_user_endpoint():
     with TestClient(app) as client:
-        # Mock current user
-        mock_user = Users(
+        # Mock current user instance
+        user_instance = Users(
             id=1,
             name="Test User",
             email="test@example.com",
@@ -107,10 +107,10 @@ def test_get_current_user_endpoint():
             is_active=True,
             pic_phone_number="+1234567890" # Company PIC phone number
         )
-        mock_user.company = mock_company # Associate company with user
+        user_instance.company = mock_company # Associate company with user
 
         # Use dependency override
-        app.dependency_overrides[get_current_user] = lambda: mock_user
+        app.dependency_overrides[get_current_user] = lambda: user_instance
         try:
             response = client.get("/api/auth/me", headers={"Authorization": "Bearer mock_token"})
             

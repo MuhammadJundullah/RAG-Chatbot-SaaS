@@ -37,11 +37,15 @@ class DocumentRepository(BaseRepository[document_model.Documents]):
         )
         return result.scalars().all()
 
-    async def update_document_text_and_status(self, db: AsyncSession, document_id: int, text: str, status: document_model.DocumentStatus) -> Optional[document_model.Documents]:
+    async def update_document_text_and_status(self, db: AsyncSession, document_id: int, text: str, status: document_model.DocumentStatus, tags: Optional[List[str]] = None, title: Optional[str] = None) -> Optional[document_model.Documents]:
         db_document = await self.get(db, document_id)
         if db_document:
             db_document.extracted_text = text
             db_document.status = status
+            if tags is not None: # Update tags if provided
+                db_document.tags = tags
+            if title is not None: # Update title if provided
+                db_document.title = title
             await db.commit()
             await db.refresh(db_document)
         return db_document

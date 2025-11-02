@@ -1,7 +1,7 @@
 from pinecone import Pinecone
 from sentence_transformers import SentenceTransformer
 from app.core.config import settings
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import uuid
 import asyncio
 
@@ -43,14 +43,21 @@ class RAGService:
             else:
                 raise e
 
-    async def update_document_content(self, document_id: str, new_text_content: str, company_id: int, source_filename: str) -> Dict[str, Any]:
+    async def update_document_content(self, document_id: str, new_text_content: str, company_id: int, title: Optional[str] = None, tags: Optional[List[str]] = None) -> Dict[str, Any]:
+        """
+        Updates the content of a document in the RAG index.
+        Deletes existing embeddings for the document and adds new ones based on the updated content.
+        Uses the document's title as the source filename for metadata.
+        """
         # First, delete existing embeddings for the document
+        # We use document_id for deletion as it's the primary identifier.
         delete_result = await self.delete_document_by_id(document_id, company_id)
         if delete_result.get("status") == "failed":
             return delete_result # Or handle error appropriately
 
         # Then, add the new content as a document
-        add_result = await self.add_text_as_document(new_text_content, source_filename, company_id, document_id)
+        # Use the provided title as the source_filename for metadata
+        add_result = await self.add_text_as_document(new_text_content, title if title else f"document_{document_id}", company_id, document_id, tags=tags)
         return add_result
 
     async def get_relevant_context(self, query: str, company_id: int, n_results: int = 5) -> str:
@@ -64,10 +71,11 @@ class RAGService:
             namespace=namespace
         )
         if response.get('matches'):
+            # Extract content and potentially filter by tags if needed in the future
             return "\n".join([match['metadata']['content'] for match in response['matches'] if 'content' in match['metadata']])
         return ""
 
-    async def add_documents(self, documents: List[str], company_id: int, source_filename: str, document_id: str):
+    async def add_documents(self, documents: List[str], company_id: int, source_filename: str, document_id: str, tags: Optional[List[str]] = None):
         namespace = self._get_namespace(company_id)
         embeddings = await asyncio.to_thread(self.embedding_model.encode, documents)
         embeddings = embeddings.tolist()
@@ -75,6 +83,8 @@ class RAGService:
         for doc, emb in zip(documents, embeddings):
             vector_id = str(uuid.uuid4())
             metadata = {'source': source_filename, 'content': doc, 'document_id': document_id}
+            if tags: # Add tags to metadata if provided
+                metadata['tags'] = tags
             vectors_to_upsert.append((vector_id, emb, metadata))
         await asyncio.to_thread(self.index.upsert, vectors=vectors_to_upsert, namespace=namespace)
 
@@ -85,11 +95,11 @@ class RAGService:
         overlap = 200
         return [text_content[i:i + chunk_size] for i in range(0, len(text_content), chunk_size - overlap)]
 
-    async def add_text_as_document(self, text_content: str, file_name: str, company_id: int, document_id: str) -> Dict[str, Any]:
+    async def add_text_as_document(self, text_content: str, file_name: str, company_id: int, document_id: str, tags: Optional[List[str]] = None) -> Dict[str, Any]:
         chunks = self._chunk_text(text_content)
         if not chunks:
             return {"status": "failed", "message": "Could not chunk document text."}
-        await self.add_documents(chunks, company_id, file_name, document_id)
+        await self.add_documents(chunks, company_id, file_name, document_id, tags=tags)
         return {"status": "success", "chunks_added": len(chunks)}
 
 # Global singleton instance, created on import

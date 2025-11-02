@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import UploadFile, HTTPException, status
-from typing import List
+from typing import List, Optional
 import os
 import pathlib
 import uuid
@@ -172,31 +172,43 @@ async def update_document_content_service(
     current_user: Users,
     document_id: int,
     new_content: str,
-    filename: str
+    title: Optional[str] = None, # Added title parameter, removed filename
+    tags: Optional[List[str]] = None # Added tags parameter
 ):
+    """Updates the text content, title, and tags of an existing document and re-generates its embeddings."""
     db_document = await document_repository.get_document(db, document_id=document_id)
     if not db_document or db_document.company_id != current_user.company_id:
         raise HTTPException(status_code=404, detail="Document not found.")
 
-    await document_repository.update_document_text_and_status(
+    # Update document text, status, title, and tags in the repository
+    updated_doc_repo = await document_repository.update_document_text_and_status(
         db, 
         document_id=document_id, 
         text=new_content, 
-        status=DocumentStatus.EMBEDDING
+        status=DocumentStatus.EMBEDDING,
+        tags=tags, # Pass tags
+        title=title # Pass title
     )
 
+    # Update document content in the RAG service, using title as source_filename
     rag_update_result = await rag_service.update_document_content(
         document_id=str(document_id), 
         new_text_content=new_content,
         company_id=current_user.company_id,
-        source_filename=filename 
+        title=title if title else db_document.title, # Use new title as source_filename, fallback to old title if new title is None
+        tags=tags # Pass tags
     )
 
     if rag_update_result.get("status") == "failed":
+        # If RAG update fails, update document status to indicate failure
+        await document_repository.update_document_status_and_reason(
+            db, document_id=document_id, status=DocumentStatus.PROCESSING_FAILED, reason=f"RAG Embedding Update Failed: {rag_update_result.get('message')}"
+        )
         raise HTTPException(status_code=500, detail=f"Failed to update RAG embeddings: {rag_update_result.get('message')}")
 
+    # If RAG update is successful, mark document as completed
     final_updated_doc = await document_repository.update_document_status_and_reason(
-        db, document_id=document_id, status=DocumentStatus.COMPLETED
+        db, document_id=document_id, status=DocumentStatus.COMPLETED, reason=None
     )
 
     return final_updated_doc
