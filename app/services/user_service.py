@@ -47,7 +47,8 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
         company_code = generate_company_code()
         new_company_obj = company_model.Company(
             name=user_data.company_name,
-            code=company_code
+            code=company_code,
+            pic_phone_number=user_data.pic_phone_number
         )
         db.add(new_company_obj)
         await db.flush()  # Flush to get the new company ID before committing

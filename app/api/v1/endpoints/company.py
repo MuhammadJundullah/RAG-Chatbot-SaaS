@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, Form
+from fastapi import APIRouter, Depends, Form, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import List, Optional
 
 from app.core.dependencies import get_current_user, get_db, get_current_company_admin
 from app.models.user_model import Users
@@ -14,10 +14,13 @@ router = APIRouter(
 )
 
 # --- NEW ENDPOINT FOR UPDATING COMPANY DETAILS ---
-@router.put("/update", response_model=company_schema.Company)
+@router.put("/me", response_model=company_schema.Company)
 async def update_company_by_admin(
-    name: str = Form(...),
-    code: str = Form(...),
+    name: Optional[str] = Form(None),
+    code: Optional[str] = Form(None),
+    address: Optional[str] = Form(None),
+    logo_file: Optional[UploadFile] = None,
+    pic_phone_number: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_company_admin)
 ):
@@ -32,6 +35,9 @@ async def update_company_by_admin(
         current_user=current_user,
         name=name,
         code=code,
+        address=address,
+        logo_file=logo_file,
+        pic_phone_number=pic_phone_number,
     )
 
 # --- NEW ENDPOINT FOR REGISTERING EMPLOYEES ---

@@ -13,6 +13,7 @@ class UserRegistration(BaseModel):
     password: str
     # For new company registration
     company_name: Optional[str] = None
+    pic_phone_number: Optional[str] = None
     # For joining an existing company
     company_id: Optional[int] = None
 
