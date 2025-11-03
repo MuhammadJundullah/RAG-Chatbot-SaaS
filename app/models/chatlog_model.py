@@ -7,6 +7,9 @@ from sqlalchemy import (
     DateTime,
     func
 )
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
+
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 
@@ -17,7 +20,7 @@ class Chatlogs(Base):
     answer = Column(Text)
     UsersId = Column(Integer, ForeignKey("Users.id"), nullable=False)
     company_id = Column(Integer, ForeignKey("Company.id"), nullable=False)
-    conversation_id = Column(String(255), nullable=False)
+    conversation_id = Column(UUID(as_uuid=True), ForeignKey('Conversation.id'), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
     user = relationship("Users", back_populates="chatlogs")

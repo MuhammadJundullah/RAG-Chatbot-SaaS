@@ -75,14 +75,19 @@ async def get_user_conversation_ids_service(
     current_user: Users,
     skip: int,
     limit: int,
-) -> List[str]:
-    conversation_ids = await chatlog_repository.get_unique_conversation_ids_for_user(
+) -> List[chatlog_schema.ConversationInfoSchema]: # Changed return type hint
+    # The repository now returns a list of tuples: (UUID_object, title_str)
+    conversation_data = await chatlog_repository.get_unique_conversation_ids_for_user(
         db=db,
         user_id=current_user.id,
         skip=skip,
         limit=limit,
     )
-    return conversation_ids
+    # Format the data into ConversationInfoSchema objects, converting UUID to string
+    return [
+        chatlog_schema.ConversationInfoSchema(id=str(conv_id), title=title) # Convert UUID to string
+        for conv_id, title in conversation_data
+    ]
 
 async def get_conversation_history_service(
     db: AsyncSession,
@@ -91,14 +96,25 @@ async def get_conversation_history_service(
     skip: int,
     limit: int,
 ) -> List[chatlog_schema.Chatlog]:
-    chat_history = await chatlog_repository.get_chat_history(
+    chat_history_models = await chatlog_repository.get_chat_history(
         db=db,
         conversation_id=conversation_id,
         user_id=current_user.id,
         skip=skip,
         limit=limit,
     )
-    return chat_history
+    # Convert Chatlog models to Pydantic schemas, ensuring conversation_id is a string
+    return [
+        chatlog_schema.Chatlog(
+            id=chatlog.id,
+            question=chatlog.question,
+            answer=chatlog.answer,
+            UsersId=chatlog.UsersId,
+            company_id=chatlog.company_id,
+            conversation_id=str(chatlog.conversation_id) 
+        )
+        for chatlog in chat_history_models
+    ]
 
 async def delete_conversation_service(
     db: AsyncSession,

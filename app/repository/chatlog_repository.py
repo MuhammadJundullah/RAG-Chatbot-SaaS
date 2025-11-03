@@ -113,8 +113,11 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
         user_id: int,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[str]:
+    ) -> List[tuple[str, str]]: # Changed return type hint
+        from app.models.conversation_model import Conversation # Import Conversation model
+
         # Subquery to find the latest created_at for each conversation_id
+        # We also select the conversation_id from the Chatlogs model
         latest_chat_per_conversation = select(
             self.model.conversation_id,
             self.model.created_at
@@ -125,12 +128,19 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
             self.model.created_at.desc()
         ).subquery()
 
-        # Main query to select distinct conversation_id ordered by their latest message
-        query = select(latest_chat_per_conversation.c.conversation_id).order_by(
+        # Main query to select distinct conversation_id and its title, ordered by their latest message
+        # Join Chatlogs with Conversation
+        query = select(
+            latest_chat_per_conversation.c.conversation_id,
+            Conversation.title
+        ).join(
+            Conversation,
+            latest_chat_per_conversation.c.conversation_id == Conversation.id
+        ).order_by(
             latest_chat_per_conversation.c.created_at.desc()
         )
         result = await db.execute(query.offset(skip).limit(limit))
-        return result.scalars().all()
+        return result.all() # Changed from scalars().all() to all()
 
     async def delete_chatlogs_by_conversation_id(self, db: AsyncSession, conversation_id: str, user_id: int) -> int:
         """Deletes all chatlog entries for a specific conversation ID and user ID."""

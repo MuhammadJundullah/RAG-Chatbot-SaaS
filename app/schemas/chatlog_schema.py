@@ -15,3 +15,7 @@ class Chatlog(ChatlogBase):
 
     class Config:
         from_attributes = True
+
+class ConversationInfoSchema(BaseModel):
+    id: str
+    title: str

@@ -33,22 +33,24 @@ async def get_my_company_service(
         raise HTTPException(status_code=404, detail="Company not found for this user.")
     return db_company
 
-async def register_employee_by_company_admin_service(
+# Renamed from register_employee_by_company_admin_service to register_employee_service
+async def register_employee_service(
     db: AsyncSession,
     employee_data: user_schema.EmployeeRegistrationByAdmin,
-    current_admin: user_model.Users
+    company_id: int # Explicitly taking company_id as an argument
 ) -> user_schema.User:
     if employee_data.division_id:
         division = await division_repository.get_division(db, employee_data.division_id)
-        if not division or division.company_id != current_admin.company_id:
+        if not division or division.company_id != company_id: # Use company_id argument
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Division not found or does not belong to your company."
             )
 
     try:
+        # Pass company_id directly to user_service.register_employee_by_admin
         new_employee = await user_service.register_employee_by_admin(
-            db, employee_data=employee_data, company_id=current_admin.company_id
+            db, employee_data=employee_data, company_id=company_id
         )
         return new_employee
     except user_service.UserRegistrationError as e:

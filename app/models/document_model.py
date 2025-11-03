@@ -31,4 +31,3 @@ class Documents(Base):
     uploaded_at = Column(DateTime, nullable=True, default=datetime.utcnow)
 
     company = relationship("Company", back_populates="documents")
-    embeddings = relationship("Embeddings", back_populates="document", cascade="all, delete-orphan")
