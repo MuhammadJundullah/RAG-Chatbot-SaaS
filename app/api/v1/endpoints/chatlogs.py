@@ -21,7 +21,7 @@ admin_router = APIRouter(
 company_admin_router = APIRouter(
     prefix="/company/chatlogs",
     tags=["Company-Admin-Chatlogs"],
-    # dependencies=[Depends(get_current_company_admin)]
+    dependencies=[Depends(get_current_company_admin)]
 )
 
 # Router for general users
