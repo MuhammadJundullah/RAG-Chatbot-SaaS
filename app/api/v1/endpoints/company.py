@@ -15,7 +15,7 @@ router = APIRouter(
 
 # --- NEW ENDPOINT FOR UPDATING COMPANY DETAILS ---
 @router.put("/update", response_model=company_schema.Company)
-async def update_my_company(
+async def update_company_by_admin(
     name: str = Form(...),
     code: str = Form(...),
     db: AsyncSession = Depends(get_db),
@@ -27,7 +27,7 @@ async def update_my_company(
     """
     # The 'db' and 'current_user' parameters are correctly injected by FastAPI's dependency injection system.
     # They are available for use within this function.
-    return await company_service.update_my_my_company_service(
+    return await company_service.update_company_by_admin_service(
         db=db,
         current_user=current_user,
         name=name,
@@ -36,7 +36,7 @@ async def update_my_company(
 
 # --- NEW ENDPOINT FOR REGISTERING EMPLOYEES ---
 @router.post("/employees/register", response_model=user_schema.User)
-async def register_employee_endpoint(
+async def register_employee_by_admin(
     employee_data: user_schema.EmployeeRegistrationByAdmin, # Using the correct schema for employee registration
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_company_admin) # Ensure only company admins can register employees
@@ -46,7 +46,7 @@ async def register_employee_endpoint(
     Requires the user to be a company administrator.
     """
     # The company_id will be derived from the current_user
-    return await company_service.register_employee_service(
+    return await company_service.register_employee_by_admin_service(
         db=db,
         company_id=current_user.company_id,
         employee_data=employee_data
@@ -55,21 +55,31 @@ async def register_employee_endpoint(
 # --- Existing endpoints ---
 
 @router.get("/", response_model=company_schema.Company)
-async def read_my_company(
+async def read_company_by_user(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user) # Changed to get_current_user for broader access
 ):
+    return await company_service.get_company_by_user_service(
+        db=db,
+        current_user=current_user
+    )
+
+@router.get("/me", response_model=company_schema.Company)
+async def read_company_by_admin(
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_company_admin)
+):
     """
-    Gets the current user's company details.
-    Accessible by any logged-in user.
+    Gets the current user's company details via /companies/me.
+    Accessible by company admin.
     """
-    return await company_service.read_my_company_service(
+    return await company_service.get_company_by_user_service(
         db=db,
         current_user=current_user
     )
 
 @router.get("/users", response_model=List[user_schema.User]) # Changed response_model to List[user_schema.User]
-async def get_company_users_endpoint(
+async def get_company_users_by_admin(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_company_admin)
 ):
@@ -77,7 +87,7 @@ async def get_company_users_endpoint(
     Gets a list of all users within the company.
     Accessible only by company administrators.
     """
-    return await company_service.get_company_users_service(
+    return await company_service.get_company_users_by_admin_service(
         db=db,
         current_user=current_user
     )

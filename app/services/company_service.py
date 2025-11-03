@@ -14,7 +14,7 @@ from app.services import user_service
 from app.core.s3_client import s3_client_manager
 from app.core.config import settings
 
-async def get_company_users_service(
+async def get_company_users_by_admin_service(
     db: AsyncSession,
     current_user: user_model.Users
 ) -> List[user_schema.User]:
@@ -24,7 +24,7 @@ async def get_company_users_service(
     users = result.scalars().all()
     return users
 
-async def get_my_company_service(
+async def get_company_by_user_service(
     db: AsyncSession,
     current_user: user_model.Users
 ) -> company_schema.Company:
@@ -34,7 +34,7 @@ async def get_my_company_service(
     return db_company
 
 # Renamed from register_employee_by_company_admin_service to register_employee_service
-async def register_employee_service(
+async def register_employee_by_admin_service(
     db: AsyncSession,
     employee_data: user_schema.EmployeeRegistrationByAdmin,
     company_id: int # Explicitly taking company_id as an argument
@@ -59,7 +59,7 @@ async def register_employee_service(
             detail=e.detail,
         )
 
-async def update_my_company_service(
+async def update_company_by_admin_service(
     db: AsyncSession,
     current_user: user_model.Users,
     name: Optional[str],
