@@ -116,7 +116,10 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
             self.model.answer,
             self.model.created_at,
             Users.username
-        ).order_by(self.model.created_at.desc()).offset(skip).limit(limit)
+        ).order_by(self.model.created_at.desc()).offset(skip)
+
+        if limit >= 0:
+            data_query = data_query.limit(limit)
         
         result = await db.execute(data_query)
         data = [

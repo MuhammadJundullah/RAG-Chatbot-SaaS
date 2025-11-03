@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import date
+from fastapi.responses import StreamingResponse
+import io
 
 from app.core.dependencies import get_current_user, get_db, get_current_super_admin, get_current_company_admin
 from app.schemas import chatlog_schema
@@ -19,7 +21,7 @@ admin_router = APIRouter(
 company_admin_router = APIRouter(
     prefix="/company/chatlogs",
     tags=["Company-Admin-Chatlogs"],
-    dependencies=[Depends(get_current_company_admin)]
+    # dependencies=[Depends(get_current_company_admin)]
 )
 
 # Router for general users
@@ -82,6 +84,31 @@ async def read_chatlogs_as_company_admin(
         page=page,
     )
     return chatlogs
+
+@company_admin_router.get("/export", response_class=StreamingResponse)
+async def export_chatlogs_as_company_admin(
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_company_admin),
+    division_id: Optional[int] = Query(None),
+    user_id: Optional[int] = Query(None),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+):
+    """
+    Export chatlogs to a CSV file for the current company admin.
+    """
+    csv_data = await chatlog_service.export_chatlogs_as_company_admin_service(
+        db=db,
+        current_user=current_user,
+        division_id=division_id,
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    
+    response = StreamingResponse(io.StringIO(csv_data), media_type="text/csv")
+    response.headers["Content-Disposition"] = "attachment; filename=chatlogs.csv"
+    return response
 
 
 @user_router.get("/", response_model=List[chatlog_schema.Chatlog])

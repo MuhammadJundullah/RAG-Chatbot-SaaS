@@ -3,6 +3,8 @@ from typing import List, Optional
 from datetime import date
 from fastapi import HTTPException
 import math
+import csv
+import io
 
 from app.repository.chatlog_repository import chatlog_repository
 from app.schemas import chatlog_schema
@@ -55,11 +57,40 @@ async def get_chatlogs_as_company_admin_service(
     total_pages = math.ceil(total_chat / limit) if limit > 0 else 0
     
     return chatlog_schema.PaginatedChatlogResponse(
+        chatlogs=[chatlog_schema.ChatlogResponse(**data) for data in chatlogs_data],
         total_pages=total_pages,
         current_page=page,
         total_chat=total_chat,
-        chatlogs=[chatlog_schema.ChatlogResponse(**data) for data in chatlogs_data]
     )
+
+async def export_chatlogs_as_company_admin_service(
+    db: AsyncSession,
+    current_user: Users,
+    division_id: Optional[int],
+    user_id: Optional[int],
+    start_date: Optional[date],
+    end_date: Optional[date],
+) -> str:
+    chatlogs_data, _ = await chatlog_repository.get_chatlogs_for_company_admin(
+        db=db,
+        company_id=current_user.company_id,
+        division_id=division_id,
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        skip=0,
+        limit=-1,
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow(["id", "username", "created_at", "question", "answer"])
+
+    for chatlog in chatlogs_data:
+        writer.writerow([chatlog["id"], chatlog["username"], chatlog["created_at"], chatlog["question"], chatlog["answer"]])
+
+    return output.getvalue()
 
 async def get_user_chatlogs_service(
     db: AsyncSession,
