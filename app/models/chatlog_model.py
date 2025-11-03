@@ -5,10 +5,10 @@ from sqlalchemy import (
     ForeignKey,
     Text,
     DateTime,
-    func
+    func,
+    JSON
 )
 from sqlalchemy.dialects.postgresql import UUID
-import uuid
 
 from sqlalchemy.orm import relationship
 from app.models.base import Base
@@ -22,6 +22,7 @@ class Chatlogs(Base):
     company_id = Column(Integer, ForeignKey("Company.id"), nullable=False)
     conversation_id = Column(UUID(as_uuid=True), ForeignKey('Conversation.id'), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
+    referenced_document_ids = Column(JSON, nullable=True)
 
     user = relationship("Users", back_populates="chatlogs")
     company = relationship("Company", back_populates="chatlogs")

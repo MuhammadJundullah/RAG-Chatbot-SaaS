@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 import uuid
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 class ChatlogBase(BaseModel):
     question: str
@@ -9,10 +9,10 @@ class ChatlogBase(BaseModel):
     UsersId: int
     company_id: int
     conversation_id: uuid.UUID
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
 class ChatlogCreate(ChatlogBase):
-    pass
+    referenced_document_ids: Optional[List[int]] = None
 
 class Chatlog(ChatlogBase):
     id: int
@@ -26,12 +26,18 @@ class ChatlogResponse(BaseModel):
     created_at: datetime
     question: str
     answer: str
+    conversation_id: uuid.UUID
 
 class PaginatedChatlogResponse(BaseModel):
     chatlogs: List[ChatlogResponse]
     total_pages: int
     current_page: int
     total_chat: int
+
+class ChatMessage(BaseModel):
+    question: str
+    answer: str
+    created_at: datetime
 
 class ConversationInfoSchema(BaseModel):
     id: uuid.UUID

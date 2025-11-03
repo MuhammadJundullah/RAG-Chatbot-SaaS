@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 import io
 
 from app.core.dependencies import get_current_user, get_db, get_current_super_admin, get_current_company_admin
-from app.schemas import chatlog_schema
+from app.schemas import chatlog_schema, conversation_schema
 from app.models.user_model import Users
 from app.services import chatlog_service
 
@@ -109,6 +109,22 @@ async def export_chatlogs_as_company_admin(
     response = StreamingResponse(io.StringIO(csv_data), media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=chatlogs.csv"
     return response
+
+@company_admin_router.get("/{conversation_id}", response_model=conversation_schema.ConversationDetailResponse)
+async def get_conversation_details_as_company_admin(
+    conversation_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_company_admin),
+):
+    """
+    Retrieve details for a specific conversation, including chat history and referenced documents.
+    """
+    conversation_details = await chatlog_service.get_conversation_details_as_company_admin(
+        db=db,
+        current_user=current_user,
+        conversation_id=conversation_id,
+    )
+    return conversation_details
 
 
 @user_router.get("/", response_model=List[chatlog_schema.Chatlog])

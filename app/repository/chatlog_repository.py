@@ -115,6 +115,7 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
             self.model.question,
             self.model.answer,
             self.model.created_at,
+            self.model.conversation_id,
             Users.username
         ).order_by(self.model.created_at.desc()).offset(skip)
 
@@ -123,8 +124,8 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
         
         result = await db.execute(data_query)
         data = [
-            {"id": i, "question": q, "answer": a, "created_at": ca, "username": u}
-            for i, q, a, ca, u in result.all()
+            {"id": i, "question": q, "answer": a, "created_at": ca, "conversation_id": conv_id, "username": u}
+            for i, q, a, ca, conv_id, u in result.all()
         ]
         
         return data, total_count
@@ -172,5 +173,15 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
         result = await db.execute(stmt)
         await db.commit()
         return result.rowcount
+
+    async def get_chatlogs_by_conversation_id(
+        self, db: AsyncSession,
+        conversation_id: str,
+    ) -> List[chatlog_model.Chatlogs]:
+        query = select(self.model).filter(
+            self.model.conversation_id == conversation_id
+        ).order_by(self.model.created_at)
+        result = await db.execute(query)
+        return result.scalars().all()
 
 chatlog_repository = ChatlogRepository()

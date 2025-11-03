@@ -58,7 +58,7 @@ class RAGService:
         # This function now only handles the deletion part.
         return {"status": "success", "message": "Old embeddings deleted. Embedding task will be triggered separately."}
 
-    async def get_relevant_context(self, query: str, company_id: int, n_results: int = 5) -> str:
+    async def get_relevant_context(self, query: str, company_id: int, n_results: int = 5) -> Dict[str, Any]:
         namespace = self._get_namespace(company_id)
         query_embedding = await asyncio.to_thread(self.embedding_model.encode, query)
         query_embedding = query_embedding.tolist()
@@ -68,10 +68,22 @@ class RAGService:
             include_metadata=True,
             namespace=namespace
         )
+        
+        context_str = ""
+        document_ids = []
+        
         if response.get('matches'):
-            # Extract content and potentially filter by tags if needed in the future
-            return "\n".join([match['metadata']['content'] for match in response['matches'] if 'content' in match['metadata']])
-        return ""
+            context_list = []
+            for match in response['matches']:
+                if 'content' in match['metadata']:
+                    context_list.append(match['metadata']['content'])
+                if 'document_id' in match['metadata']:
+                    document_ids.append(match['metadata']['document_id'])
+            
+            context_str = "\n".join(context_list)
+            document_ids = list(set(document_ids))
+
+        return {"context": context_str, "document_ids": document_ids}
 
     async def add_documents(self, documents: List[str], company_id: int, source_filename: str, document_id: str, tags: Optional[List[str]] = None):
         namespace = self._get_namespace(company_id)

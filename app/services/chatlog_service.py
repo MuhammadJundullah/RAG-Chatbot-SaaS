@@ -7,7 +7,10 @@ import csv
 import io
 
 from app.repository.chatlog_repository import chatlog_repository
-from app.schemas import chatlog_schema
+from app.repository.conversation_repository import conversation_repository
+from app.repository.document_repository import document_repository
+from app.repository.user_repository import user_repository
+from app.schemas import chatlog_schema, conversation_schema, document_schema
 from app.models.user_model import Users
 
 async def get_all_chatlogs_as_admin_service(
@@ -61,6 +64,83 @@ async def get_chatlogs_as_company_admin_service(
         total_pages=total_pages,
         current_page=page,
         total_chat=total_chat,
+    )
+
+async def get_conversations_as_company_admin_service(
+    db: AsyncSession,
+    current_user: Users,
+    page: int,
+    limit: int,
+) -> conversation_schema.PaginatedCompanyConversationResponse:
+    skip = (page - 1) * limit
+    conversations, total_conversations = await conversation_repository.get_conversations_by_company(
+        db=db,
+        company_id=current_user.company_id,
+        skip=skip,
+        limit=limit,
+    )
+    
+    total_pages = math.ceil(total_conversations / limit) if limit > 0 else 0
+    
+    return conversation_schema.PaginatedCompanyConversationResponse(
+        conversations=[conversation_schema.CompanyConversationResponse.from_orm(conv) for conv in conversations],
+        total_pages=total_pages,
+        current_page=page,
+        total_conversations=total_conversations,
+    )
+
+async def get_conversation_details_as_company_admin(
+    db: AsyncSession,
+    current_user: Users,
+    conversation_id: str,
+) -> conversation_schema.ConversationDetailResponse:
+    conversation = await conversation_repository.get_conversation(db, conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    chatlogs = await chatlog_repository.get_chatlogs_by_conversation_id(db, conversation_id)
+    if not chatlogs:
+        raise HTTPException(status_code=404, detail="No chatlogs found for this conversation")
+
+    user_id = chatlogs[0].UsersId
+    chat_user = await user_repository.get_user(db, user_id)
+    if not chat_user or chat_user.company_id != current_user.company_id:
+        raise HTTPException(status_code=403, detail="Not authorized to view this conversation")
+
+    referenced_doc_ids = set()
+    for chatlog in chatlogs:
+        if chatlog.referenced_document_ids:
+            for doc_id in chatlog.referenced_document_ids:
+                referenced_doc_ids.add(int(doc_id))
+
+    referenced_documents = await document_repository.get_documents_by_ids(db, list(referenced_doc_ids))
+
+    division_name = chat_user.division.name if chat_user.division else None
+
+    chat_history = [
+        chatlog_schema.ChatMessage(
+            question=cl.question,
+            answer=cl.answer,
+            created_at=cl.created_at
+        ) for cl in chatlogs
+    ]
+    
+    referenced_documents_response = [
+        document_schema.ReferencedDocument(
+            id=doc.id,
+            title=doc.title,
+            s3_path=doc.s3_path
+        ) for doc in referenced_documents
+    ]
+
+    return conversation_schema.ConversationDetailResponse(
+        conversation_id=conversation.id,
+        conversation_title=conversation.title,
+        conversation_created_at=conversation.created_at,
+        username=chat_user.username,
+        division_name=division_name,
+        chat_history=chat_history,
+        referenced_documents=referenced_documents_response,
     )
 
 async def export_chatlogs_as_company_admin_service(

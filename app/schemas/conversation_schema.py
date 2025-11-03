@@ -1,7 +1,8 @@
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, List
 from datetime import datetime
 import uuid
+from app.schemas import chatlog_schema, document_schema
 
 class ConversationBase(BaseModel):
     title: str
@@ -19,3 +20,27 @@ class ConversationListResponse(ConversationBase):
 
     class Config:
         from_attributes = True # For SQLAlchemy ORM mapping
+
+class CompanyConversationResponse(BaseModel):
+    conversation_id: uuid.UUID = Field(..., alias='id')
+    title: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class PaginatedCompanyConversationResponse(BaseModel):
+    conversations: List[CompanyConversationResponse]
+    total_pages: int
+    current_page: int
+    total_conversations: int
+
+class ConversationDetailResponse(BaseModel):
+    conversation_id: uuid.UUID
+    conversation_title: str
+    conversation_created_at: datetime
+    username: str
+    division_name: Optional[str]
+    chat_history: List[chatlog_schema.ChatMessage]
+    referenced_documents: List[document_schema.ReferencedDocument]

@@ -101,10 +101,12 @@ async def process_chat_message(
 
 
     # 2. Get context from RAG service
-    rag_context = await rag_service.get_relevant_context(
+    rag_response = await rag_service.get_relevant_context(
         query=user_message,
         company_id=company_id
     )
+    rag_context = rag_response["context"]
+    document_ids = rag_response["document_ids"]
 
     # 3. Generate chat response
     full_response = ""
@@ -124,7 +126,8 @@ async def process_chat_message(
         answer=full_response,
         UsersId=current_user.id,
         company_id=company_id,
-        conversation_id=conversation_id_str # Use the conversation_id (either provided or newly created)
+        conversation_id=conversation_id_str, # Use the conversation_id (either provided or newly created)
+        referenced_document_ids=document_ids
     )
     await chatlog_repository.create_chatlog(db=db, chatlog=chatlog_data)
 

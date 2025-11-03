@@ -77,4 +77,13 @@ class DocumentRepository(BaseRepository[document_model.Documents]):
     async def delete_document(self, db: AsyncSession, document_id: int) -> Optional[document_model.Documents]:
         return await self.delete(db, document_id)
 
+    async def get_documents_by_ids(self, db: AsyncSession, document_ids: List[int]) -> List[document_model.Documents]:
+        if not document_ids:
+            return []
+        result = await db.execute(
+            select(self.model)
+            .filter(self.model.id.in_(document_ids))
+        )
+        return result.scalars().all()
+
 document_repository = DocumentRepository()

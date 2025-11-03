@@ -42,3 +42,8 @@ class DocumentUpdateContentRequest(BaseModel):
     # Reverted to strictly accept 'title'
     title: Optional[str] = None
     tags: Optional[List[str]] = None
+
+class ReferencedDocument(BaseModel):
+    id: int
+    title: str
+    s3_path: Optional[str] = None
