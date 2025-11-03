@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import date
 from fastapi import HTTPException
+import math
 
 from app.repository.chatlog_repository import chatlog_repository
 from app.schemas import chatlog_schema
@@ -38,8 +39,9 @@ async def get_chatlogs_as_company_admin_service(
     end_date: Optional[date],
     skip: int,
     limit: int,
-) -> List[chatlog_schema.Chatlog]:
-    chatlogs = await chatlog_repository.get_chatlogs_for_company_admin(
+    page: int,
+) -> chatlog_schema.PaginatedChatlogResponse:
+    chatlogs_data, total_chat = await chatlog_repository.get_chatlogs_for_company_admin(
         db=db,
         company_id=current_user.company_id,
         division_id=division_id,
@@ -49,7 +51,15 @@ async def get_chatlogs_as_company_admin_service(
         skip=skip,
         limit=limit,
     )
-    return chatlogs
+    
+    total_pages = math.ceil(total_chat / limit) if limit > 0 else 0
+    
+    return chatlog_schema.PaginatedChatlogResponse(
+        total_pages=total_pages,
+        current_page=page,
+        total_chat=total_chat,
+        chatlogs=[chatlog_schema.ChatlogResponse(**data) for data in chatlogs_data]
+    )
 
 async def get_user_chatlogs_service(
     db: AsyncSession,

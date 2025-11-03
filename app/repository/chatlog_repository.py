@@ -89,24 +89,41 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
         end_date: Optional[date] = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[chatlog_model.Chatlogs]:
+    ) -> (List[dict], int):
         from app.models.user_model import Users
+        from sqlalchemy import func
 
-        query = select(self.model).filter(self.model.company_id == company_id)
+        base_query = select(self.model).join(Users, self.model.UsersId == Users.id).filter(self.model.company_id == company_id)
 
         if user_id:
-            query = query.filter(self.model.UsersId == user_id)
+            base_query = base_query.filter(self.model.UsersId == user_id)
 
         if division_id:
-            query = query.join(Users, self.model.UsersId == Users.id).filter(Users.division_id == division_id)
+            base_query = base_query.filter(Users.division_id == division_id)
 
         if start_date:
-            query = query.filter(self.model.created_at >= start_date)
+            base_query = base_query.filter(self.model.created_at >= start_date)
         if end_date:
-            query = query.filter(self.model.created_at <= end_date)
+            base_query = base_query.filter(self.model.created_at <= end_date)
+
+        count_query = base_query.with_only_columns(func.count(self.model.id))
+        total_count_result = await db.execute(count_query)
+        total_count = total_count_result.scalar_one()
+
+        data_query = base_query.with_only_columns(
+            self.model.question,
+            self.model.answer,
+            self.model.created_at,
+            Users.username
+        ).order_by(self.model.created_at.desc()).offset(skip).limit(limit)
         
-        result = await db.execute(query.offset(skip).limit(limit))
-        return result.scalars().all()
+        result = await db.execute(data_query)
+        data = [
+            {"question": q, "answer": a, "created_at": ca, "username": u}
+            for q, a, ca, u in result.all()
+        ]
+        
+        return data, total_count
 
     async def get_unique_conversation_ids_for_user(
         self, db: AsyncSession,

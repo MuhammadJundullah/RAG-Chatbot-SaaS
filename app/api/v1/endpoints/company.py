@@ -13,7 +13,6 @@ router = APIRouter(
     tags=["Company"],
 )
 
-# --- NEW ENDPOINT FOR UPDATING COMPANY DETAILS ---
 @router.put("/me", response_model=company_schema.Company)
 async def update_company_by_admin(
     name: Optional[str] = Form(None),
@@ -40,12 +39,11 @@ async def update_company_by_admin(
         pic_phone_number=pic_phone_number,
     )
 
-# --- NEW ENDPOINT FOR REGISTERING EMPLOYEES ---
 @router.post("/employees/register", response_model=user_schema.User)
 async def register_employee_by_admin(
-    employee_data: user_schema.EmployeeRegistrationByAdmin, # Using the correct schema for employee registration
+    employee_data: user_schema.EmployeeRegistrationByAdmin,
     db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_company_admin) # Ensure only company admins can register employees
+    current_user: Users = Depends(get_current_company_admin)
 ):
     """
     Registers a new employee within the company.
@@ -58,12 +56,10 @@ async def register_employee_by_admin(
         employee_data=employee_data
     )
 
-# --- Existing endpoints ---
-
 @router.get("/", response_model=company_schema.Company)
 async def read_company_by_user(
     db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_user) # Changed to get_current_user for broader access
+    current_user: Users = Depends(get_current_user)
 ):
     return await company_service.get_company_by_user_service(
         db=db,
@@ -84,7 +80,7 @@ async def read_company_by_admin(
         current_user=current_user
     )
 
-@router.get("/users", response_model=List[user_schema.User]) # Changed response_model to List[user_schema.User]
+@router.get("/users", response_model=List[user_schema.User])
 async def get_company_users_by_admin(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_company_admin)

@@ -55,11 +55,11 @@ async def read_all_chatlogs_as_admin(
     )
     return chatlogs
 
-@company_admin_router.get("/", response_model=List[chatlog_schema.Chatlog])
+@company_admin_router.get("/", response_model=chatlog_schema.PaginatedChatlogResponse)
 async def read_chatlogs_as_company_admin(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_company_admin),
-    skip: int = 0,
+    page: int = 1,
     limit: int = 100,
     division_id: Optional[int] = Query(None),
     user_id: Optional[int] = Query(None),
@@ -69,6 +69,7 @@ async def read_chatlogs_as_company_admin(
     """
     Retrieve chatlogs for the current company admin, filtered by their company.
     """
+    skip_calculated = (page - 1) * limit
     chatlogs = await chatlog_service.get_chatlogs_as_company_admin_service(
         db=db,
         current_user=current_user,
@@ -76,8 +77,9 @@ async def read_chatlogs_as_company_admin(
         user_id=user_id,
         start_date=start_date,
         end_date=end_date,
-        skip=skip,
+        skip=skip_calculated,
         limit=limit,
+        page=page,
     )
     return chatlogs
 
