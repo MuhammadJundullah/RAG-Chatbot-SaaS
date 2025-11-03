@@ -21,6 +21,7 @@ class Chatlog(ChatlogBase):
         from_attributes = True
 
 class ChatlogResponse(BaseModel):
+    id: int
     username: str
     created_at: datetime
     question: str

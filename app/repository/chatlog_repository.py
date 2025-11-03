@@ -111,6 +111,7 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
         total_count = total_count_result.scalar_one()
 
         data_query = base_query.with_only_columns(
+            self.model.id,
             self.model.question,
             self.model.answer,
             self.model.created_at,
@@ -119,8 +120,8 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
         
         result = await db.execute(data_query)
         data = [
-            {"question": q, "answer": a, "created_at": ca, "username": u}
-            for q, a, ca, u in result.all()
+            {"id": i, "question": q, "answer": a, "created_at": ca, "username": u}
+            for i, q, a, ca, u in result.all()
         ]
         
         return data, total_count
