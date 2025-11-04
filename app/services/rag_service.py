@@ -5,9 +5,18 @@ from typing import List, Dict, Any, Optional
 import uuid
 import asyncio
 
+MODEL_CACHE_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'model_cache')
+
 class RAGService:
     def __init__(self):
         """Initializes the Pinecone client and the embedding model."""
+
+        self.embedding_model = SentenceTransformer(
+            settings.EMBEDDING_MODEL_NAME, 
+            cache_folder=MODEL_CACHE_DIR, 
+            local_files_only=True
+        )
+
         if not settings.PINECONE_API_KEY:
             raise ValueError("PINECONE_API_KEY must be set.")
         

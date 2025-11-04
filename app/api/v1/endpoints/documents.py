@@ -44,8 +44,8 @@ async def upload_document(
         db=db,
         current_user=current_user,
         file=file,
-        name=name, # Pass name to service
-        tags=tag_list # Pass parsed tags to service
+        name=name,
+        tags=tag_list
     )
 
 # --- NEW RETRY ENDPOINT ---
