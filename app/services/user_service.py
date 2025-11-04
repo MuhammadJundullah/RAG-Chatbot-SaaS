@@ -2,11 +2,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 import secrets
 import string
+from fastapi import UploadFile # Import UploadFile
 from app.schemas import user_schema
 from app.repository.user_repository import user_repository
 from app.repository.company_repository import company_repository
 from app.utils.security import get_password_hash, verify_password
 from app.models import user_model, company_model
+from app.core.config import settings # Import settings for S3 bucket name
+from app.core.s3_client import s3_client_manager # Import S3 client manager
+import os # Import os for path manipulation
+import uuid # Import uuid for generating unique IDs
+import io # Import io for BytesIO
+from sqlalchemy.exc import IntegrityError # Import IntegrityError for exception handling
 
 class UserRegistrationError(Exception):
     """Custom exception for registration errors."""
@@ -68,7 +75,11 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
     # Data Layer: Save the new user to the database
     return await user_repository.create_user(db, user=db_user)
 
-async def register_employee_by_admin(db: AsyncSession, employee_data: user_schema.EmployeeRegistrationByAdmin, company_id: int):
+async def register_employee_by_admin(db: AsyncSession, employee_data: user_schema.EmployeeRegistrationByAdmin, company_id: int, profile_picture_file: UploadFile = None):
+    """
+    Registers a new employee by an admin, including uploading a profile picture to S3.
+    Handles potential username uniqueness violations from the database.
+    """
     existing_user_by_email = await user_repository.get_user_by_email(db, email=employee_data.email)
     if existing_user_by_email:
         raise UserRegistrationError("Email is already registered.")
@@ -79,6 +90,35 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
 
     hashed_password = get_password_hash(employee_data.password)
 
+    profile_picture_url = None
+    if profile_picture_file:
+        # Generate file extension and a unique identifier
+        file_extension = os.path.splitext(profile_picture_file.filename)[1]
+        logo_uuid = str(uuid.uuid4())
+        
+        # Construct the S3 key using a specific prefix for employee pictures
+        s3_key = f"employee_profile_pictures/{company_id}/{logo_uuid}{file_extension}"
+        
+        # Construct the full public URL for the uploaded file
+        full_public_logo_url = f"https://1xg7ah.leapcellobj.com/{settings.S3_BUCKET_NAME}/{s3_key}"
+            
+        try:
+            # Read file content and create a BytesIO object
+            file_content = await profile_picture_file.read()
+            file_object = io.BytesIO(file_content)
+            
+            # Upload file to S3 using the enhanced upload_file method
+            profile_picture_url = await s3_client_manager.upload_file(
+                file_object=file_object,
+                bucket_name=settings.S3_BUCKET_NAME,
+                file_key=s3_key,
+                content_type=profile_picture_file.content_type
+            )
+        except Exception as e:
+            logging.error(f"Failed to upload profile picture for employee {employee_data.email}: {e}")
+            # Raise a user-friendly error if upload fails
+            raise UserRegistrationError(f"Failed to upload profile picture: {e}")
+
     db_user = user_model.Users(
         name=employee_data.name,
         email=employee_data.email,
@@ -86,9 +126,24 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
         password=hashed_password,
         role="employee",
         company_id=company_id,
-                    division_id=employee_data.division_id    )
+        division_id=employee_data.division_id,
+        profile_picture_url=full_public_logo_url
+    )
 
-    return await user_repository.create_user(db, user=db_user)
+    try:
+        # Attempt to create the user
+        return await user_repository.create_user(db, user=db_user)
+    except IntegrityError as e:
+        # Catch database integrity errors, specifically username uniqueness violations
+        if "ix_Users_username" in str(e):
+            raise UserRegistrationError("Username already exists.")
+        else:
+            # Re-raise other integrity errors
+            raise e
+    except Exception as e:
+        # Catch other potential errors during user creation
+        logging.error(f"An unexpected error occurred during user creation: {e}")
+        raise UserRegistrationError(f"An unexpected error occurred: {e}")
 
 async def authenticate_user(db: AsyncSession, password: str, email: Optional[str] = None, username: Optional[str] = None) -> Optional[user_model.Users]:
     """

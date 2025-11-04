@@ -6,7 +6,6 @@ from sqlalchemy.future import select
 from app.utils.security import get_password_hash
 from app.models.base import Base
 
-
 class DatabaseManager:
     def __init__(self):
         """Initializes the database engine and session maker upon creation."""

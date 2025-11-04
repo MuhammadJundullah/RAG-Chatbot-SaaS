@@ -29,6 +29,8 @@ class User(UserBase):
     company_id: Optional[int] = None
     division_id: Optional[int] = None
     is_active: Optional[bool] = None
+    profile_picture_url: Optional[str] = None # Added for profile picture URL
+
     class Config:
         from_attributes = True
         

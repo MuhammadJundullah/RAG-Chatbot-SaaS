@@ -1,13 +1,13 @@
-from fastapi import APIRouter, Depends, Form, UploadFile
+from fastapi import APIRouter, Depends, Form, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
+import json # Import json
 
 from app.core.dependencies import get_current_user, get_db, get_current_company_admin
 from app.models.user_model import Users
 from app.schemas import company_schema, user_schema # Import user_schema
-from app.services import company_service
+from app.services import company_service, user_service # Import user_service
 
-# Changed prefix from "/company" to "/companies" to match the desired API path structure
 router = APIRouter(
     prefix="/companies",
     tags=["Company"],
@@ -41,19 +41,39 @@ async def update_company_by_admin(
 
 @router.post("/employees/register", response_model=user_schema.User)
 async def register_employee_by_admin(
-    employee_data: user_schema.EmployeeRegistrationByAdmin,
+    # Define each field as a Form parameter instead of a single JSON string
+    name: str = Form(...),
+    email: str = Form(...),
+    username: str = Form(...),
+    password: str = Form(...),
+    division_id: Optional[int] = Form(None),
+    profile_picture_file: UploadFile = None, # File upload parameter
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_company_admin)
 ):
     """
-    Registers a new employee within the company.
+    Registers a new employee within the company, including uploading a profile picture.
     Requires the user to be a company administrator.
     """
+    try:
+        # Manually construct the Pydantic model from form parameters
+        employee_data = user_schema.EmployeeRegistrationByAdmin(
+            name=name,
+            email=email,
+            username=username,
+            password=password,
+            division_id=division_id
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid employee data format: {e}")
+
     # The company_id will be derived from the current_user
-    return await company_service.register_employee_by_admin_service(
+    # Call the user_service function and pass the profile picture file
+    return await user_service.register_employee_by_admin(
         db=db,
         company_id=current_user.company_id,
-        employee_data=employee_data
+        employee_data=employee_data,
+        profile_picture_file=profile_picture_file
     )
 
 @router.get("/", response_model=company_schema.Company)

@@ -2,6 +2,9 @@ import aiobotocore.session
 from aiobotocore.config import AioConfig
 from app.core.config import settings
 import logging
+import io
+import os # Import os for path manipulation
+import uuid # Import uuid for generating unique IDs
 
 class AsyncS3Client:
     def __init__(self):
@@ -28,5 +31,37 @@ class AsyncS3Client:
         if self._client:
             await self._client.__aexit__(None, None, None)
             self._client = None
+
+    async def upload_file(self, file_object: io.BytesIO, bucket_name: str, file_key: str, content_type: str = None) -> str:
+        """
+        Uploads a file-like object to an S3 bucket.
+
+        Args:
+            file_object: A file-like object in binary mode (e.g., opened with 'rb').
+            bucket_name: The name of the S3 bucket.
+            file_key: The desired key (path) for the file in the bucket.
+            content_type: The MIME type of the file (e.g., 'image/jpeg').
+
+        Returns:
+            The S3 URL of the uploaded file.
+        """
+        client = await self.get_client()
+        try:
+            put_object_params = {
+                "Bucket": bucket_name,
+                "Key": file_key,
+                "Body": file_object.read()
+            }
+            if content_type:
+                put_object_params["ContentType"] = content_type
+
+            await client.put_object(**put_object_params)
+            
+            s3_url = f"{settings.S3_ENDPOINT_URL}/{bucket_name}/{file_key}"
+            logging.info(f"Successfully uploaded file to {s3_url}")
+            return s3_url
+        except Exception as e:
+            logging.error(f"Failed to upload file to S3: {e}")
+            raise
 
 s3_client_manager = AsyncS3Client()

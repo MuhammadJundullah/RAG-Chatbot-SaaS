@@ -87,6 +87,7 @@ async def read_users_me(current_user: user_model.Users = Depends(get_current_use
         company_id=current_user.company_id,
         division_id=current_user.division_id,
         is_active=current_user.is_active,
-        company_pic_phone_number=company_pic_phone
+        company_pic_phone_number=company_pic_phone,
+        profile_picture_url=current_user.profile_picture_url # Added to include profile picture URL
     )
     return user_data
