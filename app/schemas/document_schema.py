@@ -46,4 +46,3 @@ class DocumentUpdateContentRequest(BaseModel):
 class ReferencedDocument(BaseModel):
     id: int
     title: str
-    s3_path: Optional[str] = None
