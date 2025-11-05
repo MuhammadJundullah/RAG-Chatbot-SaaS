@@ -13,6 +13,16 @@ router = APIRouter(
     tags=["Company"],
 )
 
+@router.get("/", response_model=company_schema.Company)
+async def read_company_by_user(
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user)
+):
+    return await company_service.get_company_by_user_service(
+        db=db,
+        current_user=current_user
+    )
+
 @router.put("/me", response_model=company_schema.Company)
 async def update_company_by_admin(
     name: Optional[str] = Form(None),
@@ -76,15 +86,6 @@ async def register_employee_by_admin(
         profile_picture_file=profile_picture_file
     )
 
-@router.get("/", response_model=company_schema.Company)
-async def read_company_by_user(
-    db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_user)
-):
-    return await company_service.get_company_by_user_service(
-        db=db,
-        current_user=current_user
-    )
 
 @router.get("/me", response_model=company_schema.Company)
 async def read_company_by_admin(
@@ -141,3 +142,4 @@ async def get_pending_approval_companies(
         skip=skip_calculated,
         limit=limit
     )
+
