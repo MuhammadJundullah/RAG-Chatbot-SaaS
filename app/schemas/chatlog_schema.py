@@ -9,7 +9,7 @@ class ChatlogBase(BaseModel):
     UsersId: int
     company_id: int
     conversation_id: uuid.UUID
-    created_at: Optional[datetime] = None
+    created_at: datetime
 
 class ChatlogCreate(ChatlogBase):
     referenced_document_ids: Optional[List[int]] = None

@@ -232,7 +232,8 @@ async def get_conversation_history_service(
             answer=chatlog.answer,
             UsersId=chatlog.UsersId,
             company_id=chatlog.company_id,
-            conversation_id=str(chatlog.conversation_id) 
+            conversation_id=chatlog.conversation_id,
+            created_at=chatlog.created_at
         )
         for chatlog in chat_history_models
     ]

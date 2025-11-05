@@ -3,10 +3,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
 from app.schemas import chat_schema
-from app.services import chat_service
+from app.services import chat_service, document_service
 from app.core.dependencies import get_current_user, get_db
 from app.models.user_model import Users
 from app.schemas.conversation_schema import ConversationListResponse # Import the response schema
+from app.schemas.document_schema import ReferencedDocument
 
 router = APIRouter()
 
@@ -40,3 +41,20 @@ async def list_conversations_endpoint(
         limit=limit,
     )
     return conversations
+
+@router.get("/chat/document", response_model=List[ReferencedDocument], tags=["Chat"])
+async def get_company_documents(
+    current_user: Users = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Retrieve a list of documents for the current user's company.
+    Only returns document ID and title.
+    """
+    documents = await document_service.get_all_company_documents_service(
+        db=db,
+        current_user=current_user,
+        skip=0,
+        limit=1000000  # A large limit to get all documents
+    )
+    return [ReferencedDocument(id=doc.id, title=doc.title) for doc in documents]

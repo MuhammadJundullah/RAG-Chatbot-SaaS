@@ -5,8 +5,8 @@ import json # Import json
 
 from app.core.dependencies import get_current_user, get_db, get_current_company_admin
 from app.models.user_model import Users
-from app.schemas import company_schema, user_schema # Import user_schema
-from app.services import company_service, user_service # Import user_service
+from app.schemas import company_schema, user_schema
+from app.services import company_service, user_service
 
 router = APIRouter(
     prefix="/companies",
