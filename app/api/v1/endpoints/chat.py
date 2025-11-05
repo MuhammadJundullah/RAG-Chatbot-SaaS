@@ -4,7 +4,7 @@ from typing import List
 
 from app.schemas import chat_schema
 from app.services import chat_service, document_service
-from app.core.dependencies import get_current_user, get_db
+from app.core.dependencies import get_current_user, get_db, get_current_employee
 from app.models.user_model import Users
 from app.schemas.conversation_schema import ConversationListResponse # Import the response schema
 from app.schemas.document_schema import ReferencedDocument
@@ -14,7 +14,7 @@ router = APIRouter()
 @router.post("/chat", tags=["Chat"])
 async def chat_endpoint(
     request: chat_schema.ChatRequest,
-    current_user: Users = Depends(get_current_user),
+    current_user: Users = Depends(get_current_employee),
     db: AsyncSession = Depends(get_db)
 ):
     response_data = await chat_service.process_chat_message(

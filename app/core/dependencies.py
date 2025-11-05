@@ -74,6 +74,17 @@ async def get_current_company_admin(current_user: user_model.Users = Depends(get
     if not current_user.company or not current_user.company.is_active or not current_user.role == 'admin':
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User is not an active admin for an approved company",
+            detail="The user does not have admin company privileges",
+        )
+    return current_user
+
+async def get_current_employee(current_user: user_model.Users = Depends(get_current_user)) -> user_model.Users:
+    """
+    Dependency to ensure the user is an employee.
+    """
+    if current_user.role != 'employee':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The user does not have employee privileges",
         )
     return current_user

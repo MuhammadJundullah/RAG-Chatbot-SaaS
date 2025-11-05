@@ -5,7 +5,7 @@ from datetime import date
 from fastapi.responses import StreamingResponse
 import io
 
-from app.core.dependencies import get_current_user, get_db, get_current_super_admin, get_current_company_admin
+from app.core.dependencies import get_current_user, get_db, get_current_super_admin, get_current_company_admin, get_current_employee
 from app.schemas import chatlog_schema, conversation_schema
 from app.models.user_model import Users
 from app.services import chatlog_service
@@ -152,7 +152,7 @@ async def read_user_chatlogs(
 @user_router.get("/conversations", response_model=List[chatlog_schema.ConversationInfoSchema]) # Changed response_model
 async def get_user_conversation_ids(
     db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_user),
+    current_user: Users = Depends(get_current_employee),
     skip: int = 0,
     limit: int = 100,
 ):
@@ -171,7 +171,7 @@ async def get_user_conversation_ids(
 async def get_conversation_history(
     conversation_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_user),
+    current_user: Users = Depends(get_current_employee),
     skip: int = 0,
     limit: int = 100,
 ):

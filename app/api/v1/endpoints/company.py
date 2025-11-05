@@ -57,7 +57,7 @@ async def register_employee_by_admin(
     username: str = Form(...),
     password: str = Form(...),
     division_id: Optional[int] = Form(None),
-    profile_picture_file: UploadFile = None, # File upload parameter
+    profile_picture_file: UploadFile = None,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_company_admin)
 ):
