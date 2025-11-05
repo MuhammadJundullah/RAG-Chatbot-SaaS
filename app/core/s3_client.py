@@ -62,4 +62,27 @@ class AsyncS3Client:
             logging.error(f"Failed to upload file to S3: {e}")
             raise
 
+    async def delete_file(self, bucket_name: str, file_key: str):
+        """
+        Deletes a file from an S3 bucket using delete_objects.
+
+        Args:
+            bucket_name: The name of the S3 bucket.
+            file_key: The key (path) of the file to delete in the bucket.
+        """
+        client = await self.get_client()
+        try:
+            await client.delete_objects(
+                Bucket=bucket_name,
+                Delete={
+                    "Objects": [
+                        {"Key": file_key}
+                    ]
+                }
+            )
+            logging.info(f"Successfully deleted file {file_key} from bucket {bucket_name} using delete_objects")
+        except Exception as e:
+            logging.error(f"Failed to delete file {file_key} from S3: {e}")
+            raise
+
 s3_client_manager = AsyncS3Client()

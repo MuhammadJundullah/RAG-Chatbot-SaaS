@@ -52,8 +52,10 @@ class UserRepository(BaseRepository[user_model.Users]):
         await db.refresh(user)
         return user
 
-    async def delete_user(self, db: AsyncSession, user: user_model.Users):
-        await db.delete(user)
-        await db.commit()
+    async def delete_user(self, db: AsyncSession, user_id: int):
+        user = await self.get_user(db, user_id)
+        if user:
+            await db.delete(user)
+            await db.commit()
 
 user_repository = UserRepository()

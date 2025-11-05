@@ -9,17 +9,25 @@ from app.repository.company_repository import company_repository
 from app.utils.security import get_password_hash, verify_password
 from app.models import user_model, company_model
 from app.core.config import settings
+from app.core.config import settings
 from app.core.s3_client import s3_client_manager 
 import os 
 import uuid 
 import io 
 from sqlalchemy.exc import IntegrityError
 import logging
+from botocore.exceptions import ClientError
 
 class UserRegistrationError(Exception):
     """Custom exception for registration errors."""
     def __init__(self, detail: str):
         self.detail = detail
+
+class EmployeeDeletionError(Exception):
+    """Custom exception for employee deletion errors."""
+    def __init__(self, detail: str, status_code: int = 400):
+        self.detail = detail
+        self.status_code = status_code
 
 def generate_company_code(length=6):
     """Generates a random, secure company code."""
@@ -143,6 +151,39 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
         # Catch other potential errors during user creation
         logging.error(f"An unexpected error occurred during user creation: {e}")
         raise UserRegistrationError(f"An unexpected error occurred: {e}")
+
+async def delete_employee_by_admin(db: AsyncSession, company_id: int, employee_id: int):
+    """
+    Deletes an employee if they belong to the specified company.
+    """
+    employee = await user_repository.get_user(db, user_id=employee_id)
+
+    if not employee:
+        raise EmployeeDeletionError(detail="Employee not found.", status_code=404)
+
+    if employee.company_id != company_id:
+        raise EmployeeDeletionError(detail="Not authorized to delete this employee.", status_code=403)
+
+    # If employee has a profile picture, delete it from S3
+    if employee.profile_picture_url:
+        try:
+            # Extract the S3 key from the URL
+            # Assuming the URL format is https://1xg7ah.leapcellobj.com/{bucket_name}/{s3_key}
+            # We need to remove the base URL and bucket name to get the s3_key
+            base_url = f"https://1xg7ah.leapcellobj.com/{settings.S3_BUCKET_NAME}/"
+            s3_key = employee.profile_picture_url.replace(base_url, "")
+            await s3_client_manager.delete_file(bucket_name=settings.S3_BUCKET_NAME, file_key=s3_key)
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "404":
+                logging.warning(f"Profile picture not found in S3 for employee {employee.id} (key: {s3_key}). Proceeding with user deletion.")
+            else:
+                logging.error(f"Failed to delete profile picture from S3 for employee {employee.id}: {e}")
+        except Exception as e:
+            logging.error(f"An unexpected error occurred during S3 profile picture deletion for employee {employee.id}: {e}")
+            # Decide whether to raise an error or just log it. For now, we'll log and proceed with user deletion.
+
+    await user_repository.delete_user(db, user_id=employee.id)
+    return {"message": "Employee deleted successfully."}
 
 async def authenticate_user(db: AsyncSession, password: str, email: Optional[str] = None, username: Optional[str] = None) -> Optional[user_model.Users]:
     """

@@ -6,6 +6,7 @@ from app.core.dependencies import get_current_user, get_db, get_current_company_
 from app.models.user_model import Users
 from app.schemas import company_schema, user_schema
 from app.services import company_service, user_service
+from app.services.user_service import EmployeeDeletionError
 
 router = APIRouter(
     prefix="/companies",
@@ -86,6 +87,26 @@ async def register_employee_by_admin(
     )
 
 
+@router.delete("/employees/{employee_id}", status_code=204)
+async def delete_employee_by_admin(
+    employee_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_company_admin)
+):
+    """
+    Deletes an employee within the company.
+    Requires the user to be a company administrator.
+    """
+    try:
+        await user_service.delete_employee_by_admin(
+            db=db,
+            company_id=current_user.company_id,
+            employee_id=employee_id
+        )
+        return {"message": "Employee deleted successfully"}
+    except EmployeeDeletionError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+
 @router.get("/me", response_model=company_schema.Company)
 async def read_company_by_admin(
     db: AsyncSession = Depends(get_db),
@@ -121,6 +142,28 @@ async def get_active_companies(
     db: AsyncSession = Depends(get_db),
 ):
     """Gets a list of active companies, supporting pagination."""
+    skip_calculated = (page - 1) * limit
+    return await company_service.get_active_companies_service(
+        db=db,
+        skip=skip_calculated,
+        limit=limit
+    )
+
+@router.get("/pending-approval", response_model=List[company_schema.Company])
+async def get_pending_approval_companies(
+    page: int = 1,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db),
+):
+    """Gets a list of companies that are pending approval."""
+    skip_calculated = (page - 1) * limit
+    return await company_service.get_pending_approval_companies_service(
+        db=db,
+        skip=skip_calculated,
+        limit=limit
+    )
+
+
     skip_calculated = (page - 1) * limit
     return await company_service.get_active_companies_service(
         db=db,

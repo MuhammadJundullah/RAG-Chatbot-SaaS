@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, ANY
 from app.models.user_model import Users
 from app.models.company_model import Company
 from app.core.dependencies import get_current_user, get_current_company_admin, get_current_super_admin
@@ -8,6 +8,7 @@ from app.schemas.chatlog_schema import ChatMessage
 from app.schemas.document_schema import ReferencedDocument
 from datetime import datetime
 import uuid
+from app.services.user_service import EmployeeDeletionError
 
 # --- Helper Fixtures for Dependency Overrides ---
 
@@ -89,6 +90,29 @@ def test_get_pending_approval_companies(super_admin_client):
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 2
+
+@pytest.mark.asyncio
+async def test_delete_employee_by_admin_success(override_get_current_company_admin, admin_client):
+    with patch("app.services.user_service.delete_employee_by_admin", return_value=None) as mock_delete_service:
+        response = admin_client.delete("/api/v1/companies/employees/2")
+        assert response.status_code == 204
+        mock_delete_service.assert_called_once_with(db=ANY, company_id=1, employee_id=2)
+
+@pytest.mark.asyncio
+async def test_delete_employee_by_admin_not_found(override_get_current_company_admin, admin_client):
+    with patch("app.services.user_service.delete_employee_by_admin", side_effect=EmployeeDeletionError(detail="Employee not found.", status_code=404)) as mock_delete_service:
+        response = admin_client.delete("/api/v1/companies/employees/999")
+        assert response.status_code == 404
+        assert response.json() == {"detail": "Employee not found."}
+        mock_delete_service.assert_called_once_with(db=ANY, company_id=1, employee_id=999)
+
+@pytest.mark.asyncio
+async def test_delete_employee_by_admin_unauthorized(override_get_current_company_admin, admin_client):
+    with patch("app.services.user_service.delete_employee_by_admin", side_effect=EmployeeDeletionError(detail="Not authorized to delete this employee.", status_code=403)) as mock_delete_service:
+        response = admin_client.delete("/api/v1/companies/employees/3")
+        assert response.status_code == 403
+        assert response.json() == {"detail": "Not authorized to delete this employee."}
+        mock_delete_service.assert_called_once_with(db=ANY, company_id=1, employee_id=3)
 
 @pytest.mark.asyncio
 async def test_get_conversation_details_excludes_s3_path(override_get_current_company_admin, admin_client):
