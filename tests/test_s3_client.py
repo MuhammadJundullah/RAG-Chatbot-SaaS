@@ -1,10 +1,8 @@
 import pytest
-import asyncio
 import io
 from unittest.mock import patch, AsyncMock
 
 from app.core.s3_client import AsyncS3Client
-from app.core.config import settings
 
 # Mock settings for S3 client
 MOCK_S3_ENDPOINT_URL = "http://localhost:9000"

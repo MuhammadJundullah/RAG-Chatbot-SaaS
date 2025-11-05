@@ -140,6 +140,7 @@ async def get_conversation_details_as_company_admin(
         username=chat_user.username,
         division_name=division_name,
         chat_history=chat_history,
+        company_id=current_user.company_id,
         referenced_documents=referenced_documents_response,
     )
 

@@ -7,7 +7,6 @@ from app.services.rag_service import rag_service
 from app.services.gemini_service import gemini_service
 from app.models.user_model import Users
 from app.repository.chatlog_repository import chatlog_repository
-from app.models.conversation_model import Conversation # Import Conversation model
 from app.schemas.conversation_schema import ConversationCreate, ConversationListResponse # Import ConversationCreate and ListResponse schemas
 from app.repository.conversation_repository import conversation_repository # Import conversation repository
 from fastapi import HTTPException, status # Import HTTPException and status

@@ -7,7 +7,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 from sqlalchemy import Boolean
-from typing import Optional
 
 
 class Users(Base):

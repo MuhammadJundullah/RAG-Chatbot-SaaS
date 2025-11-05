@@ -3,8 +3,6 @@ from aiobotocore.config import AioConfig
 from app.core.config import settings
 import logging
 import io
-import os # Import os for path manipulation
-import uuid # Import uuid for generating unique IDs
 
 class AsyncS3Client:
     def __init__(self):

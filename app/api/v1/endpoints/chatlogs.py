@@ -124,8 +124,7 @@ async def get_conversation_details_as_company_admin(
         current_user=current_user,
         conversation_id=conversation_id,
     )
-    return conversation_details
-
+    return {**conversation_details.model_dump(), "company_id": current_user.company_id}
 
 @user_router.get("/", response_model=List[chatlog_schema.Chatlog])
 async def read_user_chatlogs(

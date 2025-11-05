@@ -1,16 +1,12 @@
 from sqlalchemy import (
     Column,
-    Integer,
     String,
-    ForeignKey,
     DateTime,
-    func,
-    Text
+    func
 )
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
-from sqlalchemy.orm import relationship
 from app.models.base import Base
 
 class Conversation(Base):

@@ -1,10 +1,8 @@
-import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock, ANY
+from unittest.mock import patch
 from fastapi import HTTPException
 from app.main import app
 from app.models.document_model import Documents, DocumentStatus
-from app.models.user_model import Users
 
 
 # --- Test Functions using admin_client fixture ---

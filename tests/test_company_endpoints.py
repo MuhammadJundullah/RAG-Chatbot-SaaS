@@ -1,18 +1,13 @@
 import pytest
-import httpx
 from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock
 import io
-import json # Import json
 
 from app.main import app
-from app.models.user_model import Users
-from app.core.config import settings
 from app.services import user_service # Import user_service
 from app.core.s3_client import s3_client_manager # Import s3_client_manager
 
 # Assuming conftest.py provides admin_client fixture
-from tests.conftest import admin_client, mock_db_session
 
 # Mock settings for S3 client
 MOCK_S3_ENDPOINT_URL = "http://localhost:9000"
@@ -57,7 +52,7 @@ async def test_register_employee_with_profile_picture(
     
     # Patch the service and s3 client manager
     with patch.object(user_service, 'register_employee_by_admin', return_value=mock_registered_user) as mock_register_service, \
-         patch.object(s3_client_manager, 'upload_file', new=mock_s3_upload) as mock_s3_upload_method, \
+         patch.object(s3_client_manager, 'upload_file', new=mock_s3_upload), \
          patch.object(app.dependency_overrides.get('get_db'), '__call__', return_value=mock_db_session): # Mock get_db dependency
         
         # Prepare employee data

@@ -1,6 +1,5 @@
 import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 from app.models.user_model import Users
 from app.models.company_model import Company
 from app.core.dependencies import get_current_user, get_current_company_admin, get_current_super_admin

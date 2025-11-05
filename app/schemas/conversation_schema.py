@@ -44,3 +44,4 @@ class ConversationDetailResponse(BaseModel):
     division_name: Optional[str]
     chat_history: List[chatlog_schema.ChatMessage]
     referenced_documents: List[document_schema.ReferencedDocument]
+    company_id: int

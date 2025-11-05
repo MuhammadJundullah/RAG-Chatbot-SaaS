@@ -3,7 +3,6 @@ from sentence_transformers import SentenceTransformer
 from app.core.config import settings
 from typing import List, Dict, Any, Optional
 import uuid
-import os
 import asyncio
 
 class RAGService:
