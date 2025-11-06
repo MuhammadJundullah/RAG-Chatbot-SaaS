@@ -56,14 +56,15 @@ async def register_employee_by_admin(
     email: str = Form(...),
     username: str = Form(...),
     password: str = Form(...),
-    division_id: Optional[int] = Form(None),
+    division_name: Optional[str] = Form(None), # Changed from division_id to division_name
     profile_picture_file: UploadFile = None,
     db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_company_admin)
+    current_user: Users = Depends(get_current_company_admin) # Added current_user dependency
 ):
     """
     Registers a new employee within the company, including uploading a profile picture.
     Requires the user to be a company administrator.
+    If a division name is provided and the division does not exist, it will be created.
     """
     try:
         # Manually construct the Pydantic model from form parameters
@@ -72,17 +73,18 @@ async def register_employee_by_admin(
             email=email,
             username=username,
             password=password,
-            division_id=division_id
+            division_name=division_name # Use division_name here
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid employee data format: {e}")
 
     # The company_id will be derived from the current_user
-    # Call the user_service function and pass the profile picture file
+    # Call the user_service function and pass the profile picture file and current_user
     return await user_service.register_employee_by_admin(
         db=db,
         company_id=current_user.company_id,
         employee_data=employee_data,
+        current_user=current_user, # Pass current_user to the service
         profile_picture_file=profile_picture_file
     )
 

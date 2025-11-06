@@ -24,4 +24,12 @@ class DivisionRepository(BaseRepository[division_model.Division]):
         )
         return result.scalars().all()
 
+    async def get_division_by_name(self, db: AsyncSession, company_id: int, name: str) -> Optional[division_model.Division]:
+        result = await db.execute(
+            select(self.model)
+            .filter(self.model.company_id == company_id, self.model.name == name)
+            .limit(1)
+        )
+        return result.scalars().first()
+
 division_repository = DivisionRepository()

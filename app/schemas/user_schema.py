@@ -57,4 +57,4 @@ class EmployeeRegistrationByAdmin(BaseModel):
     email: str
     username: str
     password: str
-    division_id: Optional[int] = None
+    division_name: Optional[str] = None

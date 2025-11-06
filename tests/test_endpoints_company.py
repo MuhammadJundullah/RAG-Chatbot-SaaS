@@ -9,6 +9,8 @@ from app.schemas.document_schema import ReferencedDocument
 from datetime import datetime
 import uuid
 from app.services.user_service import EmployeeDeletionError
+from app.schemas.user_schema import User # Import User schema for mock response
+from app.models.division_model import Division # Import Division model for mock
 
 # --- Helper Fixtures for Dependency Overrides ---
 
@@ -160,3 +162,174 @@ async def test_get_conversation_details_excludes_s3_path(override_get_current_co
         assert response_data["conversation_id"] == mock_conversation_id
         assert response_data["referenced_documents"][0]["title"] == "Doc 1"
         assert response_data["referenced_documents"][1]["title"] == "Doc 2"
+
+# --- New Test for Employee Registration ---
+
+@pytest.mark.asyncio
+async def test_register_employee_by_admin_new_division(override_get_current_company_admin, admin_client):
+    # Mock data for the request
+    employee_data = {
+        "name": "New Employee",
+        "email": "new.employee@example.com",
+        "username": "newemp",
+        "password": "password123",
+        "division_name": "R&D" # New division
+    }
+    
+    # Mock the division service to simulate creating a new division
+    mock_division = Division(id=10, name="R&D", company_id=1)
+    mock_get_division = patch("app.services.division_service.get_division_by_name_service", return_value=None)
+    mock_create_division = patch("app.services.division_service.create_division_service", return_value=mock_division)
+
+    # Mock the user service to simulate successful employee registration
+    mock_user = User(
+        id=5,
+        name="New Employee",
+        email="new.employee@example.com",
+        username="newemp",
+        role="employee",
+        company_id=1,
+        division_id=10, # Should be the ID of the new division
+        is_active=True,
+        profile_picture_url=None
+    )
+    mock_register_user = patch("app.services.user_service.register_employee_by_admin", return_value=mock_user)
+
+    with mock_get_division as m_get, mock_create_division as m_create, mock_register_user as m_register:
+        response = admin_client.post("/api/v1/companies/employees/register", data=employee_data)
+        
+        assert response.status_code == 200
+        response_data = response.json()
+        
+        # Assertions for the response
+        assert response_data["name"] == "New Employee"
+        assert response_data["email"] == "new.employee@example.com"
+        assert response_data["username"] == "newemp"
+        assert response_data["role"] == "employee"
+        assert response_data["company_id"] == 1
+        assert response_data["division_id"] == 10 # Verify the new division ID
+        assert response_data["profile_picture_url"] is None
+
+        # Assertions for mock calls
+        m_get.assert_called_once_with(ANY, 1, "R&D")
+        m_create.assert_called_once_with(db=ANY, division_name="R&D", current_user=ANY)
+        m_register.assert_called_once_with(
+            db=ANY,
+            company_id=1,
+            employee_data=ANY, # EmployeeRegistrationByAdmin object
+            current_user=ANY,
+            profile_picture_file=None
+        )
+
+@pytest.mark.asyncio
+async def test_register_employee_by_admin_existing_division(override_get_current_company_admin, admin_client):
+    # Mock data for the request
+    employee_data = {
+        "name": "Existing Employee",
+        "email": "existing.employee@example.com",
+        "username": "exemp",
+        "password": "password456",
+        "division_name": "Sales" # Existing division
+    }
+    
+    # Mock the division service to simulate using an existing division
+    mock_division = Division(id=5, name="Sales", company_id=1)
+    mock_get_division = patch("app.services.division_service.get_division_by_name_service", return_value=mock_division)
+    mock_create_division = patch("app.services.division_service.create_division_service") # Should not be called
+
+    # Mock the user service to simulate successful employee registration
+    mock_user = User(
+        id=6,
+        name="Existing Employee",
+        email="existing.employee@example.com",
+        username="exemp",
+        role="employee",
+        company_id=1,
+        division_id=5, # Should be the ID of the existing division
+        is_active=True,
+        profile_picture_url=None
+    )
+    mock_register_user = patch("app.services.user_service.register_employee_by_admin", return_value=mock_user)
+
+    with mock_get_division as m_get, mock_create_division as m_create, mock_register_user as m_register:
+        response = admin_client.post("/api/v1/companies/employees/register", data=employee_data)
+        
+        assert response.status_code == 200
+        response_data = response.json()
+        
+        # Assertions for the response
+        assert response_data["name"] == "Existing Employee"
+        assert response_data["email"] == "existing.employee@example.com"
+        assert response_data["username"] == "exemp"
+        assert response_data["role"] == "employee"
+        assert response_data["company_id"] == 1
+        assert response_data["division_id"] == 5 # Verify the existing division ID
+        assert response_data["profile_picture_url"] is None
+
+        # Assertions for mock calls
+        m_get.assert_called_once_with(ANY, 1, "Sales")
+        m_create.assert_not_called() # Ensure create_division_service was not called
+        m_register.assert_called_once_with(
+            db=ANY,
+            company_id=1,
+            employee_data=ANY, # EmployeeRegistrationByAdmin object
+            current_user=ANY,
+            profile_picture_file=None
+        )
+
+@pytest.mark.asyncio
+async def test_register_employee_by_admin_no_division(override_get_current_company_admin, admin_client):
+    # Mock data for the request
+    employee_data = {
+        "name": "No Division Employee",
+        "email": "nodiv.employee@example.com",
+        "username": "nodivemp",
+        "password": "password789",
+        # No division_name or division_id provided
+    }
+    
+    # Mock the user service to simulate successful employee registration with no division
+    mock_user = User(
+        id=7,
+        name="No Division Employee",
+        email="nodiv.employee@example.com",
+        username="nodivemp",
+        role="employee",
+        company_id=1,
+        division_id=None, # Should be None
+        is_active=True,
+        profile_picture_url=None
+    )
+    mock_register_user = patch("app.services.user_service.register_employee_by_admin", return_value=mock_user)
+
+    # Mock division services to ensure they are not called
+    mock_get_division = patch("app.services.division_service.get_division_by_name_service")
+    mock_create_division = patch("app.services.division_service.create_division_service")
+
+    with mock_get_division as m_get, mock_create_division as m_create, mock_register_user as m_register:
+        response = admin_client.post("/api/v1/companies/employees/register", data=employee_data)
+        
+        assert response.status_code == 200
+        response_data = response.json()
+        
+        # Assertions for the response
+        assert response_data["name"] == "No Division Employee"
+        assert response_data["email"] == "nodiv.employee@example.com"
+        assert response_data["username"] == "nodivemp"
+        assert response_data["role"] == "employee"
+        assert response_data["company_id"] == 1
+        assert response_data["division_id"] is None # Verify division_id is None
+        assert response_data["profile_picture_url"] is None
+
+        # Assertions for mock calls
+        m_get.assert_not_called()
+        m_create.assert_not_called()
+        m_register.assert_called_once_with(
+            db=ANY,
+            company_id=1,
+            employee_data=ANY, # EmployeeRegistrationByAdmin object
+            current_user=ANY,
+            profile_picture_file=None
+        )
+
+# --- End of New Test ---

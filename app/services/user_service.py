@@ -9,7 +9,6 @@ from app.repository.company_repository import company_repository
 from app.utils.security import get_password_hash, verify_password
 from app.models import user_model, company_model
 from app.core.config import settings
-from app.core.config import settings
 from app.core.s3_client import s3_client_manager 
 import os 
 import uuid 
@@ -17,6 +16,7 @@ import io
 from sqlalchemy.exc import IntegrityError
 import logging
 from botocore.exceptions import ClientError
+from app.services import division_service # Import division_service
 
 class UserRegistrationError(Exception):
     """Custom exception for registration errors."""
@@ -84,10 +84,11 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
     # Data Layer: Save the new user to the database
     return await user_repository.create_user(db, user=db_user)
 
-async def register_employee_by_admin(db: AsyncSession, employee_data: user_schema.EmployeeRegistrationByAdmin, company_id: int, profile_picture_file: UploadFile = None):
+async def register_employee_by_admin(db: AsyncSession, employee_data: user_schema.EmployeeRegistrationByAdmin, company_id: int, current_user: user_model.Users, profile_picture_file: UploadFile = None):
     """
     Registers a new employee by an admin, including uploading a profile picture to S3.
     Handles potential username uniqueness violations from the database.
+    If a division name is provided and the division does not exist, it will be created.
     """
     existing_user_by_email = await user_repository.get_user_by_email(db, email=employee_data.email)
     if existing_user_by_email:
@@ -98,6 +99,26 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
         raise UserRegistrationError("Username is already registered.")
 
     hashed_password = get_password_hash(employee_data.password)
+
+    division_id = None
+    if employee_data.division_name:
+        division = await division_service.get_division_by_name_service(db, company_id, employee_data.division_name)
+        if division:
+            division_id = division.id
+        else:
+            # Division does not exist, create it
+            try:
+                new_division = await division_service.create_division_service(
+                    db=db,
+                    division_name=employee_data.division_name,
+                    current_user=current_user # Pass current_user to create_division_service
+                )
+                division_id = new_division.id
+            except Exception as e:
+                logging.error(f"Failed to create division '{employee_data.division_name}': {e}")
+                raise UserRegistrationError(f"Failed to create division '{employee_data.division_name}'. Please try again or contact support.")
+    elif employee_data.division_id: # Fallback to division_id if division_name is not provided but division_id is
+        division_id = employee_data.division_id
 
     profile_picture_url = None
     if profile_picture_file and profile_picture_file.filename:
@@ -133,7 +154,7 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
         password=hashed_password,
         role="employee",
         company_id=company_id,
-        division_id=employee_data.division_id,
+        division_id=division_id, # Use the determined division_id
         profile_picture_url=profile_picture_url
     )
 
