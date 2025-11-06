@@ -6,7 +6,7 @@ from app.core.dependencies import get_current_user, get_db, get_current_company_
 from app.models.user_model import Users
 from app.schemas import company_schema, user_schema
 from app.services import company_service, user_service
-from app.services.user_service import EmployeeDeletionError
+from app.services.user_service import EmployeeDeletionError, UserRegistrationError
 
 router = APIRouter(
     prefix="/companies",
@@ -78,15 +78,18 @@ async def register_employee_by_admin(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid employee data format: {e}")
 
-    # The company_id will be derived from the current_user
-    # Call the user_service function and pass the profile picture file and current_user
-    return await user_service.register_employee_by_admin(
-        db=db,
-        company_id=current_user.company_id,
-        employee_data=employee_data,
-        current_user=current_user, # Pass current_user to the service
-        profile_picture_file=profile_picture_file
-    )
+    try:
+        # The company_id will be derived from the current_user
+        # Call the user_service function and pass the profile picture file and current_user
+        return await user_service.register_employee_by_admin(
+            db=db,
+            company_id=current_user.company_id,
+            employee_data=employee_data,
+            current_user=current_user, # Pass current_user to the service
+            profile_picture_file=profile_picture_file
+        )
+    except UserRegistrationError as e:
+        raise HTTPException(status_code=400, detail=e.detail)
 
 
 @router.delete("/employees/{employee_id}", status_code=204)
