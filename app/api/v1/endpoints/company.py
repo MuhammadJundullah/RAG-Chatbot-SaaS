@@ -6,7 +6,7 @@ from app.core.dependencies import get_current_user, get_db, get_current_company_
 from app.models.user_model import Users
 from app.schemas import company_schema, user_schema
 from app.services import company_service, user_service
-from app.services.user_service import EmployeeDeletionError, UserRegistrationError
+from app.services.user_service import EmployeeDeletionError, UserRegistrationError, EmployeeUpdateError
 
 router = APIRouter(
     prefix="/companies",
@@ -56,7 +56,7 @@ async def register_employee_by_admin(
     email: str = Form(...),
     username: str = Form(...),
     password: str = Form(...),
-    division_name: Optional[str] = Form(None), # Changed from division_id to division_name
+    division: Optional[str] = Form(None), # Changed from division_id to division
     profile_picture_file: UploadFile = None,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_company_admin) # Added current_user dependency
@@ -73,7 +73,7 @@ async def register_employee_by_admin(
             email=email,
             username=username,
             password=password,
-            division_name=division_name # Use division_name here
+            division=division # Use division here
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid employee data format: {e}")
@@ -90,6 +90,41 @@ async def register_employee_by_admin(
         )
     except UserRegistrationError as e:
         raise HTTPException(status_code=400, detail=e.detail)
+
+@router.put("/employees/{employee_id}", response_model=user_schema.User)
+async def update_employee_by_admin(
+    employee_id: int,
+    name: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
+    username: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
+    division: Optional[str] = Form(None),
+    profile_picture_file: Optional[UploadFile] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_company_admin)
+):
+    """
+    Updates an employee's information, including their profile picture.
+    Requires the user to be a company administrator.
+    """
+    employee_data = user_schema.EmployeeUpdate(
+        name=name,
+        email=email,
+        username=username,
+        password=password,
+        division=division
+    )
+
+    try:
+        return await user_service.update_employee_by_admin(
+            db=db,
+            company_id=current_user.company_id,
+            employee_id=employee_id,
+            employee_data=employee_data,
+            profile_picture_file=profile_picture_file
+        )
+    except EmployeeUpdateError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
 
 
 @router.delete("/employees/{employee_id}", status_code=204)

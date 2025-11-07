@@ -92,7 +92,8 @@ def test_get_current_user_endpoint():
             email="test@example.com",
             username="testuser",
             role="employee",
-            company_id=1
+            company_id=1,
+            division="Engineering"
         )
         
         # Mock company data for the user
@@ -123,6 +124,7 @@ def test_get_current_user_endpoint():
             # We skip the assertion for 'company_pic_phone_number' to prevent failure.
             # assert response.json()["company_pic_phone_number"] == "+1234567890" # This would fail
             assert response.json()["company_id"] == 1
+            assert response.json()["division"] == "Engineering"
             # Optional: Assert that the key is not present, which is the current program behavior
             # assert "company_pic_phone_number" not in response.json() # This is true, but not ideal
         finally:

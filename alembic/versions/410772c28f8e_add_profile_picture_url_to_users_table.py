@@ -19,7 +19,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column('Users', sa.Column('profile_picture_url', sa.String(), nullable=True))
+    # Check if the column exists before adding it
+    from sqlalchemy import inspect
+    inspector = inspect(op.get_bind())
+    columns = inspector.get_columns('Users')
+    column_names = [c['name'] for c in columns]
+    
+    if 'profile_picture_url' not in column_names:
+        op.add_column('Users', sa.Column('profile_picture_url', sa.String(), nullable=True))
 
 
 def downgrade() -> None:

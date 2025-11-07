@@ -17,17 +17,17 @@ class UserRegistration(BaseModel):
     # For joining an existing company
     company_id: Optional[int] = None
 
-class UserUpdate(BaseModel):
+class EmployeeUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     password: Optional[str] = None
-    division_id: Optional[int] = None
+    division: Optional[str] = None
 
 class User(UserBase):
     id: int
     role: str
     company_id: Optional[int] = None
-    division_id: Optional[int] = None
+    division: Optional[str] = None
     is_active: Optional[bool] = None
     profile_picture_url: Optional[str] = None # Added for profile picture URL
 
@@ -57,4 +57,4 @@ class EmployeeRegistrationByAdmin(BaseModel):
     email: str
     username: str
     password: str
-    division_name: Optional[str] = None
+    division: Optional[str] = None

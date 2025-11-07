@@ -21,7 +21,7 @@ class UserRepository(BaseRepository[user_model.Users]):
     async def get_user(self, db: AsyncSession, user_id: int) -> Optional[user_model.Users]:
         result = await db.execute(
             select(self.model)
-            .options(joinedload(self.model.division), joinedload(self.model.company))
+            .options(joinedload(self.model.company))
             .filter(self.model.id == user_id)
         )
         return result.scalar_one_or_none()

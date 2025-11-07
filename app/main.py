@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1.endpoints import auth, chat, documents, company, divisions, chatlogs, admin
+from app.api.v1.endpoints import auth, chat, documents, company, chatlogs, admin
 from app.core.database import db_manager
 
 # No complex lifespan needed with gevent and simple singleton initialization
@@ -31,7 +31,6 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(company.router, prefix="/api")
-app.include_router(divisions.router, prefix="/api")
 app.include_router(chatlogs.user_router, prefix="/api")
 app.include_router(chatlogs.admin_router, prefix="/api")
 app.include_router(chatlogs.company_admin_router, prefix="/api")

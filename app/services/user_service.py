@@ -16,7 +16,6 @@ import io
 from sqlalchemy.exc import IntegrityError
 import logging
 from botocore.exceptions import ClientError
-from app.services import division_service # Import division_service
 
 class UserRegistrationError(Exception):
     """Custom exception for registration errors."""
@@ -25,6 +24,12 @@ class UserRegistrationError(Exception):
 
 class EmployeeDeletionError(Exception):
     """Custom exception for employee deletion errors."""
+    def __init__(self, detail: str, status_code: int = 400):
+        self.detail = detail
+        self.status_code = status_code
+
+class EmployeeUpdateError(Exception):
+    """Custom exception for employee update errors."""
     def __init__(self, detail: str, status_code: int = 400):
         self.detail = detail
         self.status_code = status_code
@@ -100,26 +105,6 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
 
     hashed_password = get_password_hash(employee_data.password)
 
-    division_id = None
-    if employee_data.division_name:
-        division = await division_service.get_division_by_name_service(db, company_id, employee_data.division_name)
-        if division:
-            division_id = division.id
-        else:
-            # Division does not exist, create it
-            try:
-                new_division = await division_service.create_division_service(
-                    db=db,
-                    division_name=employee_data.division_name,
-                    current_user=current_user # Pass current_user to create_division_service
-                )
-                division_id = new_division.id
-            except Exception as e:
-                logging.error(f"Failed to create division '{employee_data.division_name}': {e}")
-                raise UserRegistrationError(f"Failed to create division '{employee_data.division_name}'. Please try again or contact support.")
-    elif employee_data.division_id: # Fallback to division_id if division_name is not provided but division_id is
-        division_id = employee_data.division_id
-
     profile_picture_url = None
     if profile_picture_file and profile_picture_file.filename:
         # Generate file extension and a unique identifier
@@ -154,7 +139,7 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
         password=hashed_password,
         role="employee",
         company_id=company_id,
-        division_id=division_id, # Use the determined division_id
+        division=employee_data.division, # Use the determined division
         profile_picture_url=profile_picture_url
     )
 
@@ -205,6 +190,60 @@ async def delete_employee_by_admin(db: AsyncSession, company_id: int, employee_i
 
     await user_repository.delete_user(db, user_id=employee.id)
     return {"message": "Employee deleted successfully."}
+
+async def update_employee_by_admin(
+    db: AsyncSession, 
+    company_id: int, 
+    employee_id: int, 
+    employee_data: user_schema.EmployeeUpdate, 
+    profile_picture_file: UploadFile = None
+) -> user_model.Users:
+    """
+    Updates an employee's data, including their profile picture.
+    """
+    employee = await user_repository.get_user(db, user_id=employee_id)
+
+    if not employee or employee.company_id != company_id:
+        raise EmployeeUpdateError(detail="Employee not found or not part of your company.", status_code=404)
+
+    update_data = employee_data.model_dump(exclude_unset=True)
+
+    if "password" in update_data and update_data["password"]:
+        update_data["password"] = get_password_hash(update_data["password"])
+
+    if profile_picture_file and profile_picture_file.filename:
+        file_extension = os.path.splitext(profile_picture_file.filename)[1]
+        logo_uuid = str(uuid.uuid4())
+        s3_key = f"employee_profile_pictures/{company_id}/{logo_uuid}{file_extension}"
+        
+        try:
+            file_content = await profile_picture_file.read()
+            file_object = io.BytesIO(file_content)
+            
+            await s3_client_manager.upload_file(
+                file_object=file_object,
+                bucket_name=settings.S3_BUCKET_NAME,
+                file_key=s3_key,
+                content_type=profile_picture_file.content_type
+            )
+            new_profile_picture_url = f"https://1xg7ah.leapcellobj.com/{settings.S3_BUCKET_NAME}/{s3_key}"
+
+            if employee.profile_picture_url:
+                base_url = f"https://1xg7ah.leapcellobj.com/{settings.S3_BUCKET_NAME}/"
+                old_s3_key = employee.profile_picture_url.replace(base_url, "")
+                await s3_client_manager.delete_file(bucket_name=settings.S3_BUCKET_NAME, file_key=old_s3_key)
+
+            update_data["profile_picture_url"] = new_profile_picture_url
+        except Exception as e:
+            logging.error(f"Failed to upload profile picture for employee {employee.id}: {e}")
+            raise EmployeeUpdateError(f"Failed to upload profile picture: {e}")
+
+    for field, value in update_data.items():
+        setattr(employee, field, value)
+
+    await db.commit()
+    await db.refresh(employee)
+    return employee
 
 async def authenticate_user(db: AsyncSession, password: str, email: Optional[str] = None, username: Optional[str] = None) -> Optional[user_model.Users]:
     """

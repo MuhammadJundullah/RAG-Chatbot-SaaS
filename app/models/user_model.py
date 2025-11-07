@@ -18,11 +18,10 @@ class Users(Base):
     password = Column(String(255))
     role = Column(String(50), nullable=False)
     company_id = Column(Integer, ForeignKey("Company.id"), nullable=True)
-    division_id = Column(Integer, ForeignKey("Division.id"), nullable=True)
+    division = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True)
     profile_picture_url = Column(String, nullable=True) # Added for profile picture URL
 
 
     company = relationship("Company", back_populates="users")
-    division = relationship("Division", back_populates="users")
     chatlogs = relationship("Chatlogs", back_populates="user")

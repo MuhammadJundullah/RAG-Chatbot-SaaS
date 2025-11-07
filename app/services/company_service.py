@@ -7,7 +7,6 @@ import os
 from botocore.exceptions import ClientError
 
 from app.repository.company_repository import company_repository
-from app.repository.division_repository import division_repository
 from app.models import user_model
 from app.schemas import user_schema, company_schema
 from app.services import user_service
@@ -32,32 +31,6 @@ async def get_company_by_user_service(
     if db_company is None:
         raise HTTPException(status_code=404, detail="Company not found for this user.")
     return db_company
-
-# Renamed from register_employee_by_company_admin_service to register_employee_service
-async def register_employee_by_admin_service(
-    db: AsyncSession,
-    employee_data: user_schema.EmployeeRegistrationByAdmin,
-    company_id: int # Explicitly taking company_id as an argument
-) -> user_schema.User:
-    if employee_data.division_id:
-        division = await division_repository.get_division(db, employee_data.division_id)
-        if not division or division.company_id != company_id: # Use company_id argument
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Division not found or does not belong to your company."
-            )
-
-    try:
-        # Pass company_id directly to user_service.register_employee_by_admin
-        new_employee = await user_service.register_employee_by_admin(
-            db, employee_data=employee_data, company_id=company_id
-        )
-        return new_employee
-    except user_service.UserRegistrationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=e.detail,
-        )
 
 async def update_company_by_admin_service(
     db: AsyncSession,
