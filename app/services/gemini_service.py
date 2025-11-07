@@ -30,7 +30,13 @@ class GeminiService:
         role_name = current_user.role if current_user.role else "employee"
 
         # Get division name
-        division_name = current_user.division.name if current_user.division else "general"
+        division_name = "general"
+        if current_user and current_user.division:
+            if isinstance(current_user.division, str):
+                division_name = current_user.division
+            elif hasattr(current_user.division, 'name'):
+                division_name = current_user.division.name
+
 
         system_instruction = f"""You are a specialized AI business assistant for {company_name}. Your role is to help employees by answering questions and providing data-driven insights.
 
