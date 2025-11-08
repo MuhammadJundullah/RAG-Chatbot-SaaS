@@ -113,9 +113,11 @@ async def get_conversation_details_as_company_admin(
             for doc_id in chatlog.referenced_document_ids:
                 referenced_doc_ids.add(int(doc_id))
 
-    referenced_documents = await document_repository.get_documents_by_ids(db, list(referenced_doc_ids))
+    referenced_documents = [] # Initialize to empty list
+    if referenced_doc_ids: # Fetch only if there are IDs
+        referenced_documents = await document_repository.get_documents_by_ids(db, list(referenced_doc_ids))
 
-    division_name = chat_user.division.name if chat_user.division else None
+    division_name = chat_user.division if chat_user.division else None
 
     chat_history = [
         chatlog_schema.ChatMessage(
