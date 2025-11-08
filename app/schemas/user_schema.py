@@ -2,7 +2,7 @@ from pydantic import BaseModel, model_validator
 from typing import Optional
 
 class UserBase(BaseModel):
-    name: str
+    name: Optional[str] = None
     email: Optional[str] = None
     username: Optional[str] = None
 
