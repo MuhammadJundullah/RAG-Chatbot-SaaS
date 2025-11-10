@@ -289,10 +289,12 @@ async def send_brevo_email(to_email: str, subject: str, html_content: str):
     Sends a transactional email using Brevo API.
     """
     # Konfigurasi API Key Brevo
-    sib_api_v3_sdk.configuration.api_key['api-key'] = settings.BREVO_API_KEY
+    configuration = sib_api_v3_sdk.Configuration()
+    configuration.api_key['api-key'] = settings.BREVO_API_KEY
     
     # Instantiate the TransactionalEmailsApi client
-    transactional_api = sib_api_v3_sdk.TransactionalEmailsApi()
+    api_client = sib_api_v3_sdk.ApiClient(configuration)
+    transactional_api = sib_api_v3_sdk.TransactionalEmailsApi(api_client)
 
     # Tentukan detail pengirim
     # Mengambil dari environment variable atau menggunakan default

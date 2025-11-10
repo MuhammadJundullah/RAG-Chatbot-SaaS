@@ -93,7 +93,7 @@ class RAGService:
         for doc, emb in zip(documents, embeddings):
             vector_id = str(uuid.uuid4())
             metadata = {'source': source_filename, 'content': doc, 'document_id': document_id}
-            if tags: # Add tags to metadata if provided
+            if tags:
                 metadata['tags'] = tags
             vectors_to_upsert.append((vector_id, emb, metadata))
         await asyncio.to_thread(self.index.upsert, vectors=vectors_to_upsert, namespace=namespace)

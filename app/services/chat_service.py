@@ -7,9 +7,9 @@ from app.services.rag_service import rag_service
 from app.services.gemini_service import gemini_service
 from app.models.user_model import Users
 from app.repository.chatlog_repository import chatlog_repository
-from app.schemas.conversation_schema import ConversationCreate, ConversationListResponse # Import ConversationCreate and ListResponse schemas
-from app.repository.conversation_repository import conversation_repository # Import conversation repository
-from fastapi import HTTPException, status # Import HTTPException and status
+from app.schemas.conversation_schema import ConversationCreate, ConversationListResponse 
+from app.repository.conversation_repository import conversation_repository 
+from fastapi import HTTPException, status
 
 # Placeholder for LLM-based title generation
 async def generate_conversation_title(user_message: str, conversation_history: list) -> str:
@@ -57,11 +57,11 @@ async def process_chat_message(
 
     # 1. Get chat history for context
     conversation_history = []
-    if request.conversation_id: # Use the original request.conversation_id if provided
+    if request.conversation_id: 
         # Validate the provided conversation_id
         try:
             valid_conversation_id = uuid.UUID(request.conversation_id)
-            conversation_id_str = str(valid_conversation_id) # Ensure conversation_id_str is the validated UUID string
+            conversation_id_str = str(valid_conversation_id)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -76,7 +76,7 @@ async def process_chat_message(
             # For simplicity, using user_message here. A real LLM would use history too.
             conversation_title = await generate_conversation_title(user_message=user_message, conversation_history=[])
             conversation_create_schema = ConversationCreate(
-                id=conversation_id_str, # Use the ID provided by the frontend
+                id=conversation_id_str,
                 title=conversation_title
             )
             await conversation_repository.create_conversation(db=db, conversation=conversation_create_schema)
@@ -85,7 +85,7 @@ async def process_chat_message(
         # Fetch history for the conversation (either existing or newly created)
         history_records = await chatlog_repository.get_chat_history(
             db=db,
-            conversation_id=conversation_id_str, # Use the validated and existing/newly created conversation_id
+            conversation_id=conversation_id_str, 
             user_id=current_user.id
         )
         conversation_history = [{"question": record.question, "answer": record.answer} for record in history_records]
@@ -93,7 +93,7 @@ async def process_chat_message(
         # Fetch history for the newly created conversation_id_str to ensure consistency
         history_records = await chatlog_repository.get_chat_history(
             db=db,
-            conversation_id=conversation_id_str, # Use the newly created conversation_id
+            conversation_id=conversation_id_str,
             user_id=current_user.id
         )
         conversation_history = [{"question": record.question, "answer": record.answer} for record in history_records]
@@ -125,7 +125,7 @@ async def process_chat_message(
         answer=full_response,
         UsersId=current_user.id,
         company_id=company_id,
-        conversation_id=conversation_id_str, # Use the conversation_id (either provided or newly created)
+        conversation_id=conversation_id_str,
         referenced_document_ids=document_ids
     )
     await chatlog_repository.create_chatlog(db=db, chatlog=chatlog_data)
