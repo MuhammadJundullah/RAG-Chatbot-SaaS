@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str
     PUBLIC_S3_BASE_URL: str = "https://1xg7ah.leapcellobj.com"
 
+    # Brevo (SendGrid) settings
+    BREVO_API_KEY: str 
+    DEFAULT_SENDER_EMAIL: str
+
+    # Application base URL for links
+    APP_BASE_URL: str = "http://localhost:8000"
+    APP_NAME: str
+
     # Redis settings for Celery
     REDIS_URL: str = "redis://localhost:6379/0"
 

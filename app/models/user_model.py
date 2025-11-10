@@ -2,11 +2,13 @@ from sqlalchemy import (
     Column,
     Integer,
     String,
-    ForeignKey
+    ForeignKey,
+    DateTime # Import DateTime
 )
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 from sqlalchemy import Boolean
+from datetime import datetime # Import datetime for default value
 
 
 class Users(Base):
@@ -22,6 +24,9 @@ class Users(Base):
     is_active = Column(Boolean, default=True)
     profile_picture_url = Column(String, nullable=True) # Added for profile picture URL
 
+    # Added fields for password reset
+    reset_token = Column(String(255), nullable=True)
+    reset_token_expiry = Column(DateTime, nullable=True)
 
     company = relationship("Company", back_populates="users")
     chatlogs = relationship("Chatlogs", back_populates="user")

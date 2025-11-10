@@ -1,4 +1,4 @@
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, Field, EmailStr # Import Field and EmailStr
 from typing import Optional
 
 class UserBase(BaseModel):
@@ -58,3 +58,9 @@ class EmployeeRegistrationByAdmin(BaseModel):
     username: str
     password: str
     division: Optional[str] = None
+
+# New schema for password reset request
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+    token: str
+    new_password: str = Field(..., min_length=8) # Enforce minimum password length

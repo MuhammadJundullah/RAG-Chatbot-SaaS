@@ -27,3 +27,5 @@ redis==5.0.1
 httpx==0.25.2
 alembic==1.13.1 # Added for database migrations
 gunicorn
+sib-api-v3-sdk
+pydantic[email]

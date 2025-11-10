@@ -1,8 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
 import secrets
 import string
-from fastapi import UploadFile 
+from typing import Optional
+from fastapi import UploadFile, HTTPException, status
 from app.schemas import user_schema
 from app.repository.user_repository import user_repository
 from app.repository.company_repository import company_repository
@@ -16,6 +16,9 @@ import io
 from sqlalchemy.exc import IntegrityError
 import logging
 from botocore.exceptions import ClientError
+from datetime import datetime, timedelta 
+import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
 
 class UserRegistrationError(Exception):
     """Custom exception for registration errors."""
@@ -37,6 +40,11 @@ class EmployeeUpdateError(Exception):
 def generate_company_code(length=6):
     """Generates a random, secure company code."""
     alphabet = string.ascii_uppercase + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+def generate_reset_token(length=32):
+    """Generates a random, secure token for password reset."""
+    alphabet = string.ascii_letters + string.digits
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 async def register_user(db: AsyncSession, user_data: user_schema.UserRegistration):
@@ -139,7 +147,7 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
         password=hashed_password,
         role="employee",
         company_id=company_id,
-        division=employee_data.division, # Use the determined division
+        division=employee_data.division,
         profile_picture_url=profile_picture_url
     )
 
@@ -248,11 +256,9 @@ async def update_employee_by_admin(
 async def authenticate_user(db: AsyncSession, password: str, email: Optional[str] = None, username: Optional[str] = None) -> Optional[user_model.Users]:
     """
     Authenticates a user by email or username and password.
-
     - Fetches the user by email or username.
     - Verifies the password.
     - Checks if the user account is active and authorized for the given role.
-
     Returns the user object if authentication is successful, otherwise None.
     """
     user = None
@@ -276,3 +282,167 @@ async def authenticate_user(db: AsyncSession, password: str, email: Optional[str
         return user
         
     return None
+
+# --- Fungsi Pengiriman Email Brevo yang Diperbarui ---
+async def send_brevo_email(to_email: str, subject: str, html_content: str):
+    """
+    Sends a transactional email using Brevo API.
+    """
+    # Konfigurasi API Key Brevo
+    sib_api_v3_sdk.configuration.api_key['api-key'] = settings.BREVO_API_KEY
+    
+    # Instantiate the TransactionalEmailsApi client
+    transactional_api = sib_api_v3_sdk.TransactionalEmailsApi()
+
+    # Tentukan detail pengirim
+    # Mengambil dari environment variable atau menggunakan default
+    sender_email = settings.DEFAULT_SENDER_EMAIL if settings.DEFAULT_SENDER_EMAIL else "noreply@yourdomain.com"
+    # Menggunakan nama aplikasi dari settings jika ada, atau placeholder
+    sender_name = getattr(settings, 'APP_NAME', 'SmartAI') 
+
+    # Tentukan detail penerima
+    to_recipient = [{"email": to_email, "name": to_email}] 
+
+    # Tentukan konten email
+    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+        to=to_recipient,
+        subject=subject,
+        html_content=html_content,
+        sender={"email": sender_email, "name": sender_name},
+        # Anda juga bisa menggunakan template_id untuk email yang lebih kompleks
+        # template_id=1 # Contoh ID template
+    )
+
+    try:
+        # Lakukan panggilan untuk mengirim email transaksional
+        response = transactional_api.send_transac_email(send_smtp_email)
+        logging.info(f"Email sent successfully to {to_email}. Response: {response}")
+        # Objek response mungkin berisi 'messageId' atau yang serupa
+    except ApiException as e:
+        logging.error(f"Exception when calling Brevo API to send email to {to_email}: {e}")
+        # Re-raise atau tangani exception sesuai kebutuhan
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Gagal mengirim email: {e.reason}"
+        )
+    except Exception as e:
+        logging.error(f"An unexpected error occurred while sending email to {to_email}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Terjadi kesalahan tak terduga saat mengirim email."
+        )
+# --- Akhir Fungsi Pengiriman Email Brevo ---
+
+
+async def request_password_reset(db: AsyncSession, email: str):
+    """
+    Initiates the password reset process for a user.
+    Generates a token, stores it, and sends a reset email.
+    """
+    user = await user_repository.get_user_by_email(db, email=email)
+
+    if not user:
+        # Mengembalikan pesan spesifik bahwa email tidak terdaftar.
+        # Perlu diingat ini dapat membocorkan informasi tentang email yang terdaftar.
+        logging.warning(f"Password reset requested for non-existent email: {email}")
+        return {"message": "Email tidak terdaftar."} # Pesan diubah sesuai permintaan
+
+    if not user.is_active:
+        logging.warning(f"Password reset requested for inactive user: {email}")
+        return {"message": "Jika akun dengan email tersebut ada, tautan reset kata sandi telah dikirim."}
+
+    # Generate token and set expiry
+    token = generate_reset_token()
+    # Menggunakan durasi token yang sama untuk reset token expiry
+    expiry_time = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES) 
+
+    user.reset_token = token
+    user.reset_token_expiry = expiry_time
+
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    # Prepare email content
+    reset_link = f"{settings.APP_BASE_URL}/auth/reset-password?token={token}&email={user.email}"
+    
+    # Fetch company name for personalization, if available
+    company_name = user.company.name if user.company else "Platform Kami"
+
+    html_content = f"""
+    <html>
+    <body>
+        <p>Halo {user.name or user.username},</p>
+        <p>Kami menerima permintaan untuk mereset kata sandi Anda.</p>
+        <p>Silakan klik tautan berikut untuk mengatur kata sandi baru Anda:</p>
+        <p><a href="{reset_link}" style="color: #007bff; text-decoration: none;">Reset Kata Sandi</a></p>
+        <p>Tautan ini akan kedaluwarsa dalam {settings.ACCESS_TOKEN_EXPIRE_MINUTES} menit.</p>
+        <p>Jika Anda tidak meminta reset kata sandi, mohon abaikan email ini.</p>
+        <p>Terima kasih,<br>Tim {company_name}</p>
+    </body>
+    </html>
+    """
+    subject = f"Reset Kata Sandi Anda untuk {company_name}"
+
+    # Kirim email menggunakan Brevo
+    try:
+        await send_brevo_email(
+            to_email=user.email,
+            subject=subject,
+            html_content=html_content
+        )
+        return {"message": "Jika akun dengan email tersebut ada, tautan reset kata sandi telah dikirim."}
+    except HTTPException as e:
+        # Tangani HTTPException yang dilempar oleh send_brevo_email
+        raise e
+    except Exception as e:
+        logging.error(f"An unexpected error occurred during password reset email sending to {user.email}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Terjadi kesalahan tak terduga saat mengirim email reset kata sandi."
+        )
+
+
+async def reset_password(db: AsyncSession, email: str, token: str, new_password: str):
+    """
+    Resets the user's password after token verification.
+    """
+    user = await user_repository.get_user_by_email(db, email=email)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tautan reset kata sandi tidak valid atau sudah kedaluwarsa.",
+        )
+
+    # Verifikasi token dan expiry
+    if user.reset_token != token or datetime.utcnow() > user.reset_token_expiry:
+        # Hapus token yang tidak valid dari pengguna untuk mencegah upaya penggunaan ulang
+        user.reset_token = None
+        user.reset_token_expiry = None
+        db.add(user)
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tautan reset kata sandi tidak valid atau sudah kedaluwarsa.",
+        )
+
+    # Hash dan update password
+    hashed_password = get_password_hash(new_password)
+    user.password = hashed_password
+
+    # Hapus token dan expiry setelah reset berhasil
+    user.reset_token = None
+    user.reset_token_expiry = None
+
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    return {"message": "Kata sandi berhasil direset."}
+
+
+# --- Fungsi yang sudah ada ---
+# Pastikan fungsi-fungsi ini tetap ada di file yang sama.
+# Untuk keringkasan, saya tidak menampilkannya lagi di sini.
+# Contoh: register_user, authenticate_user, dll.

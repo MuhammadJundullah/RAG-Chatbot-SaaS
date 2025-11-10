@@ -56,10 +56,10 @@ async def register_employee_by_admin(
     email: str = Form(...),
     username: str = Form(...),
     password: str = Form(...),
-    division: Optional[str] = Form(None), # Changed from division_id to division
+    division: Optional[str] = Form(None), 
     profile_picture_file: UploadFile = None,
     db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_company_admin) # Added current_user dependency
+    current_user: Users = Depends(get_current_company_admin) 
 ):
     """
     Registers a new employee within the company, including uploading a profile picture.
@@ -73,7 +73,7 @@ async def register_employee_by_admin(
             email=email,
             username=username,
             password=password,
-            division=division # Use division here
+            division=division 
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid employee data format: {e}")
@@ -85,7 +85,7 @@ async def register_employee_by_admin(
             db=db,
             company_id=current_user.company_id,
             employee_data=employee_data,
-            current_user=current_user, # Pass current_user to the service
+            current_user=current_user,
             profile_picture_file=profile_picture_file
         )
     except UserRegistrationError as e:
