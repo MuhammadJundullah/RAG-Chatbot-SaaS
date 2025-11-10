@@ -21,7 +21,7 @@ async def generate_conversation_title(user_message: str, conversation_history: l
     if user_message:
         # Truncate message for title if it's too long
         title = user_message[:50] + "..." if len(user_message) > 50 else user_message
-        return f"Conversation about: {title}"
+        return f"{title}"
     elif conversation_history:
         # If no user message, try to infer from history (more complex LLM task)
         # For now, a default title if history exists but no new message.

@@ -1,14 +1,21 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from pydantic import BaseModel
+from starlette.responses import StreamingResponse
+import uuid 
 
-from app.schemas import chat_schema
+from app.schemas import chat_schema, chatlog_schema 
 from app.services import chat_service, document_service
 from app.core.dependencies import get_current_user, get_db, get_current_employee
 from app.models.user_model import Users
-from app.schemas.conversation_schema import ConversationListResponse # Import the response schema
-from app.schemas.document_schema import ReferencedDocument # Keep this import if other parts of the file use it, though not strictly needed for the modified endpoint itself.
+from app.schemas.conversation_schema import ConversationListResponse 
+from app.schemas.document_schema import ReferencedDocument 
+from app.repository.chatlog_repository import chatlog_repository 
+from app.services.rag_service import rag_service 
+from app.services.gemini_service import gemini_service 
+from app.repository.conversation_repository import conversation_repository 
+from app.schemas.conversation_schema import ConversationCreate 
 
 router = APIRouter()
 
@@ -30,6 +37,98 @@ async def chat_endpoint(
         request=request
     )
     return response_data
+
+@router.post("/sse/chat", tags=["Chat"])
+async def sse_chat_endpoint(
+    request: chat_schema.ChatRequest,
+    current_user: Users = Depends(get_current_employee),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Streams AI chat responses using Server-Sent Events (SSE).
+    """
+    async def event_generator():
+        conversation_id_str = request.conversation_id
+        user_message = request.message
+        company_id = current_user.company_id
+        full_response = ""
+
+        # If no conversation_id is provided, create a new conversation
+        if not conversation_id_str:
+            new_uuid = str(uuid.uuid4())
+            conversation_title = await chat_service.generate_conversation_title(user_message=user_message, conversation_history=[])
+            conversation_create_schema = ConversationCreate(
+                id=new_uuid,
+                title=conversation_title,
+            )
+            await conversation_repository.create_conversation(db=db, conversation=conversation_create_schema)
+            conversation_id_str = new_uuid
+        else:
+            # Validate the provided conversation_id
+            try:
+                valid_conversation_id = uuid.UUID(request.conversation_id)
+                conversation_id_str = str(valid_conversation_id)
+            except ValueError:
+                yield f"data: {{\"error\": \"Invalid conversation ID format.\"}}\n\n"
+                return
+
+            # Check if the conversation exists. If not, create it.
+            existing_conversation = await conversation_repository.get_conversation(db=db, conversation_id=conversation_id_str)
+            if not existing_conversation:
+                conversation_title = await chat_service.generate_conversation_title(user_message=user_message, conversation_history=[])
+                conversation_create_schema = ConversationCreate(
+                    id=conversation_id_str,
+                    title=conversation_title
+                )
+                await conversation_repository.create_conversation(db=db, conversation=conversation_create_schema)
+
+        # 1. Get chat history for context
+        history_records = await chatlog_repository.get_chat_history(
+            db=db,
+            conversation_id=conversation_id_str,
+            user_id=current_user.id
+        )
+        conversation_history = [{"question": record.question, "answer": record.answer} for record in history_records]
+
+        # 2. Get context from RAG service
+        rag_response = await rag_service.get_relevant_context(
+            query=user_message,
+            company_id=company_id
+        )
+        rag_context = rag_response["context"]
+        document_ids = rag_response["document_ids"]
+
+        # 3. Generate chat response in streaming fashion
+        try:
+            async for chunk in gemini_service.generate_chat_response(
+                question=user_message,
+                context=rag_context,
+                query_results=None, # Assuming query_results is not directly used here for streaming
+                db=db,
+                current_user=current_user,
+                conversation_history=conversation_history
+            ):
+                full_response += chunk
+                yield f"data: {chunk}\n\n" # Send each chunk as an SSE event
+        except Exception as e:
+            yield f"data: {{\"error\": \"An error occurred during AI response generation: {str(e)}\"}}\n\n"
+            return
+
+        # 4. Save chat to database after full response is received
+        chatlog_data = chatlog_schema.ChatlogCreate(
+            question=user_message,
+            answer=full_response,
+            UsersId=current_user.id,
+            company_id=company_id,
+            conversation_id=conversation_id_str,
+            referenced_document_ids=document_ids
+        )
+        await chatlog_repository.create_chatlog(db=db, chatlog=chatlog_data)
+        
+        # Signal end of stream
+        yield "event: end\ndata: {}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @router.get("/conversations", response_model=List[ConversationListResponse], tags=["Chat"])
 async def list_conversations_endpoint(
@@ -59,7 +158,7 @@ async def get_company_documents(
     """
     documents = await document_service.get_all_company_documents_service(
         db=db,
-        current_user=current_user,
+    current_user=current_user,
         skip=0,
         limit=1000000  # A large limit to get all documents
     )
