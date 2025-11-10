@@ -380,7 +380,7 @@ async def request_password_reset(db: AsyncSession, email: str):
         <p><a href="{reset_link}" style="color: #007bff; text-decoration: none;">Reset Kata Sandi</a></p>
         <p>Tautan ini akan kedaluwarsa dalam {settings.ACCESS_TOKEN_EXPIRE_MINUTES} menit.</p>
         <p>Jika Anda tidak meminta reset kata sandi, mohon abaikan email ini.</p>
-        <p>Terima kasih,<br>Tim {company_name}</p>
+        <p>Terima kasih,<br>Tim SmartAI</p>
     </body>
     </html>
     """
