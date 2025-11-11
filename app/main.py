@@ -44,9 +44,6 @@ async def root():
     return {"message": "Multi-Tenant Company Chatbot API is running"}
 
 @app.get("/api/health")
-<<<<<<< HEAD
-async def health_check():
-=======
 async def health_check(db: AsyncSession = Depends(get_db)):
     # For health checks, user_id and company_id might be unknown or N/A
     await log_activity(
@@ -56,5 +53,4 @@ async def health_check(db: AsyncSession = Depends(get_db)):
         company_id=None, 
         activity_description="System health check performed.",
     )
->>>>>>> f1b3ebe (feat: menambahkan endpoint GET /admin/activity-logs untuk superadmin dan mengintegrasikan log ke berbagai operasi.)
     return {"status": "healthy"}
