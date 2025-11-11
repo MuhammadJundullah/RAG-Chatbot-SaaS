@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, Form, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
-
+from datetime import datetime, timezone
 from app.core.dependencies import get_current_user, get_db, get_current_company_admin
 from app.models.user_model import Users
 from app.schemas import company_schema, user_schema
 from app.services import company_service, user_service
 from app.services.user_service import EmployeeDeletionError, UserRegistrationError, EmployeeUpdateError
+from app.utils.activity_logger import log_activity
 
 router = APIRouter(
     prefix="/companies",
@@ -230,7 +231,7 @@ async def get_company_users_by_admin(
         activity_type_category="Data/CRUD", # Or "Login/Akses" if preferred for feature access
         company_id=company_id_to_log, # Use integer company ID
         activity_description=f"Admin '{current_user.email}' accessed list of company users. Found {len(users)} users.",
-        timestamp=datetime.now(datetime.timezone.utc)
+        timestamp=datetime.now(timezone.utc)
     )
     return users
 
