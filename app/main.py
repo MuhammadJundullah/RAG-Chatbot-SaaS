@@ -1,7 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.endpoints import auth, chat, documents, company, chatlogs, admin
 from app.core.database import db_manager
+from app.utils.activity_logger import log_activity 
+from datetime import datetime 
+from app.core.dependencies import get_db 
 
 # No complex lifespan needed with gevent and simple singleton initialization
 app = FastAPI(
@@ -11,7 +15,6 @@ app = FastAPI(
 )
 
 # The RAGService, S3Client, and DBEngine are initialized on import now.
-
 @app.on_event("shutdown")
 async def shutdown_event():
     """Close database connections on shutdown."""
@@ -41,5 +44,17 @@ async def root():
     return {"message": "Multi-Tenant Company Chatbot API is running"}
 
 @app.get("/api/health")
+<<<<<<< HEAD
 async def health_check():
+=======
+async def health_check(db: AsyncSession = Depends(get_db)):
+    # For health checks, user_id and company_id might be unknown or N/A
+    await log_activity(
+        db=db, 
+        user_id=None, 
+        activity_type_category="Kesehatan Sistem",
+        company_id=None, 
+        activity_description="System health check performed.",
+    )
+>>>>>>> f1b3ebe (feat: menambahkan endpoint GET /admin/activity-logs untuk superadmin dan mengintegrasikan log ke berbagai operasi.)
     return {"status": "healthy"}

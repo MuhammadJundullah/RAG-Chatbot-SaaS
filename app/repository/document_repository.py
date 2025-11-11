@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List, Optional
+from sqlalchemy import func
 
 from app.models import document_model
 from app.schemas import document_schema
@@ -26,8 +27,16 @@ class DocumentRepository(BaseRepository[document_model.Documents]):
         )
         return result.scalars().all()
 
-    async def get_documents_by_company(self, db: AsyncSession, company_id: int, skip: int, limit: int) -> List[document_model.Documents]:
-        """Gets all documents for a specific company."""
+    async def count_documents_by_company(self, db: AsyncSession, company_id: int) -> int:
+        """Counts all documents for a specific company."""
+        result = await db.execute(
+            select(func.count(self.model.id))
+            .filter(self.model.company_id == company_id)
+        )
+        return result.scalar_one()
+
+    async def get_documents_by_company(self, db: AsyncSession, company_id: int, skip: int, limit: int) -> (List[document_model.Documents], int):
+        """Gets all documents for a specific company with total count."""
         result = await db.execute(
             select(self.model)
             .filter(self.model.company_id == company_id)
@@ -35,7 +44,9 @@ class DocumentRepository(BaseRepository[document_model.Documents]):
             .offset(skip)
             .limit(limit)
         )
-        return result.scalars().all()
+        documents = result.scalars().all()
+        total_count = await self.count_documents_by_company(db, company_id)
+        return documents, total_count
 
     async def update_document_text_and_status(self, db: AsyncSession, document_id: int, text: str, status: document_model.DocumentStatus, tags: Optional[List[str]] = None, title: Optional[str] = None) -> Optional[document_model.Documents]:
         db_document = await self.get(db, document_id)

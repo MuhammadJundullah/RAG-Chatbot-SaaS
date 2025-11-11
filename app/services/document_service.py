@@ -4,6 +4,7 @@ from typing import List, Optional
 import os
 import pathlib
 import uuid
+import datetime
 from botocore.exceptions import ClientError
 
 from app.models.user_model import Users
@@ -14,6 +15,7 @@ from app.core.s3_client import s3_client_manager
 from app.core.config import settings
 from app.services.rag_service import rag_service
 from app.tasks.document_tasks import upload_document_to_s3, process_ocr_task, process_embedding_task
+from app.utils.activity_logger import log_activity
 
 
 async def upload_document_service(
@@ -49,6 +51,16 @@ async def upload_document_service(
     db_document = await document_repository.create_document(db=db, document=doc_create)
     print(f"[Upload Service] Document {db_document.id} created with temp_storage_path: {db_document.temp_storage_path}")
 
+    # Log document upload
+    company_id_to_log = current_user.company_id if current_user.company else None
+    await log_activity(
+        db=db, # Pass the database session
+        user_id=current_user.id, # Use integer user ID
+        activity_type_category="Proses Dokumen", # Or "Data/CRUD"
+        company_id=company_id_to_log, # Use integer company ID
+        activity_description=f"Document '{db_document.title}' (ID: {db_document.id}) uploaded by admin '{current_user.email}'.",
+    )
+
     upload_document_to_s3.delay(db_document.id)
 
     return db_document
@@ -73,6 +85,18 @@ async def retry_document_upload_service(
         updated_doc = await document_repository.update_document_status_and_reason(
             db, document_id=document_id, status=DocumentStatus.UPLOADED, reason=None
         )
+        updated_doc = await document_repository.update_document_status_and_reason(
+            db, document_id=document_id, status=DocumentStatus.UPLOADED, reason=None
+        )
+        # Log document upload retry
+        company_id_to_log = current_user.company_id if current_user.company else None
+        await log_activity(
+            db=db, # Pass the database session
+            user_id=current_user.id, # Use integer user ID
+            activity_type_category="Proses Dokumen",
+            company_id=company_id_to_log, # Use integer company ID
+            activity_description=f"Document ID {document_id} upload retried by admin '{current_user.email}'.",
+        )
         process_ocr_task.delay(document_id)
         print(f"Document {document_id} has been re-queued for OCR processing (S3 path found).")
         return updated_doc
@@ -80,6 +104,15 @@ async def retry_document_upload_service(
     if db_document.temp_storage_path and os.path.exists(db_document.temp_storage_path):
         updated_doc = await document_repository.update_document_status_and_reason(
             db, document_id=document_id, status=DocumentStatus.UPLOADING, reason=None
+        )
+        # Log document upload retry (temp file found)
+        company_id_to_log = current_user.company_id if current_user.company else None
+        await log_activity(
+            db=db, # Pass the database session
+            user_id=current_user.id, # Use integer user ID
+            activity_type_category="Proses Dokumen",
+            company_id=company_id_to_log, # Use integer company ID
+            activity_description=f"Document ID {document_id} upload retried (temp file found) by admin '{current_user.email}'.",
         )
         upload_document_to_s3.delay(document_id)
         print(f"Document {document_id} has been re-queued for S3 upload (temp file found).")
@@ -96,10 +129,20 @@ async def get_all_company_documents_service(
     skip: int = 0,
     limit: int = 100
 ):
-    documents = await document_repository.get_documents_by_company(
+    documents, total_count = await document_repository.get_documents_by_company(
         db, company_id=current_user.company_id, skip=skip, limit=limit
     )
-    return documents
+    
+    # Log document list retrieval
+    company_id_to_log = current_user.company_id if current_user.company else None
+    await log_activity(
+        db=db, # Pass the database session
+        user_id=current_user.id, # Use integer user ID
+        activity_type_category="Data/CRUD",
+        company_id=company_id_to_log, # Use integer company ID
+        activity_description=f"Admin '{current_user.email}' retrieved list of all company documents. Found {total_count} documents.",
+    )
+    return documents, total_count
 
 async def get_documents_pending_validation_service(
     db: AsyncSession,
@@ -107,6 +150,16 @@ async def get_documents_pending_validation_service(
 ):
     documents = await document_repository.get_documents_by_status(
         db, status=DocumentStatus.PENDING_VALIDATION, company_id=current_user.company_id
+    )
+    
+    # Log document list retrieval
+    company_id_to_log = current_user.company_id if current_user.company else None
+    await log_activity(
+        db=db, # Pass the database session
+        user_id=current_user.id, # Use integer user ID
+        activity_type_category="Proses Dokumen", # Or "Data/CRUD"
+        company_id=company_id_to_log, # Use integer company ID
+        activity_description=f"Admin '{current_user.email}' retrieved list of documents pending validation. Found {len(documents)} documents.",
     )
     return documents
 
@@ -197,6 +250,16 @@ async def update_document_content_service(
     process_embedding_task.delay(document_id)
     print(f"[Service] Queued embedding task for document ID: {document_id}")
 
+    # Log document content update
+    company_id_to_log = current_user.company_id if current_user.company else None
+    await log_activity(
+        db=db, # Pass the database session
+        user_id=current_user.id, # Use integer user ID
+        activity_type_category="Data/CRUD",
+        company_id=company_id_to_log, # Use integer company ID
+        activity_description=f"Document ID {document_id} content updated by admin '{current_user.email}'.",
+    )
+
     # Return the document with status EMBEDDING, Celery task will update final status
     return updated_doc_repo
 
@@ -211,6 +274,16 @@ async def read_single_document_service(
     
     if db_document.company_id != current_user.company_id:
         raise HTTPException(status_code=403, detail="You do not have permission to access this document.")
+    
+    # Log document read
+    company_id_to_log = current_user.company_id if current_user.company else None
+    await log_activity(
+        db=db, # Pass the database session
+        user_id=current_user.id, # Use integer user ID
+        activity_type_category="Data/CRUD",
+        company_id=company_id_to_log, # Use integer company ID
+        activity_description=f"Document ID {document_id} read by admin '{current_user.email}'.",
+    )
         
     return db_document
 
@@ -224,41 +297,53 @@ async def delete_document_service(
         raise HTTPException(status_code=404, detail="Document not found.")
 
     try:
+        # 1. Delete from RAG service
         await rag_service.delete_document_by_id(
-            document_id=str(document_id), 
+            document_id=str(document_id),
             company_id=db_document.company_id
         )
 
+        # 2. Delete from S3
         if db_document.s3_path:
             try:
                 s3 = await s3_client_manager.get_client()
                 await s3.delete_objects(
                     Bucket=settings.S3_BUCKET_NAME,
-                    Delete={
-                        "Objects": [
-                            {"Key": db_document.s3_path}
-                        ]
-                    }
+                    Delete={"Objects": [{"Key": db_document.s3_path}]}
                 )
             except ClientError as e:
                 if e.response['Error']['Code'] not in ['404', 'NoSuchKey']:
+                    # If it's a real error, re-raise it to be caught by the outer block
                     raise e
+                # If it's just not found, that's okay, we can proceed.
                 print(f"Warning: S3 object not found during deletion, proceeding. Key: {db_document.s3_path}")
 
+        # 3. Delete temporary file if it exists
         if db_document.temp_storage_path and os.path.exists(db_document.temp_storage_path):
-            print("[Delete Document] Entering temporary file cleanup block.")
             try:
-                print(f"[Delete Document] Attempting to remove temporary file: {db_document.temp_storage_path}")
                 os.remove(db_document.temp_storage_path)
                 print(f"[Delete Document] Removed temporary file: {db_document.temp_storage_path}")
-                print(f"[Delete Document] After os.remove: File exists? {os.path.exists(db_document.temp_storage_path)}")
             except OSError as e:
+                # Log the error but don't stop the process, as deleting the DB record is more important
                 print(f"[Delete Document] Error: Failed to remove temporary file {db_document.temp_storage_path}: {e}")
 
+        # 4. Delete from database
         await document_repository.delete_document(db=db, document_id=document_id)
+
+        # 5. Log the activity
+        company_id_to_log = current_user.company_id if current_user.company else None
+        await log_activity(
+            db=db,
+            user_id=current_user.id,
+            activity_type_category="Data/CRUD",
+            company_id=company_id_to_log,
+            activity_description=f"Document ID {document_id} deleted by admin '{current_user.email}'."
+        )
+
+        return None # Success
 
     except Exception as e:
         print(f"[ERROR] Failed to delete document: {str(e)}")
+        # Here you might want to decide if you need to rollback any partial deletions
+        # For now, just raising an HTTP exception
         raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
-
-    return None

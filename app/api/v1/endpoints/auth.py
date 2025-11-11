@@ -5,8 +5,9 @@ from app.services.user_service import UserRegistrationError, UserRegistrationErr
 from app.core.dependencies import get_db, get_current_user
 from app.schemas import user_schema, token_schema
 from app.utils import auth
+from app.utils.activity_logger import log_activity # Import log_activity
 from app.models import user_model, company_model # Ensure company_model is imported if needed
-from datetime import datetime, timedelta # Import datetime and timedelta
+from datetime import datetime, timedelta, timezone # Import datetime and timedelta
 import secrets
 import string
 import os
@@ -35,6 +36,16 @@ async def register(
     """
     try:
         user = await user_service.register_user(db, user_data=user_data)
+        
+        # Log successful registration
+        company_id_to_log = user.company_id # Get company_id from the registered user object
+        await log_activity(
+            db=db, # Pass the database session
+            user_id=user.id, # Use integer user ID
+            activity_type_category="Data/CRUD",
+            company_id=company_id_to_log, # Use integer company ID
+            activity_description=f"User '{user.email}' registered as admin for company '{user_data.company_name}'.",
+        )
         
         if user.role == 'admin':
             return {"message": f"Company '{user_data.company_name}' and admin user '{user.email}' registered successfully. Pending approval from a super admin."}
@@ -71,6 +82,14 @@ async def login_for_access_token(
     user = await user_service.authenticate_user(db, email=data.email, username=data.username, password=data.password)
     
     if not user:
+        # Log failed login attempt
+        await log_activity(
+            db=db, # Pass the database session
+            user_id=None, # User ID is not known on failure
+            activity_type_category="Login/Akses",
+            company_id=None, # Company is unknown if authentication fails
+            activity_description="User login failed.",
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect credentials or user is inactive/unauthorized.",
@@ -85,6 +104,16 @@ async def login_for_access_token(
     if user.company_id:
         token_data_payload["company_id"] = user.company_id
 
+    # Log successful login
+    company_id_to_log = user.company_id if user.company else None # Use integer company ID
+    await log_activity(
+        db=db, # Pass the database session
+        user_id=user.id, # Use integer user ID
+        activity_type_category="Login/Akses",
+        company_id=company_id_to_log, # Use integer company ID
+        activity_description=f"User '{user.email}' logged in successfully.",
+    )
+
     token_data = auth.create_access_token(data=token_data_payload)
     return {
         "access_token": token_data["access_token"],
@@ -94,7 +123,7 @@ async def login_for_access_token(
     }
 
 @router.get("/me", response_model=user_schema.User)
-async def read_users_me(current_user: user_model.Users = Depends(get_current_user)):
+async def read_users_me(current_user: user_model.Users = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """
     Get the current logged in user, including their company's PIC phone number.
     """
@@ -102,7 +131,7 @@ async def read_users_me(current_user: user_model.Users = Depends(get_current_use
     if current_user.company and current_user.company.pic_phone_number:
         company_pic_phone = current_user.company.pic_phone_number
 
-    user_data = user_schema.User(
+    user_data = user_schema.User( # Corrected indentation
         id=current_user.id,
         name=current_user.name,
         username=current_user.username,
@@ -114,9 +143,19 @@ async def read_users_me(current_user: user_model.Users = Depends(get_current_use
         company_pic_phone_number=company_pic_phone,
         profile_picture_url=current_user.profile_picture_url # Added to include profile picture URL
     )
+    
+    # Log feature access
+    company_id_to_log = current_user.company_id if current_user.company else None # Use integer company ID
+    await log_activity(
+        db=db, # Pass the database session
+        user_id=current_user.id, # Use integer user ID
+        activity_type_category="Login/Akses",
+        company_id=company_id_to_log, # Use integer company ID
+        activity_description=f"User '{current_user.email}' accessed 'Get My Profile' feature.",
+    )
+    
     return user_data
-
-# --- New endpoints for password reset ---
+    # --- New endpoints for password reset ---
 
 @router.post("/request-password-reset")
 async def request_reset_route(email: str, db: AsyncSession = Depends(get_db)):

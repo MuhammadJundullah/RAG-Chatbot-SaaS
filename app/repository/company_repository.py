@@ -20,28 +20,17 @@ class CompanyRepository(BaseRepository[company_model.Company]):
         result = await db.execute(select(self.model).filter(self.model.code == code))
         return result.scalar_one_or_none()
 
-    async def get_companies(self, db: AsyncSession, skip: int = 0, limit: int = 100) -> List[company_model.Company]:
-        return await self.get_multi(db, skip=skip, limit=limit)
-
-    async def get_active_companies(self, db: AsyncSession, skip: int = 0, limit: int = 100) -> List[company_model.Company]:
-        """Gets a list of companies that are active."""
-        result = await db.execute(
-            select(self.model).filter(self.model.is_active).offset(skip).limit(limit)
-        )
+    async def get_companies(self, db: AsyncSession, skip: int = 0, limit: int = 100, status: Optional[str] = None) -> List[company_model.Company]:
+        """Gets a list of companies, with optional filtering by status."""
+        query = select(self.model)
+        if status == "active":
+            query = query.filter(self.model.is_active == True)
+        elif status == "pending":
+            query = query.filter(self.model.is_active == False)
+        
+        query = query.offset(skip).limit(limit)
+        result = await db.execute(query)
         return result.scalars().all()
-
-    async def is_company_active(self, db: AsyncSession, company_id: int) -> bool:
-        """Checks if a company is active."""
-        company = await self.get(db, company_id)
-        return company and company.is_active
-
-    async def get_pending_companies(self, db: AsyncSession, skip: int = 0, limit: int = 100) -> List[company_model.Company]:
-        """Gets a list of companies that are not active (pending approval)."""
-        result = await db.execute(
-            select(self.model).filter(self.model.is_active == False).offset(skip).limit(limit)  # noqa: E712
-        )
-        pending_companies = result.scalars().all()
-        return pending_companies
 
     async def approve_company(self, db: AsyncSession, company_id: int):
         """Activates a company by setting its is_active status to True."""

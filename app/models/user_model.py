@@ -3,12 +3,12 @@ from sqlalchemy import (
     Integer,
     String,
     ForeignKey,
-    DateTime # Import DateTime
+    DateTime 
 )
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 from sqlalchemy import Boolean
-from datetime import datetime # Import datetime for default value
+from datetime import datetime
 
 
 class Users(Base):
@@ -22,7 +22,7 @@ class Users(Base):
     company_id = Column(Integer, ForeignKey("Company.id"), nullable=True)
     division = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True)
-    profile_picture_url = Column(String, nullable=True) # Added for profile picture URL
+    profile_picture_url = Column(String, nullable=True)
 
     # Added fields for password reset
     reset_token = Column(String(255), nullable=True)
@@ -30,3 +30,8 @@ class Users(Base):
 
     company = relationship("Company", back_populates="users")
     chatlogs = relationship("Chatlogs", back_populates="user")
+
+    # Add relationship for activity logs
+    activity_logs = relationship("ActivityLog", back_populates="user")
+
+    

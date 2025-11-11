@@ -18,5 +18,7 @@ class Company(Base):
     users = relationship("Users", back_populates="company")
     documents = relationship("Documents", back_populates="company")
     chatlogs = relationship("Chatlogs", back_populates="company")
+    # Add relationship for activity logs
+    activity_logs = relationship("ActivityLog", back_populates="company")
     address = Column(String(255), nullable=True)
     pic_phone_number = Column(String(50), nullable=True) # Added pic_phone_number

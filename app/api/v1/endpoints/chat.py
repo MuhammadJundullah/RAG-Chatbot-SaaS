@@ -3,19 +3,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
-import uuid 
+import uuid
+import datetime
 
-from app.schemas import chat_schema, chatlog_schema 
+from app.schemas import chat_schema, chatlog_schema
 from app.services import chat_service, document_service
 from app.core.dependencies import get_current_user, get_db, get_current_employee
 from app.models.user_model import Users
-from app.schemas.conversation_schema import ConversationListResponse 
-from app.schemas.document_schema import ReferencedDocument 
-from app.repository.chatlog_repository import chatlog_repository 
-from app.services.rag_service import rag_service 
-from app.services.gemini_service import gemini_service 
-from app.repository.conversation_repository import conversation_repository 
-from app.schemas.conversation_schema import ConversationCreate 
+from app.schemas.conversation_schema import ConversationListResponse
+from app.schemas.document_schema import ReferencedDocument
+from app.repository.chatlog_repository import chatlog_repository
+from app.services.rag_service import rag_service
+from app.services.gemini_service import gemini_service
+from app.repository.conversation_repository import conversation_repository
+from app.schemas.conversation_schema import ConversationCreate
+from app.utils.activity_logger import log_activity
 
 router = APIRouter()
 
@@ -35,6 +37,16 @@ async def chat_endpoint(
         db=db,
         current_user=current_user,
         request=request
+    )
+
+    # Log chat message
+    company_id_to_log = current_user.company_id if current_user.company else None
+    await log_activity(
+        db=db, # Pass the database session
+        user_id=current_user.id, # Use integer user ID
+        activity_type_category="Data/CRUD", # Or a new category like "CHAT_MESSAGE"
+        company_id=company_id_to_log, # Use integer company ID
+        activity_description=f"User '{current_user.email}' sent a chat message.",
     )
     return response_data
 
@@ -110,10 +122,10 @@ async def sse_chat_endpoint(
             ):
                 full_response += chunk
                 yield f"data: {chunk}\n\n" # Send each chunk as an SSE event
-        except Exception as e:
+        except Exception as e: # Corrected indentation for except block
             yield f"data: {{\"error\": \"An error occurred during AI response generation: {str(e)}\"}}\n\n"
             return
-
+        
         # 4. Save chat to database after full response is received
         chatlog_data = chatlog_schema.ChatlogCreate(
             question=user_message,
@@ -124,7 +136,17 @@ async def sse_chat_endpoint(
             referenced_document_ids=document_ids
         )
         await chatlog_repository.create_chatlog(db=db, chatlog=chatlog_data)
-        
+
+        # Log chat message (after saving to chatlog)
+        company_id_to_log = current_user.company_id if current_user.company else None
+        await log_activity(
+            db=db, # Pass the database session
+            user_id=current_user.id, # Use integer user ID
+            activity_type_category="Data/CRUD", # Or "CHAT_MESSAGE"
+            company_id=company_id_to_log, # Use integer company ID
+            activity_description=f"User '{current_user.email}' sent a chat message in conversation {conversation_id_str}.",
+        )
+
         # Signal end of stream
         yield "event: end\ndata: {}\n\n"
 
@@ -146,6 +168,16 @@ async def list_conversations_endpoint(
         skip=skip,
         limit=limit,
     )
+
+    # Log conversation list retrieval
+    company_id_to_log = current_user.company_id if current_user.company else None
+    await log_activity(
+        db=db, # Pass the database session
+        user_id=current_user.id, # Use integer user ID
+        activity_type_category="Data/CRUD",
+        company_id=company_id_to_log, # Use integer company ID
+        activity_description=f"User '{current_user.email}' retrieved list of conversations. Found {len(conversations)} conversations.",
+    )
     return conversations
 
 @router.get("/chat/document", response_model=List[ChatDocumentResponse], tags=["Chat"]) # Changed response_model
@@ -158,10 +190,21 @@ async def get_company_documents(
     """
     documents = await document_service.get_all_company_documents_service(
         db=db,
-    current_user=current_user,
+        current_user=current_user,
         skip=0,
         limit=1000000  # A large limit to get all documents
     )
+
+    # Log document list retrieval
+    company_id_to_log = current_user.company_id if current_user.company else None
+    await log_activity(
+        db=db, # Pass the database session
+        user_id=current_user.id, # Use integer user ID
+        activity_type_category="Data/CRUD",
+        company_id=company_id_to_log, # Use integer company ID
+        activity_description=f"User '{current_user.email}' retrieved list of company documents for chat. Found {len(documents)} documents.",
+    )
+
     # Map documents to the new response model including extracted_text
     return [
         ChatDocumentResponse(

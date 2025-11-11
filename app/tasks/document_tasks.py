@@ -198,6 +198,13 @@ def upload_document_to_s3(self, document_id: int):
     try:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(_run_upload_processing(document_id))
+        
+        # Log successful S3 upload task completion
+        # Note: We don't have direct access to db session or current_user here.
+        # Logging will be done within _run_upload_processing or by the service calling this task.
+        # For now, we log the task execution itself.
+        print(f"[Celery Task] Upload task completed for document ID: {document_id}")
+
     except Exception as exc:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(_handle_task_failure(document_id, 'Upload', exc))
@@ -216,6 +223,8 @@ def process_ocr_task(self, document_id: int):
     try:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(_run_ocr_processing(document_id))
+        # Log successful OCR task completion
+        print(f"[Celery Task] OCR task completed for document ID: {document_id}")
     except Exception as exc:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(_handle_task_failure(document_id, 'OCR', exc))
@@ -234,6 +243,8 @@ def process_embedding_task(self, document_id: int):
     try:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(_run_embedding_processing(document_id))
+        # Log successful embedding task completion
+        print(f"[Celery Task] Embedding task completed for document ID: {document_id}")
     except Exception as exc:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(_handle_task_failure(document_id, 'Embedding', exc))
