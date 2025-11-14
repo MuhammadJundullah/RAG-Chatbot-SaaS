@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, Form, UploadFile, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import distinct, select, func # Tambahkan select dan func
+from sqlalchemy import distinct, select, func 
 from typing import List, Optional
 from datetime import datetime, timezone
 from app.core.dependencies import get_db, get_current_company_admin, get_current_employee
 from app.models.user_model import Users
 from app.schemas import company_schema, user_schema
-from app.schemas.user_schema import User, PaginatedUserResponse # Tambahkan PaginatedUserResponse
+from app.schemas.user_schema import User, PaginatedUserResponse 
 from app.services import company_service, user_service
 from app.services.user_service import EmployeeDeletionError, EmployeeUpdateError
 from app.utils.activity_logger import log_activity
@@ -198,16 +198,16 @@ async def read_company_by_admin(
 # Modified /users endpoint to include pagination and filters
 @router.get(
     "/users",
-    response_model=PaginatedUserResponse, # Changed response model for pagination
+    response_model=PaginatedUserResponse,
     summary="List company users with pagination",
     description="Retrieves a list of users within the company, with pagination and optional filters.",
 )
 async def get_company_users_by_admin(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_company_admin),
-    page: int = Query(1, ge=1, description="Page number"), # Added pagination params
-    limit: int = Query(100, ge=1, le=1000, description="Items per page"), # Added pagination params
-    username: Optional[str] = Query(None, description="Filter by username"), # Added optional filter
+    page: int = Query(1, ge=1, description="Page number"), 
+    limit: int = Query(100, ge=1, le=1000, description="Items per page"), 
+    username: Optional[str] = Query(None, description="Filter by username"),
 ):
     """
     Gets a paginated list of users within the company.

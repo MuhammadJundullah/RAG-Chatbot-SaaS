@@ -46,11 +46,12 @@ async def get_company_users_paginated(
         limit=limit,
         username=username
     )
+    total_pages = (total_users + limit - 1) // limit
     return user_schema.PaginatedUserResponse(
         users=users,
-        total=total_users,
-        page=page,
-        limit=limit
+        total_users=total_users,
+        current_page=page,
+        total_pages=total_pages
     )
 
 async def update_company_by_admin_service(
@@ -85,7 +86,7 @@ async def update_company_by_admin_service(
                 Body=await logo_file.read(),
                 ContentType=logo_file.content_type
             )
-            logo_s3_path_to_update = full_public_logo_url # Update with new logo path
+            logo_s3_path_to_update = full_public_logo_url 
 
             if db_company.logo_s3_path:
                 old_s3_key = db_company.logo_s3_path.replace(f"{settings.PUBLIC_S3_BASE_URL}/{settings.S3_BUCKET_NAME}/", "")

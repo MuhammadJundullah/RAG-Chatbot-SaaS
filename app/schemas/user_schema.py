@@ -63,10 +63,11 @@ class EmployeeRegistrationByAdmin(BaseModel):
 class PasswordResetRequest(BaseModel):
     email: EmailStr
     token: str
-    new_password: str = Field(..., min_length=8) # Enforce minimum password length
+    new_password: str = Field(..., min_length=8) 
 
 class PaginatedUserResponse(BaseModel):
     users: list[User]
-    total: int
-    page: int
-    limit: int
+    total_users: int
+    current_page: int
+    total_pages: int
+    

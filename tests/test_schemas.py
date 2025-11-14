@@ -1,7 +1,7 @@
+import uuid
 from app.schemas.user_schema import UserRegistration, UserLoginCombined, User
 from app.schemas.company_schema import Company
 from app.schemas.document_schema import DocumentCreate, Document
-from app.schemas.division_schema import DivisionCreate, Division
 from app.schemas.chatlog_schema import ChatlogCreate, Chatlog
 from app.schemas.token_schema import Token
 from app.schemas.chat_schema import ChatRequest
@@ -39,7 +39,7 @@ def test_user_schema():
         username="testuser",
         role="employee",
         company_id=1,
-        division_id=1,
+        division="Test Division",
         is_active=True
     )
     
@@ -49,7 +49,7 @@ def test_user_schema():
     assert user.username == "testuser"
     assert user.role == "employee"
     assert user.company_id == 1
-    assert user.division_id == 1
+    assert user.division == "Test Division"
     assert user.is_active
 
 
@@ -93,52 +93,33 @@ def test_document_schema():
     assert doc.content_type == "application/pdf"
 
 
-def test_division_create_schema():
-    div_create = DivisionCreate(
-        name="Test Division",
-        company_id=1
-    )
-    
-    assert div_create.name == "Test Division"
-    assert div_create.company_id == 1
-
-
-def test_division_schema():
-    div = Division(
-        id=1,
-        name="Test Division",
-        company_id=1
-    )
-    
-    assert div.id == 1
-    assert div.name == "Test Division"
-    assert div.company_id == 1
-
-
 def test_chatlog_create_schema():
+    test_uuid = uuid.uuid4()
     chatlog_create = ChatlogCreate(
         question="Test question?",
         answer="Test answer.",
         UsersId=1,
         company_id=1,
-        conversation_id="test_conversation"
+        conversation_id=test_uuid
     )
     
     assert chatlog_create.question == "Test question?"
     assert chatlog_create.answer == "Test answer."
     assert chatlog_create.UsersId == 1
     assert chatlog_create.company_id == 1
-    assert chatlog_create.conversation_id == "test_conversation"
+    assert chatlog_create.conversation_id == test_uuid
 
 
 def test_chatlog_schema():
+    test_uuid = uuid.uuid4()
     chatlog = Chatlog(
         id=1,
         question="Test question?",
         answer="Test answer.",
         UsersId=1,
         company_id=1,
-        conversation_id="test_conversation"
+        conversation_id=test_uuid,
+        created_at=uuid.uuid4()
     )
     
     assert chatlog.id == 1
@@ -146,7 +127,7 @@ def test_chatlog_schema():
     assert chatlog.answer == "Test answer."
     assert chatlog.UsersId == 1
     assert chatlog.company_id == 1
-    assert chatlog.conversation_id == "test_conversation"
+    assert chatlog.conversation_id == test_uuid
 
 
 def test_token_schema():
@@ -157,7 +138,7 @@ def test_token_schema():
         username="testuser",
         role="employee",
         company_id=1,
-        division_id=1,
+        division="Test Division",
         is_active=True
     )
 

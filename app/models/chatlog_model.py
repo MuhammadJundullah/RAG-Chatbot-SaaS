@@ -9,6 +9,7 @@ from sqlalchemy import (
     JSON
 )
 from sqlalchemy.dialects.postgresql import UUID
+from app.models.guid import GUID
 
 from sqlalchemy.orm import relationship
 from app.models.base import Base
@@ -20,7 +21,7 @@ class Chatlogs(Base):
     answer = Column(Text)
     UsersId = Column(Integer, ForeignKey("Users.id"), nullable=False)
     company_id = Column(Integer, ForeignKey("Company.id"), nullable=False)
-    conversation_id = Column(UUID(as_uuid=True), ForeignKey('Conversation.id'), nullable=False)
+    conversation_id = Column(GUID, ForeignKey('Conversation.id'), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     referenced_document_ids = Column(JSON, nullable=True)
 

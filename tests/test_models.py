@@ -3,9 +3,7 @@ from sqlalchemy.orm import sessionmaker
 from app.models.user_model import Users
 from app.models.company_model import Company
 from app.models.document_model import Documents, DocumentStatus
-from app.models.division_model import Division
 from app.models.chatlog_model import Chatlogs
-from app.models.embedding_model import Embeddings
 from app.models.base import Base
 
 # Create an in-memory SQLite database for testing
@@ -27,7 +25,7 @@ def test_user_model():
         password="hashed_password",
         role="employee",
         company_id=1,
-        division_id=1,
+        division="Test Division",
         is_active=True
     )
     
@@ -36,7 +34,6 @@ def test_user_model():
     assert user.username == "testuser"
     assert user.role == "employee"
     assert user.company_id == 1
-    assert user.division_id == 1
     assert user.is_active
 
 
@@ -66,17 +63,6 @@ def test_document_model():
     assert document.content_type == "application/pdf"
 
 
-def test_division_model():
-    # Create a test division instance
-    division = Division(
-        name="Test Division",
-        company_id=1
-    )
-    
-    assert division.name == "Test Division"
-    assert division.company_id == 1
-
-
 def test_chatlog_model():
     # Create a test chatlog instance
     chatlog = Chatlogs(
@@ -92,14 +78,3 @@ def test_chatlog_model():
     assert chatlog.UsersId == 1
     assert chatlog.company_id == 1
     assert chatlog.conversation_id == "test_conversation"
-
-
-def test_embedding_model():
-    # Create a test embedding instance
-    embedding = Embeddings(
-        document_id=1,
-        vector_id="test_vector_id"
-    )
-    
-    assert embedding.document_id == 1
-    assert embedding.vector_id == "test_vector_id"
