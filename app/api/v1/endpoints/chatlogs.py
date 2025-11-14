@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import distinct, select
 from typing import List, Optional
 from datetime import date
 from fastapi.responses import StreamingResponse
@@ -9,6 +10,7 @@ from app.core.dependencies import get_current_user, get_db, get_current_super_ad
 from app.schemas import chatlog_schema, conversation_schema
 from app.models.user_model import Users
 from app.services import chatlog_service
+from app.models.log_model import ActivityLog
 
 # Router for super admin
 admin_router = APIRouter(
@@ -145,10 +147,11 @@ async def read_user_chatlogs(
         end_date=end_date,
         skip=skip,
         limit=limit,
+
     )
     return chatlogs
 
-@user_router.get("/conversations", response_model=List[chatlog_schema.ConversationInfoSchema]) # Changed response_model
+@user_router.get("/conversations", response_model=List[chatlog_schema.ConversationInfoSchema])
 async def get_user_conversation_ids(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_employee),

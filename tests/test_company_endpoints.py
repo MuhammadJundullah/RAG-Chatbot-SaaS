@@ -5,6 +5,7 @@ import io
 
 from app.main import app
 from app.services import user_service # Import user_service
+from app.schemas.user_schema import PaginatedUserResponse
 from app.core.s3_client import s3_client_manager # Import s3_client_manager
 
 # Assuming conftest.py provides admin_client fixture
@@ -262,3 +263,79 @@ async def test_register_employee_s3_upload_failure(
         
         mock_register_service.assert_called_once() # Service should still be called to attempt upload
         mock_s3_upload.assert_called_once() # S3 upload should be attempted
+
+@pytest.mark.asyncio
+async def test_get_company_users_by_admin(
+    admin_client: TestClient,
+    mock_db_session: AsyncMock,
+):
+    """
+    Tests the GET /companies/users endpoint for company administrators.
+    """
+    # Mock data for users
+    mock_users_data = [
+        user_schema.User(
+            id=1, name="User One", email="user1@example.com", username="userone",
+            role="employee", company_id=1, division="HR", is_active=True, profile_picture_url=None
+        ),
+        user_schema.User(
+            id=2, name="User Two", email="user2@example.com", username="usertwo",
+            role="employee", company_id=1, division="IT", is_active=True, profile_picture_url=None
+        ),
+        user_schema.User(
+            id=3, name="Admin User", email="admin@example.com", username="adminuser",
+            role="admin", company_id=1, division="Management", is_active=True, profile_picture_url=None
+        ),
+    ]
+
+    # Scenario 1: Get all users, first page
+    mock_paginated_response_all = PaginatedUserResponse(
+        items=mock_users_data[:2], total=len(mock_users_data), page=1, limit=2
+    )
+    with patch("app.services.company_service.get_company_users_paginated", AsyncMock(return_value=mock_paginated_response_all)) as mock_service:
+        response = admin_client.get("/companies/users?page=1&limit=2")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == len(mock_users_data)
+        assert data["page"] == 1
+        assert data["limit"] == 2
+        assert len(data["items"]) == 2
+        assert data["items"][0]["username"] == "userone"
+        mock_service.assert_called_once_with(
+            db=mock_db_session, company_id=1, page=1, limit=2, username=None
+        )
+
+    # Scenario 2: Filter by username
+    mock_paginated_response_filtered = PaginatedUserResponse(
+        items=[mock_users_data[0]], total=1, page=1, limit=100
+    )
+    with patch("app.services.company_service.get_company_users_paginated", AsyncMock(return_value=mock_paginated_response_filtered)) as mock_service:
+        response = admin_client.get("/companies/users?username=userone")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["items"][0]["username"] == "userone"
+        mock_service.assert_called_once_with(
+            db=mock_db_session, company_id=1, page=1, limit=100, username="userone"
+        )
+
+    # Scenario 3: No users found
+    mock_paginated_response_empty = PaginatedUserResponse(
+        items=[], total=0, page=1, limit=100
+    )
+    with patch("app.services.company_service.get_company_users_paginated", AsyncMock(return_value=mock_paginated_response_empty)) as mock_service:
+        response = admin_client.get("/companies/users?username=nonexistent")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 0
+        assert len(data["items"]) == 0
+        mock_service.assert_called_once_with(
+            db=mock_db_session, company_id=1, page=1, limit=100, username="nonexistent"
+        )
+
+    # Scenario 4: Internal server error from service
+    with patch("app.services.company_service.get_company_users_paginated", AsyncMock(side_effect=Exception("Service error"))) as mock_service:
+        response = admin_client.get("/companies/users")
+        assert response.status_code == 500
+        assert "Service error" in response.json()["detail"]
+        mock_service.assert_called_once()

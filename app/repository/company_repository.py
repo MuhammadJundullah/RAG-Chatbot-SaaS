@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import func
 from app.models import company_model, user_model
 from app.schemas import company_schema
 from app.repository.base_repository import BaseRepository
@@ -105,5 +106,35 @@ class CompanyRepository(BaseRepository[company_model.Company]):
         await db.commit()
         await db.refresh(db_company)
         return db_company
+
+    async def get_company_users_paginated(
+        self,
+        db: AsyncSession,
+        company_id: int,
+        skip: int,
+        limit: int,
+        username: Optional[str] = None
+    ) -> tuple[List[user_model.Users], int]:
+        """
+        Retrieves a paginated list of users for a given company, with optional username filtering.
+        Returns the list of users and the total count.
+        """
+        stmt = select(user_model.Users).where(user_model.Users.company_id == company_id)
+        count_stmt = select(func.count()).select_from(user_model.Users).where(user_model.Users.company_id == company_id)
+
+        if username:
+            stmt = stmt.where(user_model.Users.username.ilike(f"%{username}%"))
+            count_stmt = count_stmt.where(user_model.Users.username.ilike(f"%{username}%"))
+
+        stmt = stmt.offset(skip).limit(limit)
+
+        result = await db.execute(stmt)
+        users = result.scalars().all()
+        
+        total_users = await db.scalar(count_stmt)
+        if total_users is None:
+            total_users = 0
+
+        return users, total_users
 
 company_repository = CompanyRepository()

@@ -1,15 +1,16 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, distinct
 from typing import List, Optional
 from math import ceil
-import csv
-import io # Import io for StringIO
-from starlette.responses import StreamingResponse # Import StreamingResponse
+import io
+from starlette.responses import StreamingResponse
 
 from app.core.dependencies import get_current_super_admin, get_db
 from app.schemas import company_schema, log_schema
 from app.services import admin_service
 from app.models.user_model import Users
+from app.models.log_model import ActivityLog
 
 router = APIRouter(
     prefix="/admin",
@@ -119,3 +120,46 @@ async def export_activity_logs(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=activity_logs.csv"}
     )
+
+# --- ENDPOINT BARU DITAMBAHKAN DI SINI ---
+@router.get(
+    "/activity-logs/type",
+    response_model=log_schema.CategoryListResponse,
+    summary="Dapatkan kategori tipe aktivitas yang unik",
+    description="Mengambil daftar nilai unik dari kolom 'activity_type_category' pada log aktivitas."
+)
+async def get_distinct_activity_categories(
+    db: AsyncSession = Depends(get_db),
+    company_id: Optional[int] = Query(None, description="Opsional: Filter berdasarkan ID perusahaan"),
+):
+    """
+    Mengambil nilai distinct untuk kolom 'activity_type_category'.
+    Opsional dapat difilter berdasarkan company_id.
+    """
+    try:
+        # Buat statement query SQL menggunakan SQLAlchemy
+        stmt = select(distinct(ActivityLog.activity_type_category))
+
+        # Terapkan filter company_id jika diberikan
+        if company_id is not None:
+            stmt = stmt.where(ActivityLog.company_id == company_id)
+        
+        # Eksekusi query
+        result = await db.execute(stmt)
+        
+        # Ambil semua kategori distinct
+        distinct_categories = result.scalars().all()
+        
+        # Kembalikan daftar kategori
+        return log_schema.CategoryListResponse(categories=distinct_categories)
+
+    except Exception as e:
+        # Log the exception for debugging
+        # logger.error(f"Error fetching distinct activity categories: {e}") 
+        
+        # Raise an HTTPException for the client
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Terjadi kesalahan saat mengambil kategori distinct: {str(e)}"
+        )
+

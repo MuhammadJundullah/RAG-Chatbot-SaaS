@@ -5,6 +5,7 @@ from app.api.v1.endpoints import auth, chat, documents, company, chatlogs, admin
 from app.core.database import db_manager
 from app.utils.activity_logger import log_activity 
 from app.core.dependencies import get_db 
+from app.core.global_error_handler import register_global_exception_handlers 
 
 # No complex lifespan needed with gevent and simple singleton initialization
 app = FastAPI(
@@ -12,6 +13,9 @@ app = FastAPI(
     description="A SaaS platform for company-specific AI chatbots using RAG and Database Integration.",
     version="1.0.0"
 )
+
+# Register global exception handlers
+register_global_exception_handlers(app) # Call the registration function here
 
 # The RAGService, S3Client, and DBEngine are initialized on import now.
 @app.on_event("shutdown")

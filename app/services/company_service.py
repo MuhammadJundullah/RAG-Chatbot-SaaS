@@ -31,6 +31,28 @@ async def get_company_by_user_service(
         raise HTTPException(status_code=404, detail="Company not found for this user.")
     return db_company
 
+async def get_company_users_paginated(
+    db: AsyncSession,
+    company_id: int,
+    skip: int,
+    limit: int,
+    page: int,
+    username: Optional[str] = None
+) -> user_schema.PaginatedUserResponse:
+    users, total_users = await company_repository.get_company_users_paginated(
+        db=db,
+        company_id=company_id,
+        skip=skip,
+        limit=limit,
+        username=username
+    )
+    return user_schema.PaginatedUserResponse(
+        users=users,
+        total=total_users,
+        page=page,
+        limit=limit
+    )
+
 async def update_company_by_admin_service(
     db: AsyncSession,
     current_user: user_model.Users,
@@ -38,7 +60,7 @@ async def update_company_by_admin_service(
     code: Optional[str],
     address: Optional[str],
     logo_file: Optional[UploadFile],
-    pic_phone_number: Optional[str] # Added pic_phone_number
+    pic_phone_number: Optional[str]
 ) -> company_schema.Company:
     db_company = await company_repository.get_company(db, company_id=current_user.company_id)
     if db_company is None:

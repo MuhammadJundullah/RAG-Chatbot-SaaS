@@ -1,13 +1,13 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from future.utils import string_types
 from sqlalchemy.future import select
 from sqlalchemy import func, and_
 from sqlalchemy.orm import joinedload
 from datetime import datetime
-from typing import Tuple, List, Optional # Baris ini ditambahkan
+from typing import Tuple, List, Optional 
 
 from app.models import log_model
 from app.repository.base_repository import BaseRepository
+from urllib.parse import unquote
 
 class LogRepository(BaseRepository[log_model.ActivityLog]):
     def __init__(self):
@@ -26,6 +26,7 @@ class LogRepository(BaseRepository[log_model.ActivityLog]):
         """
         Gets activity logs with pagination and filtering.
         """
+
         stmt = select(self.model).options(
             joinedload(self.model.user), joinedload(self.model.company)
         ).order_by(self.model.id.desc())

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import List, Optional
 from datetime import datetime
 from .user_schema import User
 from .company_schema import Company
@@ -22,3 +22,9 @@ class PaginatedActivityLogResponse(BaseModel):
     total_pages: int
     current_page: int
     total_logs: int
+
+class CategoryList(BaseModel):
+    categories: List[str]
+
+class CategoryListResponse(BaseModel):
+    categories: List[str]
