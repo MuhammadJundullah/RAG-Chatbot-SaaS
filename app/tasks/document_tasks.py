@@ -97,7 +97,7 @@ async def _run_ocr_processing(document_id: int):
         await doc_repo_module.document_repository.update_document_status_and_reason(db, document_id, DocumentStatus.OCR_PROCESSING)
 
         s3 = await s3_client_manager.get_client()
-        response = await s3.get_object(Bucket=settings.S3_BUCKET_NAME, Key=doc.s3_path) # Use s3_path
+        response = await s3.get_object(Bucket=settings.S3_BUCKET_NAME, Key=doc.s3_path) 
         file_bytes = await response["Body"].read()
 
         print(f"[OCR Task] Document {document_id} content_type: {doc.content_type}")
@@ -112,7 +112,7 @@ async def _run_ocr_processing(document_id: int):
             db,
             document_id=document_id,
             text=extracted_text,
-            status=DocumentStatus.PENDING_VALIDATION # Corrected status to use Enum
+            status=DocumentStatus.PENDING_VALIDATION 
         )
         print(f"[OCR Task] Finished OCR for document ID: {document_id}. Status set to PENDING_VALIDATION.")
 
@@ -142,7 +142,7 @@ async def _run_embedding_processing(document_id: int):
             print(f"[Embedding Task] Calling rag_service.update_document_content for document ID: {document_id} to delete old embeddings.")
             delete_result = await rag_service.update_document_content(
                 document_id=str(document_id),
-                new_text_content="", # Not used for deletion, but required by signature
+                new_text_content="",
                 company_id=doc.company_id,
                 title=doc.title, # Pass title for metadata if needed by delete_document_by_id
                 tags=doc.tags # Pass tags if needed by delete_document_by_id

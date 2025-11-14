@@ -1,22 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services import user_service
-from app.services.user_service import UserRegistrationError, UserRegistrationError # Ensure custom exceptions are imported
+from app.services.user_service import UserRegistrationError
 from app.core.dependencies import get_db, get_current_user
 from app.schemas import user_schema, token_schema
 from app.utils import auth
-from app.utils.activity_logger import log_activity # Import log_activity
-from app.models import user_model, company_model # Ensure company_model is imported if needed
-from datetime import datetime, timedelta, timezone # Import datetime and timedelta
-import secrets
-import string
-import os
-import uuid
-import io
+from app.utils.activity_logger import log_activity 
+from app.models import user_model 
 from sqlalchemy.exc import IntegrityError
-import logging
-from botocore.exceptions import ClientError
-from app.core.config import settings # Import settings
 
 router = APIRouter(
     prefix="/auth",
@@ -84,10 +75,10 @@ async def login_for_access_token(
     if not user:
         # Log failed login attempt
         await log_activity(
-            db=db, # Pass the database session
-            user_id=None, # User ID is not known on failure
+            db=db, 
+            user_id=None, 
             activity_type_category="Login/Akses",
-            company_id=None, # Company is unknown if authentication fails
+            company_id=None, 
             activity_description="User login failed.",
         )
         raise HTTPException(
@@ -105,12 +96,12 @@ async def login_for_access_token(
         token_data_payload["company_id"] = user.company_id
 
     # Log successful login
-    company_id_to_log = user.company_id if user.company else None # Use integer company ID
+    company_id_to_log = user.company_id if user.company else None
     await log_activity(
-        db=db, # Pass the database session
-        user_id=user.id, # Use integer user ID
+        db=db, 
+        user_id=user.id, 
         activity_type_category="Login/Akses",
-        company_id=company_id_to_log, # Use integer company ID
+        company_id=company_id_to_log, 
         activity_description=f"User '{user.email}' logged in successfully.",
     )
 
@@ -131,7 +122,7 @@ async def read_users_me(current_user: user_model.Users = Depends(get_current_use
     if current_user.company and current_user.company.pic_phone_number:
         company_pic_phone = current_user.company.pic_phone_number
 
-    user_data = user_schema.User( # Corrected indentation
+    user_data = user_schema.User(
         id=current_user.id,
         name=current_user.name,
         username=current_user.username,
@@ -141,16 +132,16 @@ async def read_users_me(current_user: user_model.Users = Depends(get_current_use
         division=current_user.division,
         is_active=current_user.is_active,
         company_pic_phone_number=company_pic_phone,
-        profile_picture_url=current_user.profile_picture_url # Added to include profile picture URL
+        profile_picture_url=current_user.profile_picture_url 
     )
     
     # Log feature access
-    company_id_to_log = current_user.company_id if current_user.company else None # Use integer company ID
+    company_id_to_log = current_user.company_id if current_user.company else None 
     await log_activity(
-        db=db, # Pass the database session
-        user_id=current_user.id, # Use integer user ID
+        db=db,
+        user_id=current_user.id, 
         activity_type_category="Login/Akses",
-        company_id=company_id_to_log, # Use integer company ID
+        company_id=company_id_to_log, 
         activity_description=f"User '{current_user.email}' accessed 'Get My Profile' feature.",
     )
     
@@ -180,7 +171,7 @@ async def request_reset_route(email: str, db: AsyncSession = Depends(get_db)):
 
 @router.post("/reset-password")
 async def reset_password_route(
-    data: user_schema.PasswordResetRequest, # Assuming this schema exists
+    data: user_schema.PasswordResetRequest, 
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -200,5 +191,3 @@ async def reset_password_route(
         token=data.token,
         new_password=data.new_password
     )
-
-# --- End of new endpoints ---

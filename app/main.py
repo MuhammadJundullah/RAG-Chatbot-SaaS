@@ -4,7 +4,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.endpoints import auth, chat, documents, company, chatlogs, admin
 from app.core.database import db_manager
 from app.utils.activity_logger import log_activity 
-from datetime import datetime 
 from app.core.dependencies import get_db 
 
 # No complex lifespan needed with gevent and simple singleton initialization

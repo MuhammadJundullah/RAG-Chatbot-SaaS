@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Form, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import datetime, timezone
-from app.core.dependencies import get_current_user, get_db, get_current_company_admin
+from app.core.dependencies import get_db, get_current_company_admin, get_current_employee
 from app.models.user_model import Users
 from app.schemas import company_schema, user_schema
 from app.services import company_service, user_service
@@ -17,7 +17,7 @@ router = APIRouter(
 @router.get("/", response_model=company_schema.Company)
 async def read_company_by_user(
     db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_user)
+    current_user: Users = Depends(get_current_employee)
 ):
     return await company_service.get_company_by_user_service(
         db=db,
@@ -58,7 +58,7 @@ async def update_company_by_admin(
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log, # Use integer company ID
         activity_description=f"Company '{updated_company.name}' updated by admin '{current_user.email}'.",
-        timestamp=datetime.now(datetime.timezone.utc)
+        timestamp=datetime.now(timezone.utc)
     )
     return updated_company
 
@@ -110,7 +110,7 @@ async def register_employee_by_admin(
             activity_type_category="Data/CRUD",
             company_id=company_id_to_log, # Use integer company ID
             activity_description=f"Employee '{registered_employee.email}' registered by admin '{current_user.email}'.",
-            timestamp=datetime.now(datetime.timezone.utc)
+            timestamp=datetime.now(timezone.utc)
         )
         return registered_employee
     except UserRegistrationError as e:
@@ -157,7 +157,7 @@ async def update_employee_by_admin(
             activity_type_category="Data/CRUD",
             company_id=company_id_to_log, # Use integer company ID
             activity_description=f"Employee '{updated_employee.email}' updated by admin '{current_user.email}'.",
-            timestamp=datetime.now(datetime.timezone.utc)
+            timestamp=datetime.now(timezone.utc)
         )
         return updated_employee
     except EmployeeUpdateError as e:
@@ -260,28 +260,6 @@ async def get_active_companies(
         timestamp=datetime.now(datetime.timezone.utc)
     )
     return companies
-
-@router.get("/pending-approval", response_model=List[company_schema.Company])
-async def get_pending_approval_companies(
-    page: int = 1,
-    limit: int = 100,
-    db: AsyncSession = Depends(get_db),
-):
-    """Gets a list of companies that are pending approval."""
-    skip_calculated = (page - 1) * limit
-    return await company_service.get_pending_approval_companies_service(
-        db=db,
-        skip=skip_calculated,
-        limit=limit
-    )
-
-
-    skip_calculated = (page - 1) * limit
-    return await company_service.get_active_companies_service(
-        db=db,
-        skip=skip_calculated,
-        limit=limit
-    )
 
 @router.get("/pending-approval", response_model=List[company_schema.Company])
 async def get_pending_approval_companies(

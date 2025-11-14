@@ -1,10 +1,7 @@
 import datetime
-import json
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.log_model import ActivityLog # Import the model
-from app.models.user_model import Users # Import Users model for type hinting if needed
-from app.models.company_model import Company # Import Company model for type hinting if needed
 
 async def log_activity(
     db: AsyncSession,

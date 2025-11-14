@@ -248,7 +248,7 @@ async def test_update_employee_by_admin(override_get_current_company_admin, admi
 async def test_update_employee_not_found(override_get_current_company_admin, admin_client):
     employee_id = 999
     update_data = {"name": "Any Name"}
-    with patch("app.services.user_service.update_employee_by_admin", side_effect=EmployeeUpdateError(detail="Employee not found", status_code=404)) as mock_update_service:
+    with patch("app.services.user_service.update_employee_by_admin", side_effect=EmployeeUpdateError(detail="Employee not found", status_code=404)):
         response = admin_client.put(f"/api/companies/employees/{employee_id}", data=update_data)
         assert response.status_code == 404
         assert response.json() == {"detail": "Employee not found"}

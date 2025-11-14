@@ -18,7 +18,6 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 # --- User Authentication and Authorization Dependencies ---
-
 async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) -> user_model.Users:
     """
     Dependency to get the current user from a JWT token.
@@ -82,6 +81,7 @@ async def get_current_employee(current_user: user_model.Users = Depends(get_curr
     """
     Dependency to ensure the user is an employee.
     """
+
     if current_user.role != 'employee':
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

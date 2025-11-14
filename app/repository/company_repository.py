@@ -24,9 +24,9 @@ class CompanyRepository(BaseRepository[company_model.Company]):
         """Gets a list of companies, with optional filtering by status."""
         query = select(self.model)
         if status == "active":
-            query = query.filter(self.model.is_active == True)
+            query = query.filter(self.model.is_active)
         elif status == "pending":
-            query = query.filter(self.model.is_active == False)
+            query = query.filter(not self.model.is_active)
         
         query = query.offset(skip).limit(limit)
         result = await db.execute(query)

@@ -1,4 +1,4 @@
-from fastapi import HTTPException, status, UploadFile
+from fastapi import HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List, Optional
@@ -9,7 +9,6 @@ from botocore.exceptions import ClientError
 from app.repository.company_repository import company_repository
 from app.models import user_model
 from app.schemas import user_schema, company_schema
-from app.services import user_service
 from app.core.s3_client import s3_client_manager
 from app.core.config import settings
 

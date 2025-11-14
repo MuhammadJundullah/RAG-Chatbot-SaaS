@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import List, Optional
 from math import ceil
+import csv
+import io # Import io for StringIO
+from starlette.responses import StreamingResponse # Import StreamingResponse
 
 from app.core.dependencies import get_current_super_admin, get_db
 from app.schemas import company_schema, log_schema
@@ -13,8 +16,6 @@ router = APIRouter(
     tags=["Super Admin"],
     dependencies=[Depends(get_current_super_admin)],
 )
-
-from typing import List, Optional
 
 # get all companies with optional status filter
 @router.get("/companies", response_model=List[company_schema.Company])
@@ -53,21 +54,30 @@ async def reject_company(
 async def get_activity_logs(
     page: int = 1,
     limit: int = 100,
+    company_id: Optional[int] = None,
+    activity_type_category: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_super_admin)
 ):
     """
     Gets all activity logs.
     Supports pagination via 'page' (page number) and 'limit' (number of items per page) query parameters.
+    Supports filtering by 'company_id', 'activity_type_category', 'start_date', and 'end_date'.
     Returns a list of logs and pagination details.
-    Example: /api/admin/activity-logs/?page=1&limit=20
+    Example: /api/admin/activity-logs/?page=1&limit=20&company_id=1&activity_type_category=Data/CRUD&start_date=2023-01-01&end_date=2023-12-31
     """
     skip_calculated = (page - 1) * limit
 
     logs, total_count = await admin_service.get_activity_logs_service(
         db=db,
         skip=skip_calculated,
-        limit=limit
+        limit=limit,
+        company_id=company_id,
+        activity_type_category=activity_type_category,
+        start_date=start_date,
+        end_date=end_date
     )
 
     total_pages = ceil(total_count / limit) if limit > 0 else 0
@@ -77,4 +87,35 @@ async def get_activity_logs(
         total_pages=total_pages,
         current_page=page,
         total_logs=total_count
+    )
+
+# --- NEW ENDPOINT FOR EXPORTING ACTIVITY LOGS ---
+@router.get("/export-logs")
+async def export_activity_logs(
+    company_id: Optional[int] = None,
+    activity_type_category: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_super_admin)
+):
+    """
+    Exports activity logs as a CSV file.
+    Supports filtering by 'company_id', 'activity_type_category', 'start_date', and 'end_date'.
+    """
+    # Fetch logs using the service, potentially without pagination for export
+    # We'll assume the service function can handle fetching all relevant logs
+    csv_data = await admin_service.export_activity_logs_service(
+        db=db,
+        company_id=company_id,
+        activity_type_category=activity_type_category,
+        start_date=start_date,
+        end_date=end_date
+    )
+
+    # Prepare the response for CSV download
+    return StreamingResponse(
+        io.StringIO(csv_data),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=activity_logs.csv"}
     )

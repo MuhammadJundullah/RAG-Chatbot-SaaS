@@ -1,17 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 import uuid
-import datetime
 
 from app.schemas import chat_schema, chatlog_schema
 from app.services import chat_service, document_service
 from app.core.dependencies import get_current_user, get_db, get_current_employee
 from app.models.user_model import Users
 from app.schemas.conversation_schema import ConversationListResponse
-from app.schemas.document_schema import ReferencedDocument
 from app.repository.chatlog_repository import chatlog_repository
 from app.services.rag_service import rag_service
 from app.services.gemini_service import gemini_service
@@ -81,7 +79,7 @@ async def sse_chat_endpoint(
                 valid_conversation_id = uuid.UUID(request.conversation_id)
                 conversation_id_str = str(valid_conversation_id)
             except ValueError:
-                yield f"data: {{\"error\": \"Invalid conversation ID format.\"}}\n\n"
+                yield "data: {\"error\": \"Invalid conversation ID format.\"}\n\n"
                 return
 
             # Check if the conversation exists. If not, create it.
@@ -188,7 +186,7 @@ async def get_company_documents(
     """
     Retrieve a list of documents for the current user's company, including their extracted text.
     """
-    documents = await document_service.get_all_company_documents_service(
+    documents_list, total_count = await document_service.get_all_company_documents_service(
         db=db,
         current_user=current_user,
         skip=0,
@@ -202,15 +200,15 @@ async def get_company_documents(
         user_id=current_user.id, # Use integer user ID
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log, # Use integer company ID
-        activity_description=f"User '{current_user.email}' retrieved list of company documents for chat. Found {len(documents)} documents.",
+        activity_description=f"User '{current_user.email}' retrieved list of company documents for chat. Found {len(documents_list)} documents.",
     )
 
     # Map documents to the new response model including extracted_text
     return [
-        ChatDocumentResponse(
-            id=doc.id,
-            title=doc.title,
-            extracted_text=doc.extracted_text
-        )
-        for doc in documents
+        {
+            "id": doc.id,
+            "title": doc.title,
+            "extracted_text": doc.extracted_text,
+        }
+        for doc in documents_list
     ]

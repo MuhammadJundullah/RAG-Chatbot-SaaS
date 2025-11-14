@@ -1,11 +1,8 @@
 from datetime import datetime
-from typing import Optional
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 # Import related models to define relationships
-from app.models.user_model import Users
-from app.models.company_model import Company
 
 class ActivityLog(Base):
     __tablename__ = "Activity_logs"

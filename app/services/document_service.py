@@ -4,7 +4,6 @@ from typing import List, Optional
 import os
 import pathlib
 import uuid
-import datetime
 from botocore.exceptions import ClientError
 
 from app.models.user_model import Users

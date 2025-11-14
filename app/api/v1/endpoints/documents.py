@@ -2,7 +2,6 @@ from fastapi import APIRouter, UploadFile, File, Depends, status, Form
 from typing import List
 from math import ceil
 from pydantic import BaseModel
-import datetime
 
 from app.core.dependencies import get_db, get_current_company_admin
 from app.models.user_model import Users
