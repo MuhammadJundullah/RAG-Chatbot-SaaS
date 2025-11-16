@@ -74,4 +74,20 @@ class ConversationRepository(BaseRepository[Conversation]):
         ]
         return conversations
 
+    async def update_title(self, db: AsyncSession, conversation_id: str, title: str) -> Optional[Conversation]:
+        conversation = await self.get(db, conversation_id)
+        if conversation:
+            conversation.title = title
+            await db.commit()
+            await db.refresh(conversation)
+        return conversation
+
+    async def archive_conversation(self, db: AsyncSession, conversation_id: str) -> Optional[Conversation]:
+        conversation = await self.get(db, conversation_id)
+        if conversation:
+            conversation.is_archived = True
+            await db.commit()
+            await db.refresh(conversation)
+        return conversation
+
 conversation_repository = ConversationRepository()

@@ -40,5 +40,6 @@ class ChatMessage(BaseModel):
     created_at: datetime
 
 class ConversationInfoSchema(BaseModel):
-    id: uuid.UUID
+    id: str
     title: str
+    is_archived: bool

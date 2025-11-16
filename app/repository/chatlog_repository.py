@@ -135,7 +135,7 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
         user_id: int,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[tuple[str, str]]: # Changed return type hint
+    ) -> List[tuple[str, str, bool]]: # Changed return type hint
         from app.models.conversation_model import Conversation # Import Conversation model
 
         # Subquery to find the latest created_at for each conversation_id
@@ -154,7 +154,8 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
         # Join Chatlogs with Conversation
         query = select(
             latest_chat_per_conversation.c.conversation_id,
-            Conversation.title
+            Conversation.title,
+            Conversation.is_archived
         ).join(
             Conversation,
             latest_chat_per_conversation.c.conversation_id == Conversation.id

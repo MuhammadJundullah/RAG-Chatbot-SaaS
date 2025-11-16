@@ -9,7 +9,7 @@ from app.schemas import chat_schema, chatlog_schema
 from app.services import chat_service, document_service
 from app.core.dependencies import get_current_user, get_db, get_current_employee
 from app.models.user_model import Users
-from app.schemas.conversation_schema import ConversationListResponse
+from app.schemas.conversation_schema import ConversationListResponse, ConversationUpdateTitle
 from app.repository.chatlog_repository import chatlog_repository
 from app.services.rag_service import rag_service
 from app.services.gemini_service import gemini_service
@@ -113,14 +113,14 @@ async def sse_chat_endpoint(
             async for chunk in gemini_service.generate_chat_response(
                 question=user_message,
                 context=rag_context,
-                query_results=None, # Assuming query_results is not directly used here for streaming
+                query_results=None, 
                 db=db,
                 current_user=current_user,
                 conversation_history=conversation_history
             ):
                 full_response += chunk
-                yield f"data: {chunk}\n\n" # Send each chunk as an SSE event
-        except Exception as e: # Corrected indentation for except block
+                yield f"data: {chunk}\n\n" 
+        except Exception as e: 
             yield f"data: {{\"error\": \"An error occurred during AI response generation: {str(e)}\"}}\n\n"
             return
         
@@ -138,10 +138,10 @@ async def sse_chat_endpoint(
         # Log chat message (after saving to chatlog)
         company_id_to_log = current_user.company_id if current_user.company else None
         await log_activity(
-            db=db, # Pass the database session
-            user_id=current_user.id, # Use integer user ID
-            activity_type_category="Data/CRUD", # Or "CHAT_MESSAGE"
-            company_id=company_id_to_log, # Use integer company ID
+            db=db, 
+            user_id=current_user.id, 
+            activity_type_category="Data/CRUD", 
+            company_id=company_id_to_log, 
             activity_description=f"User '{current_user.email}' sent a chat message in conversation {conversation_id_str}.",
         )
 
@@ -170,13 +170,63 @@ async def list_conversations_endpoint(
     # Log conversation list retrieval
     company_id_to_log = current_user.company_id if current_user.company else None
     await log_activity(
-        db=db, # Pass the database session
-        user_id=current_user.id, # Use integer user ID
+        db=db, 
+        user_id=current_user.id, 
         activity_type_category="Data/CRUD",
-        company_id=company_id_to_log, # Use integer company ID
+        company_id=company_id_to_log, 
         activity_description=f"User '{current_user.email}' retrieved list of conversations. Found {len(conversations)} conversations.",
     )
     return conversations
+
+@router.patch("/chat/conversations/{conversation_id}/archive", response_model=ConversationListResponse, tags=["Chat"])
+async def archive_conversation_endpoint(
+    conversation_id: str,
+    current_user: Users = Depends(get_current_employee),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Archives a specific conversation.
+    """
+    updated_conversation = await chat_service.archive_chat(
+        db=db,
+        conversation_id=conversation_id,
+        current_user=current_user
+    )
+    # Log activity
+    await log_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type_category="Data/CRUD",
+        company_id=current_user.company_id,
+        activity_description=f"User '{current_user.email}' archived conversation {conversation_id}.",
+    )
+    return updated_conversation
+
+@router.patch("/chat/conversations/{conversation_id}/title", response_model=ConversationListResponse, tags=["Chat"])
+async def edit_conversation_title_endpoint(
+    conversation_id: str,
+    request: ConversationUpdateTitle,
+    current_user: Users = Depends(get_current_employee),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Edits the title of a specific conversation.
+    """
+    updated_conversation = await chat_service.edit_chat_title(
+        db=db,
+        conversation_id=conversation_id,
+        new_title=request.title,
+        current_user=current_user
+    )
+    # Log activity
+    await log_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type_category="Data/CRUD",
+        company_id=current_user.company_id,
+        activity_description=f"User '{current_user.email}' edited title of conversation {conversation_id}.",
+    )
+    return updated_conversation
 
 @router.get("/chat/document", response_model=List[ChatDocumentResponse], tags=["Chat"]) # Changed response_model
 async def get_company_documents(
@@ -190,16 +240,16 @@ async def get_company_documents(
         db=db,
         current_user=current_user,
         skip=0,
-        limit=1000000  # A large limit to get all documents
+        limit=1000000
     )
 
     # Log document list retrieval
     company_id_to_log = current_user.company_id if current_user.company else None
     await log_activity(
-        db=db, # Pass the database session
-        user_id=current_user.id, # Use integer user ID
+        db=db, 
+        user_id=current_user.id,
         activity_type_category="Data/CRUD",
-        company_id=company_id_to_log, # Use integer company ID
+        company_id=company_id_to_log, 
         activity_description=f"User '{current_user.email}' retrieved list of company documents for chat. Found {len(documents_list)} documents.",
     )
 

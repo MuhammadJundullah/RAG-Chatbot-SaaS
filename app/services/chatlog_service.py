@@ -199,18 +199,21 @@ async def get_user_conversation_ids_service(
     current_user: Users,
     skip: int,
     limit: int,
-) -> List[chatlog_schema.ConversationInfoSchema]: # Changed return type hint
-    # The repository now returns a list of tuples: (UUID_object, title_str)
+) -> List[chatlog_schema.ConversationInfoSchema]:
+    """
+    Retrieve a list of unique conversations (ID, title, and archived status) for the current user.
+    """
+    # The repository now returns a list of tuples: (conv_id, title, is_archived)
     conversation_data = await chatlog_repository.get_unique_conversation_ids_for_user(
         db=db,
         user_id=current_user.id,
         skip=skip,
         limit=limit,
     )
-    # Format the data into ConversationInfoSchema objects, converting UUID to string
+    # Format the data into ConversationInfoSchema objects
     return [
-        chatlog_schema.ConversationInfoSchema(id=str(conv_id), title=title) # Convert UUID to string
-        for conv_id, title in conversation_data
+        chatlog_schema.ConversationInfoSchema(id=str(conv_id), title=title, is_archived=is_archived)
+        for conv_id, title, is_archived in conversation_data
     ]
 
 async def get_conversation_history_service(

@@ -6,6 +6,7 @@ from app.schemas import chat_schema, chatlog_schema
 from app.services.rag_service import rag_service
 from app.services.gemini_service import gemini_service
 from app.models.user_model import Users
+from app.models.conversation_model import Conversation
 from app.repository.chatlog_repository import chatlog_repository
 from app.schemas.conversation_schema import ConversationCreate, ConversationListResponse 
 from app.repository.conversation_repository import conversation_repository 
@@ -149,3 +150,49 @@ async def get_conversations_with_titles(
         limit=limit,
     )
     return conversations
+
+async def archive_chat(
+    db: AsyncSession,
+    conversation_id: str,
+    current_user: Users
+) -> Conversation:
+    """
+    Archives a conversation for the current user.
+    """
+    # First, check if the conversation exists
+    conversation = await conversation_repository.get_conversation(db=db, conversation_id=conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+
+    # Authorization: Check if the user is part of this conversation
+    user_chatlogs = await chatlog_repository.get_chat_history(db=db, conversation_id=conversation_id, user_id=current_user.id, limit=1)
+    if not user_chatlogs:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to archive this conversation")
+
+    # If authorized, archive the conversation
+    updated_conversation = await conversation_repository.archive_conversation(db=db, conversation_id=conversation_id)
+    return updated_conversation
+
+
+async def edit_chat_title(
+    db: AsyncSession,
+    conversation_id: str,
+    new_title: str,
+    current_user: Users
+) -> Conversation:
+    """
+    Edits the title of a conversation for the current user.
+    """
+    # First, check if the conversation exists
+    conversation = await conversation_repository.get_conversation(db=db, conversation_id=conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+
+    # Authorization: Check if the user is part of this conversation
+    user_chatlogs = await chatlog_repository.get_chat_history(db=db, conversation_id=conversation_id, user_id=current_user.id, limit=1)
+    if not user_chatlogs:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to edit this conversation")
+
+    # If authorized, update the title
+    updated_conversation = await conversation_repository.update_title(db=db, conversation_id=conversation_id, title=new_title)
+    return updated_conversation

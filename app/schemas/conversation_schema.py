@@ -4,6 +4,9 @@ from datetime import datetime
 import uuid
 from app.schemas import chatlog_schema, document_schema
 
+class ConversationUpdateTitle(BaseModel):
+    title: str
+
 class ConversationBase(BaseModel):
     title: str
     created_at: Optional[datetime] = None
@@ -14,8 +17,9 @@ class ConversationCreate(ConversationBase):
     id: str # Expecting a UUID string to be passed in
 
 class ConversationListResponse(ConversationBase):
-    id: str
+    id: uuid.UUID
     title: str
+    is_archived: bool
     created_at: datetime
 
     class Config:
@@ -24,6 +28,7 @@ class ConversationListResponse(ConversationBase):
 class CompanyConversationResponse(BaseModel):
     conversation_id: uuid.UUID = Field(..., alias='id')
     title: str
+    is_archived: bool
     created_at: datetime
 
     class Config:
@@ -39,6 +44,7 @@ class PaginatedCompanyConversationResponse(BaseModel):
 class ConversationDetailResponse(BaseModel):
     conversation_id: uuid.UUID
     conversation_title: str
+    is_archived: bool
     conversation_created_at: datetime
     username: str
     division_name: Optional[str]
