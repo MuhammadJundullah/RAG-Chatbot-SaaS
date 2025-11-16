@@ -17,7 +17,7 @@ from app.models.base import Base
 class Chatlogs(Base):
     __tablename__ = "Chatlogs"
     id = Column(Integer, primary_key=True)
-    question = Column(String(255))
+    question = Column(Text)
     answer = Column(Text)
     UsersId = Column(Integer, ForeignKey("Users.id"), nullable=False)
     company_id = Column(Integer, ForeignKey("Company.id"), nullable=False)

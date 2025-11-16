@@ -1,4 +1,4 @@
-from pydantic import BaseModel, model_validator, Field, EmailStr # Import Field and EmailStr
+from pydantic import BaseModel, model_validator, Field, EmailStr 
 from typing import Optional
 
 class UserBase(BaseModel):
@@ -10,11 +10,9 @@ class UserRegistration(BaseModel):
     name: str
     email: str
     username: Optional[str] = None
-    password: str
-    # For new company registration
+    password: str    
     company_name: Optional[str] = None
     pic_phone_number: Optional[str] = None
-    # For joining an existing company
     company_id: Optional[int] = None
 
 class EmployeeUpdate(BaseModel):
@@ -29,7 +27,7 @@ class User(UserBase):
     company_id: Optional[int] = None
     division: Optional[str] = None
     is_active: Optional[bool] = None
-    profile_picture_url: Optional[str] = None # Added for profile picture URL
+    profile_picture_url: Optional[str] = None
 
     class Config:
         from_attributes = True
