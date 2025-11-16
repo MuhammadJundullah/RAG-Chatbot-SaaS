@@ -175,7 +175,7 @@ async def delete_employee_by_admin(
             activity_type_category="Data/CRUD",
             company_id=company_id_to_log,
             activity_description=f"Employee with ID {employee_id} deleted by admin '{current_user.email}'.",
-            timestamp=datetime.now(datetime.timezone.utc)
+            timestamp=datetime.now(timezone.utc)
         )
         return {"message": "Employee deleted successfully"}
     except EmployeeDeletionError as e:
