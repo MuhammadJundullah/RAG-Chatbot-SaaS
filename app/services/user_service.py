@@ -9,14 +9,11 @@ from app.repository.company_repository import company_repository
 from app.utils.security import get_password_hash, verify_password
 from app.models import user_model, company_model
 from app.core.config import settings
-from app.core.s3_client import s3_client_manager 
-import os 
-import uuid 
-import io 
+import os
+import uuid
 from sqlalchemy.exc import IntegrityError
 import logging
-from botocore.exceptions import ClientError
-from datetime import datetime, timedelta 
+from datetime import datetime, timedelta
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
 
@@ -99,7 +96,7 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
 
 async def register_employee_by_admin(db: AsyncSession, employee_data: user_schema.EmployeeRegistrationByAdmin, company_id: int, current_user: user_model.Users, profile_picture_file: UploadFile = None):
     """
-    Registers a new employee by an admin, including uploading a profile picture to S3.
+    Registers a new employee by an admin, including uploading a profile picture to the local server.
     Handles potential username uniqueness violations from the database.
     If a division name is provided and the division does not exist, it will be created.
     """
@@ -115,29 +112,22 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
 
     profile_picture_url = None
     if profile_picture_file and profile_picture_file.filename:
-        # Generate file extension and a unique identifier
-        file_extension = os.path.splitext(profile_picture_file.filename)[1]
-        logo_uuid = str(uuid.uuid4())
+        UPLOAD_DIR = "static/employee_profiles"
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
         
-        # Construct the S3 key using a specific prefix for employee pictures
-        s3_key = f"employee_profile_pictures/{company_id}/{logo_uuid}{file_extension}"
+        file_extension = os.path.splitext(profile_picture_file.filename)[1]
+        file_uuid = str(uuid.uuid4())
+        filename = f"{file_uuid}{file_extension}"
+        file_path = os.path.join(UPLOAD_DIR, filename)
             
         try:
-            # Read file content and create a BytesIO object
             file_content = await profile_picture_file.read()
-            file_object = io.BytesIO(file_content)
+            with open(file_path, "wb") as f:
+                f.write(file_content)
             
-            # Upload file to S3 using the enhanced upload_file method
-            await s3_client_manager.upload_file(
-                file_object=file_object,
-                bucket_name=settings.S3_BUCKET_NAME,
-                file_key=s3_key,
-                content_type=profile_picture_file.content_type
-            )
-            profile_picture_url = f"https://1xg7ah.leapcellobj.com/{settings.S3_BUCKET_NAME}/{s3_key}"
+            profile_picture_url = f"/{file_path}"
         except Exception as e:
             logging.error(f"Failed to upload profile picture for employee {employee_data.email}: {e}")
-            # Raise a user-friendly error if upload fails
             raise UserRegistrationError(f"Failed to upload profile picture: {e}")
 
     db_user = user_model.Users(
@@ -178,22 +168,16 @@ async def delete_employee_by_admin(db: AsyncSession, company_id: int, employee_i
     if employee.company_id != company_id:
         raise EmployeeDeletionError(detail="Not authorized to delete this employee.", status_code=403)
 
-    # If employee has a profile picture, delete it from S3
+    # If employee has a profile picture, delete it from the local filesystem
     if employee.profile_picture_url:
         try:
-            # Extract the S3 key from the URL
-            # Assuming the URL format is https://1xg7ah.leapcellobj.com/{bucket_name}/{s3_key}
-            # We need to remove the base URL and bucket name to get the s3_key
-            base_url = f"https://1xg7ah.leapcellobj.com/{settings.S3_BUCKET_NAME}/"
-            s3_key = employee.profile_picture_url.replace(base_url, "")
-            await s3_client_manager.delete_file(bucket_name=settings.S3_BUCKET_NAME, file_key=s3_key)
-        except ClientError as e:
-            if e.response["Error"]["Code"] == "404":
-                logging.warning(f"Profile picture not found in S3 for employee {employee.id} (key: {s3_key}). Proceeding with user deletion.")
-            else:
-                logging.error(f"Failed to delete profile picture from S3 for employee {employee.id}: {e}")
+            # The URL is stored like /static/employee_profiles/filename.ext
+            # We need to remove the leading '/' to get the correct relative path
+            file_path = employee.profile_picture_url.lstrip('/')
+            if os.path.exists(file_path):
+                os.remove(file_path)
         except Exception as e:
-            logging.error(f"An unexpected error occurred during S3 profile picture deletion for employee {employee.id}: {e}")
+            logging.error(f"Failed to delete profile picture {file_path} for employee {employee.id}: {e}")
             # Decide whether to raise an error or just log it. For now, we'll log and proceed with user deletion.
 
     await user_repository.delete_user(db, user_id=employee.id)
@@ -207,7 +191,7 @@ async def update_employee_by_admin(
     profile_picture_file: UploadFile = None
 ) -> user_model.Users:
     """
-    Updates an employee's data, including their profile picture.
+    Updates an employee's data, including their profile picture stored locally.
     """
     employee = await user_repository.get_user(db, user_id=employee_id)
 
@@ -220,26 +204,26 @@ async def update_employee_by_admin(
         update_data["password"] = get_password_hash(update_data["password"])
 
     if profile_picture_file and profile_picture_file.filename:
+        UPLOAD_DIR = "static/employee_profiles"
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+
         file_extension = os.path.splitext(profile_picture_file.filename)[1]
-        logo_uuid = str(uuid.uuid4())
-        s3_key = f"employee_profile_pictures/{company_id}/{logo_uuid}{file_extension}"
+        file_uuid = str(uuid.uuid4())
+        filename = f"{file_uuid}{file_extension}"
+        file_path = os.path.join(UPLOAD_DIR, filename)
         
         try:
             file_content = await profile_picture_file.read()
-            file_object = io.BytesIO(file_content)
+            with open(file_path, "wb") as f:
+                f.write(file_content)
             
-            await s3_client_manager.upload_file(
-                file_object=file_object,
-                bucket_name=settings.S3_BUCKET_NAME,
-                file_key=s3_key,
-                content_type=profile_picture_file.content_type
-            )
-            new_profile_picture_url = f"https://1xg7ah.leapcellobj.com/{settings.S3_BUCKET_NAME}/{s3_key}"
+            new_profile_picture_url = f"/{file_path}"
 
+            # Delete old profile picture if it exists
             if employee.profile_picture_url:
-                base_url = f"https://1xg7ah.leapcellobj.com/{settings.S3_BUCKET_NAME}/"
-                old_s3_key = employee.profile_picture_url.replace(base_url, "")
-                await s3_client_manager.delete_file(bucket_name=settings.S3_BUCKET_NAME, file_key=old_s3_key)
+                old_file_path = employee.profile_picture_url.lstrip('/')
+                if os.path.exists(old_file_path):
+                    os.remove(old_file_path)
 
             update_data["profile_picture_url"] = new_profile_picture_url
         except Exception as e:
@@ -302,7 +286,7 @@ async def send_brevo_email(to_email: str, subject: str, html_content: str):
     # Menggunakan nama aplikasi dari settings jika ada, atau placeholder
     sender_name = getattr(settings, 'APP_NAME', 'SmartAI') 
 
-    # Tentukan detail penerima
+    # Tentukan detail penerima p
     to_recipient = [{"email": to_email, "name": to_email}] 
 
     # Tentukan konten email

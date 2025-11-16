@@ -10,10 +10,9 @@ from app.models.user_model import Users
 from app.models.document_model import DocumentStatus
 from app.schemas import document_schema
 from app.repository.document_repository import document_repository
-from app.core.s3_client import s3_client_manager
 from app.core.config import settings
 from app.services.rag_service import rag_service
-from app.tasks.document_tasks import upload_document_to_s3, process_ocr_task, process_embedding_task
+from app.tasks.document_tasks import process_ocr_task, process_embedding_task
 from app.utils.activity_logger import log_activity
 
 
@@ -48,6 +47,12 @@ async def upload_document_service(
         tags=tags # Pass tags to the schema
     )
     db_document = await document_repository.create_document(db=db, document=doc_create)
+    
+    # Manually update status to UPLOADED since we are skipping the S3 upload step
+    db_document = await document_repository.update_document_status_and_reason(
+        db, document_id=db_document.id, status=DocumentStatus.UPLOADED
+    )
+
     print(f"[Upload Service] Document {db_document.id} created with temp_storage_path: {db_document.temp_storage_path}")
 
     # Log document upload
@@ -60,7 +65,8 @@ async def upload_document_service(
         activity_description=f"Document '{db_document.title}' (ID: {db_document.id}) uploaded by admin '{current_user.email}'.",
     )
 
-    upload_document_to_s3.delay(db_document.id)
+    # Directly trigger OCR task
+    process_ocr_task.delay(db_document.id)
 
     return db_document
 
@@ -74,52 +80,29 @@ async def retry_document_upload_service(
     if not db_document or db_document.company_id != current_user.company_id:
         raise HTTPException(status_code=404, detail="Document not found.")
 
-    if db_document.status != DocumentStatus.UPLOAD_FAILED:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Document is not in a failed upload state. Current status: {db_document.status.value}"
-        )
-    
-    if db_document.s3_path:
+    # We are no longer using S3, so we only care about the temp path.
+    # If the temp file exists, we can retry the OCR process.
+    if db_document.temp_storage_path and os.path.exists(db_document.temp_storage_path):
+        # Set status to UPLOADED to allow OCR task to run
         updated_doc = await document_repository.update_document_status_and_reason(
             db, document_id=document_id, status=DocumentStatus.UPLOADED, reason=None
         )
-        updated_doc = await document_repository.update_document_status_and_reason(
-            db, document_id=document_id, status=DocumentStatus.UPLOADED, reason=None
-        )
-        # Log document upload retry
+        
         company_id_to_log = current_user.company_id if current_user.company else None
         await log_activity(
-            db=db, # Pass the database session
-            user_id=current_user.id, # Use integer user ID
+            db=db,
+            user_id=current_user.id,
             activity_type_category="Proses Dokumen",
-            company_id=company_id_to_log, # Use integer company ID
-            activity_description=f"Document ID {document_id} upload retried by admin '{current_user.email}'.",
+            company_id=company_id_to_log,
+            activity_description=f"Document ID {document_id} processing retried by admin '{current_user.email}'.",
         )
         process_ocr_task.delay(document_id)
-        print(f"Document {document_id} has been re-queued for OCR processing (S3 path found).")
-        return updated_doc
-
-    if db_document.temp_storage_path and os.path.exists(db_document.temp_storage_path):
-        updated_doc = await document_repository.update_document_status_and_reason(
-            db, document_id=document_id, status=DocumentStatus.UPLOADING, reason=None
-        )
-        # Log document upload retry (temp file found)
-        company_id_to_log = current_user.company_id if current_user.company else None
-        await log_activity(
-            db=db, # Pass the database session
-            user_id=current_user.id, # Use integer user ID
-            activity_type_category="Proses Dokumen",
-            company_id=company_id_to_log, # Use integer company ID
-            activity_description=f"Document ID {document_id} upload retried (temp file found) by admin '{current_user.email}'.",
-        )
-        upload_document_to_s3.delay(document_id)
-        print(f"Document {document_id} has been re-queued for S3 upload (temp file found).")
+        print(f"Document {document_id} has been re-queued for OCR processing (temp file found).")
         return updated_doc
 
     raise HTTPException(
         status_code=400,
-        detail="Cannot retry: The temporary file for this document no longer exists and no S3 path was recorded. Document is unrecoverable."
+        detail="Cannot retry: The temporary file for this document no longer exists. Document is unrecoverable."
     )
 
 async def get_all_company_documents_service(
@@ -302,22 +285,7 @@ async def delete_document_service(
             company_id=db_document.company_id
         )
 
-        # 2. Delete from S3
-        if db_document.s3_path:
-            try:
-                s3 = await s3_client_manager.get_client()
-                await s3.delete_objects(
-                    Bucket=settings.S3_BUCKET_NAME,
-                    Delete={"Objects": [{"Key": db_document.s3_path}]}
-                )
-            except ClientError as e:
-                if e.response['Error']['Code'] not in ['404', 'NoSuchKey']:
-                    # If it's a real error, re-raise it to be caught by the outer block
-                    raise e
-                # If it's just not found, that's okay, we can proceed.
-                print(f"Warning: S3 object not found during deletion, proceeding. Key: {db_document.s3_path}")
-
-        # 3. Delete temporary file if it exists
+        # 2. Delete temporary file if it exists
         if db_document.temp_storage_path and os.path.exists(db_document.temp_storage_path):
             try:
                 os.remove(db_document.temp_storage_path)
@@ -326,10 +294,10 @@ async def delete_document_service(
                 # Log the error but don't stop the process, as deleting the DB record is more important
                 print(f"[Delete Document] Error: Failed to remove temporary file {db_document.temp_storage_path}: {e}")
 
-        # 4. Delete from database
+        # 3. Delete from database
         await document_repository.delete_document(db=db, document_id=document_id)
 
-        # 5. Log the activity
+        # 4. Log the activity
         company_id_to_log = current_user.company_id if current_user.company else None
         await log_activity(
             db=db,

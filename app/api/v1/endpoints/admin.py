@@ -55,7 +55,7 @@ async def reject_company(
 async def get_activity_logs(
     page: int = 1,
     limit: int = 100,
-    company_id: Optional[int] = None,
+    company_id: Optional[str] = None,
     activity_type_category: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -93,7 +93,7 @@ async def get_activity_logs(
 # --- NEW ENDPOINT FOR EXPORTING ACTIVITY LOGS ---
 @router.get("/export-logs")
 async def export_activity_logs(
-    company_id: Optional[int] = None,
+    company_id: Optional[str] = None,
     activity_type_category: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,

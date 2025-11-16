@@ -61,19 +61,35 @@ async def get_activity_logs_service(
     db: AsyncSession,
     skip: int,
     limit: int,
-    company_id: Optional[int] = None,
+    company_id: Optional[str] = None,
     activity_type_category: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None
 ) -> Tuple[List[ActivityLog], int]:
     """
     Service to get all activity logs with pagination and filtering.
+    Handles empty string parameters by converting them to None.
     """
+    # Convert empty strings to None and handle company_id conversion
+    company_id_int = None
+    if company_id and company_id.strip():
+        try:
+            company_id_int = int(company_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid company_id format. Must be an integer.")
+
+    if not activity_type_category or not activity_type_category.strip():
+        activity_type_category = None
+    if not start_date or not start_date.strip():
+        start_date = None
+    if not end_date or not end_date.strip():
+        end_date = None
+
     logs, total_count = await log_repository.get_activity_logs(
         db=db,
         skip=skip,
         limit=limit,
-        company_id=company_id,
+        company_id=company_id_int,
         activity_type_category=activity_type_category,
         start_date=start_date,
         end_date=end_date
@@ -82,22 +98,36 @@ async def get_activity_logs_service(
 
 async def export_activity_logs_service(
     db: AsyncSession,
-    company_id: Optional[int] = None,
+    company_id: Optional[str] = None,
     activity_type_category: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None
 ) -> str:
     """
     Fetches activity logs with filters and formats them into a CSV string.
+    Handles empty string parameters by converting them to None.
     """
+    # Convert empty strings to None and handle company_id conversion
+    company_id_int = None
+    if company_id and company_id.strip():
+        try:
+            company_id_int = int(company_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid company_id format. Must be an integer.")
+
+    if not activity_type_category or not activity_type_category.strip():
+        activity_type_category = None
+    if not start_date or not start_date.strip():
+        start_date = None
+    if not end_date or not end_date.strip():
+        end_date = None
+        
     # Fetch all logs matching the criteria for export.
-    # We pass limit=None to indicate fetching all records.
-    # The repository's get_activity_logs should handle limit=None to fetch all.
     logs, _ = await log_repository.get_activity_logs(
         db=db,
-        skip=0, # No skip for export, fetch all from the beginning
-        limit=None, # Fetch all records
-        company_id=company_id,
+        skip=0,
+        limit=None,
+        company_id=company_id_int,
         activity_type_category=activity_type_category,
         start_date=start_date,
         end_date=end_date
@@ -108,11 +138,10 @@ async def export_activity_logs_service(
     writer = csv.writer(output)
 
     # Write header row
-    # Ensure these field names match the ActivityLog model attributes or desired output
     header = [
         "ID", "Timestamp", "User ID", "Company ID", 
         "Activity Type Category", "Activity Description",
-        "User Email", "Company Name" # Assuming these are available via joinedload
+        "User Email", "Company Name"
     ]
     writer.writerow(header)
 

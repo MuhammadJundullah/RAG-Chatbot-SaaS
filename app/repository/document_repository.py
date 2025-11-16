@@ -61,14 +61,11 @@ class DocumentRepository(BaseRepository[document_model.Documents]):
             await db.refresh(db_document)
         return db_document
 
-    async def update_document_after_upload(self, db: AsyncSession, document_id: int, s3_path: str, status: document_model.DocumentStatus) -> Optional[document_model.Documents]:
-        """Updates a document's status and S3 path after a successful upload."""
+    async def clear_temp_storage_path(self, db: AsyncSession, document_id: int) -> Optional[document_model.Documents]:
+        """Clears the temporary storage path of a document."""
         db_document = await self.get(db, document_id)
         if db_document:
-            db_document.s3_path = s3_path
-            db_document.status = status
             db_document.temp_storage_path = None
-            db_document.failed_reason = None
             await db.commit()
             await db.refresh(db_document)
         return db_document

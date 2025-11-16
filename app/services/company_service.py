@@ -4,12 +4,10 @@ from sqlalchemy.future import select
 from typing import List, Optional
 import uuid
 import os
-from botocore.exceptions import ClientError
 
 from app.repository.company_repository import company_repository
 from app.models import user_model
 from app.schemas import user_schema, company_schema
-from app.core.s3_client import s3_client_manager
 from app.core.config import settings
 
 async def get_company_users_by_admin_service(
@@ -67,58 +65,41 @@ async def update_company_by_admin_service(
     if db_company is None:
         raise HTTPException(status_code=404, detail="Company not found for this admin.")
 
-    # Initialize logo_s3_path with the existing logo path
-    logo_s3_path_to_update = db_company.logo_s3_path
-
-    s3_client = await s3_client_manager.get_client()
+    logo_path_to_update = db_company.logo_s3_path
 
     if logo_file and logo_file.filename:
-        
+        UPLOAD_DIR = "static/company_logos"
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+
         file_extension = os.path.splitext(logo_file.filename)[1]
         logo_uuid = str(uuid.uuid4())
-        s3_key = f"company_logos/{current_user.company_id}/{logo_uuid}{file_extension}"
-        full_public_logo_url = f"{settings.PUBLIC_S3_BASE_URL}/{settings.S3_BUCKET_NAME}/{s3_key}"
-
+        filename = f"{logo_uuid}{file_extension}"
+        file_path = os.path.join(UPLOAD_DIR, filename)
+        
         try:
-            await s3_client.put_object(
-                Bucket=settings.S3_BUCKET_NAME,
-                Key=s3_key,
-                Body=await logo_file.read(),
-                ContentType=logo_file.content_type
-            )
-            logo_s3_path_to_update = full_public_logo_url 
+            # Save new logo
+            content = await logo_file.read()
+            with open(file_path, "wb") as f:
+                f.write(content)
+            
+            logo_path_to_update = f"/{file_path}"
 
+            # Delete old logo if it exists
             if db_company.logo_s3_path:
-                old_s3_key = db_company.logo_s3_path.replace(f"{settings.PUBLIC_S3_BASE_URL}/{settings.S3_BUCKET_NAME}/", "")
-
-                if old_s3_key != s3_key:
-                    try:
-                        await s3_client.delete_objects(
-                            Bucket=settings.S3_BUCKET_NAME,
-                            Delete={
-                                "Objects": [
-                                    {"Key": old_s3_key}
-                                ]
-                            }
-                        )
-                        print(f"[Company Update] Deleted old logo from S3: {old_s3_key}")
-                    except ClientError as e:
-                        if e.response['Error']['Code'] not in ['404', 'NoSuchKey']:
-                            raise e
-                        print(f"[Company Update] Warning: Old S3 logo not found during deletion, proceeding. Key: {old_s3_key}")
+                old_file_path = db_company.logo_s3_path.lstrip('/')
+                if os.path.exists(old_file_path) and old_file_path != file_path:
+                    os.remove(old_file_path)
 
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to upload logo to S3: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to upload logo: {e}")
 
     company_update = company_schema.CompanyUpdate(
         name=name,
         code=code,
         address=address,
-        logo_s3_path=logo_s3_path_to_update, # Use the determined logo path
-        pic_phone_number=pic_phone_number # Added pic_phone_number
+        logo_s3_path=logo_path_to_update,
+        pic_phone_number=pic_phone_number
     )
-
-    print(f"[DEBUG] Received company_update: {company_update.model_dump()}")
 
     updated_company = await company_repository.update_company(db, current_user.company_id, company_update)
     if not updated_company:

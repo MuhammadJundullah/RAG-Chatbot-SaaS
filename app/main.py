@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.endpoints import auth, chat, documents, company, chatlogs, admin
@@ -13,6 +14,9 @@ app = FastAPI(
     description="A SaaS platform for company-specific AI chatbots using RAG and Database Integration.",
     version="1.0.0"
 )
+
+# Mount static files directory
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Register global exception handlers
 register_global_exception_handlers(app) # Call the registration function here
