@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import Optional, List
 from datetime import date
+from sqlalchemy import func
 from app.models import chatlog_model
 from app.schemas import chatlog_schema
 from app.repository.base_repository import BaseRepository
@@ -184,5 +185,33 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
         ).order_by(self.model.created_at)
         result = await db.execute(query)
         return result.scalars().all()
+
+    async def get_total_chat_count(self, db: AsyncSession, company_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None) -> int:
+        """Gets the total number of chatlogs for a company, with optional date filtering."""
+        query = select(func.count(self.model.id)).filter(self.model.company_id == company_id)
+        if start_date:
+            query = query.filter(self.model.created_at >= start_date)
+        if end_date:
+            query = query.filter(self.model.created_at <= end_date)
+        result = await db.execute(query)
+        return result.scalar_one_or_none() or 0
+
+    async def get_daily_chat_activity(self, db: AsyncSession, company_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None) -> List[tuple[date, int]]:
+        """Gets the daily chat count for a company, with optional date filtering."""
+        query = select(
+            func.date(self.model.created_at).label("chat_date"),
+            func.count(self.model.id).label("chat_count")
+        ).filter(
+            self.model.company_id == company_id
+        )
+        if start_date:
+            query = query.filter(func.date(self.model.created_at) >= start_date)
+        if end_date:
+            query = query.filter(func.date(self.model.created_at) <= end_date)
+        
+        query = query.group_by("chat_date").order_by("chat_date")
+        
+        result = await db.execute(query)
+        return result.all()
 
 chatlog_repository = ChatlogRepository()

@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.v1.endpoints import auth, chat, documents, company, chatlogs, admin
+from app.api.v1.endpoints import auth, chat, documents, company, chatlogs, admin, dashboard
 from app.core.database import db_manager
 from app.utils.activity_logger import log_activity 
 from app.core.dependencies import get_db 
@@ -45,6 +45,7 @@ app.include_router(chatlogs.user_router, prefix="/api")
 app.include_router(chatlogs.admin_router, prefix="/api")
 app.include_router(chatlogs.company_admin_router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(dashboard.router, prefix="/api")
 
 @app.get("/api/")
 async def root():

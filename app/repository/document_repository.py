@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List, Optional
-from sqlalchemy import func
+from sqlalchemy import func, case
 
 from app.models import document_model
 from app.schemas import document_schema
@@ -91,6 +91,46 @@ class DocumentRepository(BaseRepository[document_model.Documents]):
         result = await db.execute(
             select(self.model)
             .filter(self.model.id.in_(document_ids))
+        )
+        return result.scalars().all()
+
+    async def get_document_summary(self, db: AsyncSession, company_id: int) -> dict:
+        """Gets a summary of document counts by status for a company."""
+        processing_statuses = [
+            document_model.DocumentStatus.UPLOADING,
+            document_model.DocumentStatus.UPLOADED,
+            document_model.DocumentStatus.OCR_PROCESSING,
+            document_model.DocumentStatus.PENDING_VALIDATION,
+            document_model.DocumentStatus.EMBEDDING,
+        ]
+        failed_statuses = [
+            document_model.DocumentStatus.UPLOAD_FAILED,
+            document_model.DocumentStatus.PROCESSING_FAILED,
+        ]
+
+        query = select(
+            func.count(self.model.id).label("total_documents"),
+            func.count(case((self.model.status.in_(processing_statuses), self.model.id))).label("processing_documents"),
+            func.count(case((self.model.status == document_model.DocumentStatus.COMPLETED, self.model.id))).label("completed_documents"),
+            func.count(case((self.model.status.in_(failed_statuses), self.model.id))).label("failed_documents")
+        ).filter(self.model.company_id == company_id)
+
+        result = await db.execute(query)
+        summary = result.one()
+        return {
+            "total_documents": summary.total_documents,
+            "processing_documents": summary.processing_documents,
+            "completed_documents": summary.completed_documents,
+            "failed_documents": summary.failed_documents,
+        }
+
+    async def get_recent_documents(self, db: AsyncSession, company_id: int, limit: int = 3) -> List[document_model.Documents]:
+        """Gets the most recently updated documents for a company."""
+        result = await db.execute(
+            select(self.model)
+            .filter(self.model.company_id == company_id)
+            .order_by(self.model.updated_at.desc().nulls_last())
+            .limit(limit)
         )
         return result.scalars().all()
 

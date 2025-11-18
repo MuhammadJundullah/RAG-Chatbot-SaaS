@@ -29,5 +29,6 @@ class Documents(Base):
     failed_reason = Column(Text, nullable=True)
     tags = Column(ARRAY(String), nullable=True) 
     uploaded_at = Column(DateTime, nullable=True, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=True, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     company = relationship("Company", back_populates="documents")

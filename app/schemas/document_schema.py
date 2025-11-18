@@ -12,6 +12,7 @@ class DocumentBase(BaseModel):
     status: DocumentStatus
     tags: Optional[List[str]] = None 
     uploaded_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 class DocumentCreate(BaseModel):
     """Schema used for creating a new document record in the database."""
