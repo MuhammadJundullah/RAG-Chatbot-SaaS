@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import date, datetime
 from app.models.document_model import DocumentStatus
 
@@ -24,6 +24,8 @@ class RecentDocumentSchema(BaseModel):
 
 class DashboardResponseSchema(BaseModel):
     document_summary: DocumentSummarySchema
-    chat_activity: List[ChatActivityPointSchema]
+    chat_activity: dict
+
     total_chats: int
     recent_documents: List[RecentDocumentSchema]
+

@@ -22,8 +22,6 @@ router = APIRouter(
 async def get_dashboard_summary(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_company_admin),
-    start_date: Optional[date] = Query(None, description="Start date for chat activity filter (YYYY-MM-DD)"),
-    end_date: Optional[date] = Query(None, description="End date for chat activity filter (YYYY-MM-DD)"),
 ):
     """
     Provides a summary of company data for the dashboard, including:
@@ -39,6 +37,4 @@ async def get_dashboard_summary(
     return await dashboard_service.get_dashboard_summary(
         db=db, 
         company_id=current_user.company_id,
-        start_date=start_date,
-        end_date=end_date
     )
