@@ -162,13 +162,6 @@ async def request_reset_route(email: str, db: AsyncSession = Depends(get_db)):
     # Call the service function
     return await user_service.request_password_reset(db, email=email)
 
-# Assuming a schema for password reset request exists in user_schema.py
-# Example:
-# class PasswordResetRequest(BaseModel):
-#     email: EmailStr
-#     token: str
-#     new_password: str = Field(..., min_length=8)
-
 @router.post("/reset-password")
 async def reset_password_route(
     data: user_schema.PasswordResetRequest, 

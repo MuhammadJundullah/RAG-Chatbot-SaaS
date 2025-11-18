@@ -1,6 +1,4 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-import secrets
-import string
 from typing import Optional
 from fastapi import UploadFile, HTTPException, status
 from app.schemas import user_schema
@@ -10,12 +8,13 @@ from app.utils.security import get_password_hash, verify_password
 from app.models import user_model, company_model
 from app.core.config import settings
 import os
-import uuid
 from sqlalchemy.exc import IntegrityError
 import logging
 from datetime import datetime, timedelta
-import sib_api_v3_sdk
-from sib_api_v3_sdk.rest import ApiException
+
+from app.utils.generators import generate_company_code, generate_reset_token
+from app.utils.email_sender import send_brevo_email
+from app.utils.file_manager import save_uploaded_file, delete_static_file
 
 class UserRegistrationError(Exception):
     """Custom exception for registration errors."""
@@ -33,16 +32,6 @@ class EmployeeUpdateError(Exception):
     def __init__(self, detail: str, status_code: int = 400):
         self.detail = detail
         self.status_code = status_code
-
-def generate_company_code(length=6):
-    """Generates a random, secure company code."""
-    alphabet = string.ascii_uppercase + string.digits
-    return ''.join(secrets.choice(alphabet) for _ in range(length))
-
-def generate_reset_token(length=32):
-    """Generates a random, secure token for password reset."""
-    alphabet = string.ascii_letters + string.digits
-    return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 async def register_user(db: AsyncSession, user_data: user_schema.UserRegistration):
     """
@@ -70,14 +59,14 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
             raise UserRegistrationError("Company name is already registered.")
 
         # Data Layer: Create new company object
-        company_code = generate_company_code()
+        company_code = generate_company_code() # Use helper
         new_company_obj = company_model.Company(
             name=user_data.company_name,
             code=company_code,
             pic_phone_number=user_data.pic_phone_number
         )
         db.add(new_company_obj)
-        await db.flush()  # Flush to get the new company ID before committing
+        await db.flush()  
 
         # Data Layer: Create new user object as company admin
         db_user = user_model.Users(
@@ -113,19 +102,8 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
     profile_picture_url = None
     if profile_picture_file and profile_picture_file.filename:
         UPLOAD_DIR = "static/employee_profiles"
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-        
-        file_extension = os.path.splitext(profile_picture_file.filename)[1]
-        file_uuid = str(uuid.uuid4())
-        filename = f"{file_uuid}{file_extension}"
-        file_path = os.path.join(UPLOAD_DIR, filename)
-            
         try:
-            file_content = await profile_picture_file.read()
-            with open(file_path, "wb") as f:
-                f.write(file_content)
-            
-            profile_picture_url = f"/{file_path}"
+            profile_picture_url = await save_uploaded_file(profile_picture_file, UPLOAD_DIR) # Use helper
         except Exception as e:
             logging.error(f"Failed to upload profile picture for employee {employee_data.email}: {e}")
             raise UserRegistrationError(f"Failed to upload profile picture: {e}")
@@ -170,15 +148,7 @@ async def delete_employee_by_admin(db: AsyncSession, company_id: int, employee_i
 
     # If employee has a profile picture, delete it from the local filesystem
     if employee.profile_picture_url:
-        try:
-            # The URL is stored like /static/employee_profiles/filename.ext
-            # We need to remove the leading '/' to get the correct relative path
-            file_path = employee.profile_picture_url.lstrip('/')
-            if os.path.exists(file_path):
-                os.remove(file_path)
-        except Exception as e:
-            logging.error(f"Failed to delete profile picture {file_path} for employee {employee.id}: {e}")
-            # Decide whether to raise an error or just log it. For now, we'll log and proceed with user deletion.
+        delete_static_file(employee.profile_picture_url) # Use helper
 
     await user_repository.delete_user(db, user_id=employee.id)
     return {"message": "Employee deleted successfully."}
@@ -205,25 +175,12 @@ async def update_employee_by_admin(
 
     if profile_picture_file and profile_picture_file.filename:
         UPLOAD_DIR = "static/employee_profiles"
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-        file_extension = os.path.splitext(profile_picture_file.filename)[1]
-        file_uuid = str(uuid.uuid4())
-        filename = f"{file_uuid}{file_extension}"
-        file_path = os.path.join(UPLOAD_DIR, filename)
-        
         try:
-            file_content = await profile_picture_file.read()
-            with open(file_path, "wb") as f:
-                f.write(file_content)
-            
-            new_profile_picture_url = f"/{file_path}"
+            new_profile_picture_url = await save_uploaded_file(profile_picture_file, UPLOAD_DIR) # Use helper
 
             # Delete old profile picture if it exists
             if employee.profile_picture_url:
-                old_file_path = employee.profile_picture_url.lstrip('/')
-                if os.path.exists(old_file_path):
-                    os.remove(old_file_path)
+                delete_static_file(employee.profile_picture_url) # Use helper
 
             update_data["profile_picture_url"] = new_profile_picture_url
         except Exception as e:
@@ -267,59 +224,6 @@ async def authenticate_user(db: AsyncSession, password: str, email: Optional[str
         
     return None
 
-# --- Fungsi Pengiriman Email Brevo yang Diperbarui ---
-async def send_brevo_email(to_email: str, subject: str, html_content: str):
-    """
-    Sends a transactional email using Brevo API.
-    """
-    # Konfigurasi API Key Brevo
-    configuration = sib_api_v3_sdk.Configuration()
-    configuration.api_key['api-key'] = settings.BREVO_API_KEY
-    
-    # Instantiate the TransactionalEmailsApi client
-    api_client = sib_api_v3_sdk.ApiClient(configuration)
-    transactional_api = sib_api_v3_sdk.TransactionalEmailsApi(api_client)
-
-    # Tentukan detail pengirim
-    # Mengambil dari environment variable atau menggunakan default
-    sender_email = settings.DEFAULT_SENDER_EMAIL if settings.DEFAULT_SENDER_EMAIL else "noreply@yourdomain.com"
-    # Menggunakan nama aplikasi dari settings jika ada, atau placeholder
-    sender_name = getattr(settings, 'APP_NAME', 'SmartAI') 
-
-    # Tentukan detail penerima p
-    to_recipient = [{"email": to_email, "name": to_email}] 
-
-    # Tentukan konten email
-    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-        to=to_recipient,
-        subject=subject,
-        html_content=html_content,
-        sender={"email": sender_email, "name": sender_name},
-        # Anda juga bisa menggunakan template_id untuk email yang lebih kompleks
-        # template_id=1 # Contoh ID template
-    )
-
-    try:
-        # Lakukan panggilan untuk mengirim email transaksional
-        response = transactional_api.send_transac_email(send_smtp_email)
-        logging.info(f"Email sent successfully to {to_email}. Response: {response}")
-        # Objek response mungkin berisi 'messageId' atau yang serupa
-    except ApiException as e:
-        logging.error(f"Exception when calling Brevo API to send email to {to_email}: {e}")
-        # Re-raise atau tangani exception sesuai kebutuhan
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Gagal mengirim email: {e.reason}"
-        )
-    except Exception as e:
-        logging.error(f"An unexpected error occurred while sending email to {to_email}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Terjadi kesalahan tak terduga saat mengirim email."
-        )
-# --- Akhir Fungsi Pengiriman Email Brevo ---
-
-
 async def request_password_reset(db: AsyncSession, email: str):
     """
     Initiates the password reset process for a user.
@@ -338,7 +242,7 @@ async def request_password_reset(db: AsyncSession, email: str):
         return {"message": "Jika akun dengan email tersebut ada, tautan reset kata sandi telah dikirim."}
 
     # Generate token and set expiry
-    token = generate_reset_token()
+    token = generate_reset_token() # Use helper
     # Menggunakan durasi token yang sama untuk reset token expiry
     expiry_time = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES) 
 
@@ -364,7 +268,7 @@ async def request_password_reset(db: AsyncSession, email: str):
         <p><a href="{reset_link}" style="color: #007bff; text-decoration: none;">Reset Kata Sandi</a></p>
         <p>Tautan ini akan kedaluwarsa dalam {settings.ACCESS_TOKEN_EXPIRE_MINUTES} menit.</p>
         <p>Jika Anda tidak meminta reset kata sandi, mohon abaikan email ini.</p>
-        <p>Terima kasih,<br>Tim SmartAI</p>
+        <p>Terima kasih,<br>Tim {settings.APP_NAME}</p>
     </body>
     </html>
     """
@@ -372,7 +276,7 @@ async def request_password_reset(db: AsyncSession, email: str):
 
     # Kirim email menggunakan Brevo
     try:
-        await send_brevo_email(
+        await send_brevo_email( 
             to_email=user.email,
             subject=subject,
             html_content=html_content
@@ -426,9 +330,3 @@ async def reset_password(db: AsyncSession, email: str, token: str, new_password:
     await db.refresh(user)
 
     return {"message": "Kata sandi berhasil direset."}
-
-
-# --- Fungsi yang sudah ada ---
-# Pastikan fungsi-fungsi ini tetap ada di file yang sama.
-# Untuk keringkasan, saya tidak menampilkannya lagi di sini.
-# Contoh: register_user, authenticate_user, dll.
