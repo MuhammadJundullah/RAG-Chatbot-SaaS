@@ -34,6 +34,7 @@ env/
 env.bak/
 venv.bak/
 scripts/config.env
+ssl/
 
 # PyInstaller
 *.manifest
