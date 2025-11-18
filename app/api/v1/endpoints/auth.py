@@ -94,6 +94,8 @@ async def login_for_access_token(
     }
     if user.company_id:
         token_data_payload["company_id"] = user.company_id
+    if user.company and user.company.name:
+        token_data_payload["company_name"] = user.company.name
 
     # Log successful login
     company_id_to_log = user.company_id if user.company else None
