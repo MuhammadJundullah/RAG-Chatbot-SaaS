@@ -26,9 +26,13 @@ async def read_company_by_user(
         current_user=current_user
     )
 
-@router.put("/me", response_model=company_schema.Company)
+@router.put("/me", response_model=company_schema.CompanyMeResponse)
 async def update_company_by_admin(
     name: Optional[str] = Form(None),
+    company_email: Optional[str] = Form(None),
+    admin_name: Optional[str] = Form(None),
+    admin_email: Optional[str] = Form(None),
+    admin_password: Optional[str] = Form(None),
     code: Optional[str] = Form(None),
     address: Optional[str] = Form(None),
     logo_file: Optional[UploadFile] = None,
@@ -37,13 +41,17 @@ async def update_company_by_admin(
     current_user: Users = Depends(get_current_company_admin)
 ):
     """
-    Updates the company's name and code.
+    Updates the company's and admin's information.
     Requires the user to be a company administrator.
     """
-    updated_company = await company_service.update_company_by_admin_service(
+    updated_company, updated_admin = await company_service.update_company_by_admin_service(
         db=db,
         current_user=current_user,
         name=name,
+        company_email=company_email,
+        admin_name=admin_name,
+        admin_email=admin_email,
+        admin_password=admin_password,
         code=code,
         address=address,
         logo_file=logo_file,
@@ -59,7 +67,15 @@ async def update_company_by_admin(
         activity_description=f"Company '{updated_company.name}' updated by admin '{current_user.email}'.",
         timestamp=datetime.now(timezone.utc)
     )
-    return updated_company
+    
+    company_data = company_schema.Company.from_orm(updated_company)
+    
+    response = company_schema.CompanyMeResponse(
+        **company_data.model_dump(),
+        admin_name=updated_admin.name,
+        admin_email=updated_admin.email
+    )
+    return response
 
 @router.post("/employees/register", response_model=user_schema.User)
 async def register_employee_by_admin(

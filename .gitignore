@@ -10,6 +10,7 @@ __pycache__/
 .python-version
 .Python
 build/
+static/
 develop-eggs/
 dist/
 downloads/
@@ -79,6 +80,7 @@ instance/
 
 # dotenv
 .env
+*.env
 .env.*
 
 # postman

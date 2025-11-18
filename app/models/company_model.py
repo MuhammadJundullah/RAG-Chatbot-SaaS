@@ -12,6 +12,7 @@ class Company(Base):
     __tablename__ = "Company"
     id = Column(Integer, primary_key=True)
     name = Column(String(100))
+    company_email = Column(String(100), nullable=True, unique=True)
     code = Column(String(10))
     logo_s3_path = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=False) # New column for company active status

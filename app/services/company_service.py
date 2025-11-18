@@ -6,9 +6,11 @@ import uuid
 import os
 
 from app.repository.company_repository import company_repository
-from app.models import user_model
+from app.repository import user_repository
+from app.models import user_model, company_model
 from app.schemas import user_schema, company_schema
 from app.core.config import settings
+from app.utils.security import get_password_hash
 
 async def get_company_users_by_admin_service(
     db: AsyncSession,
@@ -56,14 +58,28 @@ async def update_company_by_admin_service(
     db: AsyncSession,
     current_user: user_model.Users,
     name: Optional[str],
+    company_email: Optional[str],
+    admin_name: Optional[str],
+    admin_email: Optional[str],
+    admin_password: Optional[str],
     code: Optional[str],
     address: Optional[str],
     logo_file: Optional[UploadFile],
     pic_phone_number: Optional[str]
-) -> company_schema.Company:
+) -> (company_model.Company, user_model.Users):
     db_company = await company_repository.get_company(db, company_id=current_user.company_id)
     if db_company is None:
         raise HTTPException(status_code=404, detail="Company not found for this admin.")
+
+    # Update admin user details
+    if admin_name:
+        current_user.name = admin_name
+    if admin_email:
+        current_user.email = admin_email
+    if admin_password:
+        current_user.hashed_password = get_password_hash(admin_password)
+    
+    db.add(current_user)
 
     logo_path_to_update = db_company.logo_s3_path
 
@@ -77,14 +93,12 @@ async def update_company_by_admin_service(
         file_path = os.path.join(UPLOAD_DIR, filename)
         
         try:
-            # Save new logo
             content = await logo_file.read()
             with open(file_path, "wb") as f:
                 f.write(content)
             
             logo_path_to_update = f"/{file_path}"
 
-            # Delete old logo if it exists
             if db_company.logo_s3_path:
                 old_file_path = db_company.logo_s3_path.lstrip('/')
                 if os.path.exists(old_file_path) and old_file_path != file_path:
@@ -93,16 +107,24 @@ async def update_company_by_admin_service(
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to upload logo: {e}")
 
-    company_update = company_schema.CompanyUpdate(
-        name=name,
-        code=code,
-        address=address,
-        logo_s3_path=logo_path_to_update,
-        pic_phone_number=pic_phone_number
-    )
+    update_data = {
+        "name": name,
+        "company_email": company_email,
+        "code": code,
+        "address": address,
+        "logo_s3_path": logo_path_to_update,
+        "pic_phone_number": pic_phone_number
+    }
+    
+    # Filter out None values so they don't overwrite existing data
+    update_data_filtered = {k: v for k, v in update_data.items() if v is not None}
 
-    updated_company = await company_repository.update_company(db, current_user.company_id, company_update)
-    if not updated_company:
-        raise HTTPException(status_code=500, detail="Failed to update company in database.")
+    for key, value in update_data_filtered.items():
+        setattr(db_company, key, value)
 
-    return updated_company
+    db.add(db_company)
+    await db.commit()
+    await db.refresh(db_company)
+    await db.refresh(current_user)
+
+    return db_company, current_user
