@@ -15,9 +15,9 @@ router = APIRouter(
 
 @router.get(
     "/summary",
-    response_model=dashboard_schema.DashboardResponseSchema,
+    response_model=dashboard_schema.DashboardBreakdownResponseSchema,
     summary="Get Dashboard Summary Data",
-    description="Retrieves a comprehensive summary of data for the company's dashboard.",
+    description="Retrieves a comprehensive summary of data for the company's dashboard, wrapped in a dashboard_breakdown object.",
 )
 async def get_dashboard_summary(
     db: AsyncSession = Depends(get_db),
@@ -29,12 +29,16 @@ async def get_dashboard_summary(
     - Daily chat activity (can be filtered by date)
     - Total chat count (can be filtered by date)
     - Recently updated documents
+    
+    The response is wrapped in a 'dashboard_breakdown' object.
     """
     if not current_user.company_id:
         # This case should ideally not be hit due to the dependency, but as a safeguard:
         raise HTTPException(status_code=404, detail="Admin user is not associated with a company.")
 
-    return await dashboard_service.get_dashboard_summary(
+    summary_data = await dashboard_service.get_dashboard_summary(
         db=db, 
         company_id=current_user.company_id,
     )
+    
+    return {"dashboard_breakdown": summary_data}

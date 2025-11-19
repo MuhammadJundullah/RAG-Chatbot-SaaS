@@ -29,3 +29,6 @@ class DashboardResponseSchema(BaseModel):
     total_chats: int
     recent_documents: List[RecentDocumentSchema]
 
+class DashboardBreakdownResponseSchema(BaseModel):
+    dashboard_breakdown: DashboardResponseSchema
+
