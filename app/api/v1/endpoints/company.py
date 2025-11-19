@@ -197,7 +197,7 @@ async def delete_employee_by_admin(
     except EmployeeDeletionError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
 
-@router.get("/me", response_model=company_schema.Company)
+@router.get("/me", response_model=company_schema.CompanyMeResponse)
 async def read_company_by_admin(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_company_admin)
@@ -206,10 +206,61 @@ async def read_company_by_admin(
     Gets the current user's company details via /companies/me.
     Accessible by company admin.
     """
-    return await company_service.get_company_by_user_service(
+    # The service needs to return data compatible with CompanyMeResponse,
+    # which includes admin_name and admin_email.
+    # Assuming get_company_by_user_service retrieves these details.
+    company_details = await company_service.get_company_by_user_service(
         db=db,
         current_user=current_user
     )
+    
+    # Construct the CompanyMeResponse model.
+    # This assumes company_details contains all necessary company fields
+    # and that the service can also provide admin_name and admin_email.
+    # If company_details is just a Company model, we might need to fetch admin info separately.
+    # For now, let's assume the service provides enough data or the Company model can be extended.
+    
+    # If company_details is already a CompanyMeResponse or contains all fields:
+    # return company_details 
+
+    # If company_details is a Company model and we need to add admin info:
+    # This part might require a change in company_service.get_company_by_user_service
+    # to fetch admin details as well.
+    # For demonstration, let's assume we can construct it.
+    # A more robust solution would be to ensure company_service returns a structure
+    # that directly maps to CompanyMeResponse or to modify the Company model if needed.
+
+    # Placeholder for constructing CompanyMeResponse.
+    # This assumes 'company_details' contains enough info or can be mapped.
+    # If company_details is a Company model, we need admin_name and admin_email.
+    # If current_user is the admin, we can use current_user.name and current_user.email.
+    
+    # Let's create a CompanyMeResponse instance.
+    # This might require fetching admin details if get_company_by_user_service doesn't return them.
+    # For now, assuming the service returns a Company object and we can add admin details from current_user.
+    
+    # IMPORTANT: The original service `get_company_by_user_service` returns `company_schema.Company`.
+    # `CompanyMeResponse` requires `admin_name` and `admin_email`.
+    # The `current_user` object is the admin. We can use `current_user.name` and `current_user.email`.
+    # We need to ensure `company_details` has all the company fields.
+    
+    # Constructing CompanyMeResponse requires admin details which are available in `current_user`.
+    # `company_details` is of type `company_schema.Company`.
+    
+    response = company_schema.CompanyMeResponse(
+        id=company_details.id,
+        name=company_details.name,
+        code=company_details.code,
+        logo_s3_path=company_details.logo_s3_path,
+        address=company_details.address,
+        is_active=company_details.is_active,
+        pic_phone_number=company_details.pic_phone_number,
+        company_email=company_details.company_email,
+        admin_name=current_user.name, # Using current_user's name as admin_name
+        admin_email=current_user.email # Using current_user's email as admin_email
+    )
+    
+    return response
 
 # Modified /users endpoint to include pagination and filters
 @router.get(
