@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List, Optional
 from sqlalchemy import func, case
+from datetime import date, timedelta
 
 from app.models import document_model
 from app.schemas import document_schema
@@ -133,5 +134,16 @@ class DocumentRepository(BaseRepository[document_model.Documents]):
             .limit(limit)
         )
         return result.scalars().all()
+
+    async def get_document_uploads_count_in_range(self, db: AsyncSession, company_id: int, start_date: date, end_date: date) -> int:
+        """Counts document uploads within a specified date range for a company.
+        Assumes 'created_at' field stores the upload timestamp."""
+        result = await db.execute(
+            select(func.count(self.model.id))
+            .filter(self.model.company_id == company_id)
+            .filter(self.model.uploaded_at >= start_date)
+            .filter(self.model.uploaded_at <= end_date)
+        )
+        return result.scalar_one()
 
 document_repository = DocumentRepository()

@@ -11,50 +11,81 @@ async def get_dashboard_summary(
     company_id: int, 
 ) -> dashboard_schema.DashboardResponseSchema:
     """
-    Gathers all data required for the dashboard summary for the last 30 days.
+    Gathers all data required for the dashboard summary.
     """
-    # Calculate date range for the last 30 days
-    end_date = date.today()
-    start_date = end_date - timedelta(days=29) # 30 days inclusive
+    today = date.today()
+    end_date = today # Use today as the end date for all calculations
+    
+    # Date range for the last 30 days
+    start_date_30d = end_date - timedelta(days=29) # 30 days inclusive
 
-    # 1. Get document summary (not affected by date filter)
+    # Date range for the last 7 days
+    start_date_7d = end_date - timedelta(days=6) # 7 days inclusive
+    
+    # Date range for the current month
+    start_of_month = today.replace(day=1)
+
+    # 1. Get document summary (this might need adjustment if it should be month-specific)
+    # For now, assume it remains a general summary as per existing code.
     doc_summary_data = await document_repository.get_document_summary(db, company_id=company_id)
     document_summary = dashboard_schema.DocumentSummarySchema(**doc_summary_data)
 
-    # 2. Get chat activity (for the last 30 days)
-    daily_activity_data_list = await chatlog_repository.get_daily_chat_activity(
-        db, company_id=company_id, start_date=start_date, end_date=end_date
+    # 2. Get chat activity for the last 30 days
+    daily_activity_data_list_30d = await chatlog_repository.get_daily_chat_activity(
+        db, company_id=company_id, start_date=start_date_30d, end_date=end_date
     )
-    # Transform list of ChatActivityPointSchema into a dictionary {date_str: chat_count}
-    chat_activity_dict: Dict[str, int] = {}
-    for row in daily_activity_data_list:
-        chat_activity_dict[row.chat_date.strftime('%Y-%m-%d')] = row.chat_count
+    chat_activity_dict_30d: Dict[str, int] = {}
+    for row in daily_activity_data_list_30d:
+        chat_activity_dict_30d[row.chat_date.strftime('%Y-%m-%d')] = row.chat_count
     
-    # Fill in missing dates within the 30-day range with 0 chats
-    current_date = start_date
+    # Fill missing dates for 30-day range
+    current_date = start_date_30d
     while current_date <= end_date:
         date_str = current_date.strftime('%Y-%m-%d')
-        if date_str not in chat_activity_dict:
-            chat_activity_dict[date_str] = 0
+        if date_str not in chat_activity_dict_30d:
+            chat_activity_dict_30d[date_str] = 0
         current_date += timedelta(days=1)
+    sorted_chat_activity_30d = dict(sorted(chat_activity_dict_30d.items()))
 
-    # Sort the dictionary by date
-    sorted_chat_activity = dict(sorted(chat_activity_dict.items()))
+    # 3. Get chat activity for the last 7 days
+    daily_activity_data_list_7d = await chatlog_repository.get_daily_chat_activity(
+        db, company_id=company_id, start_date=start_date_7d, end_date=end_date
+    )
+    chat_activity_dict_7d: Dict[str, int] = {}
+    for row in daily_activity_data_list_7d:
+        chat_activity_dict_7d[row.chat_date.strftime('%Y-%m-%d')] = row.chat_count
+    
+    # Fill missing dates for 7-day range
+    current_date = start_date_7d
+    while current_date <= end_date:
+        date_str = current_date.strftime('%Y-%m-%d')
+        if date_str not in chat_activity_dict_7d:
+            chat_activity_dict_7d[date_str] = 0
+        current_date += timedelta(days=1)
+    sorted_chat_activity_7d = dict(sorted(chat_activity_dict_7d.items()))
 
-
-    # 3. Get total chats (for the last 30 days)
+    # 4. Get total chats (for the last 30 days) - assuming total is for the longer period
     total_chats = await chatlog_repository.get_total_chat_count(
-        db, company_id=company_id, start_date=start_date, end_date=end_date
+        db, company_id=company_id, start_date=start_date_30d, end_date=end_date
+    )
+    
+    # 5. Get document uploads for the current month
+    # Assumes document_repository has a method to count uploads within a date range.
+    # If this method does not exist, it will need to be added to the repository.
+    document_uploads_this_month = await document_repository.get_document_uploads_count_in_range(
+        db, company_id=company_id, start_date=start_of_month, end_date=end_date
     )
 
-    # 4. Get recent documents (not affected by date filter)
+    # 6. Get recent documents (not affected by date filter)
     recent_docs_data = await document_repository.get_recent_documents(db, company_id=company_id, limit=3)
     recent_documents = [dashboard_schema.RecentDocumentSchema.from_orm(doc) for doc in recent_docs_data]
 
-    # 5. Assemble the final response
+    # 7. Assemble the final response using the updated schema fields
     dashboard_response = dashboard_schema.DashboardResponseSchema(
         document_summary=document_summary,
-        chat_activity=sorted_chat_activity, # Use the dictionary here
+        chat_activity_30d=sorted_chat_activity_30d,
+        chat_activity_7d=sorted_chat_activity_7d,
+        document_uploads_this_month=document_uploads_this_month, # Add the new field
         total_chats=total_chats,
         recent_documents=recent_documents,
     )

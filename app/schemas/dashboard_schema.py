@@ -24,7 +24,9 @@ class RecentDocumentSchema(BaseModel):
 
 class DashboardResponseSchema(BaseModel):
     document_summary: DocumentSummarySchema
-    chat_activity: dict
+    chat_activity_30d: dict
+    chat_activity_7d: dict
+    document_uploads_this_month: int
 
     total_chats: int
     recent_documents: List[RecentDocumentSchema]
