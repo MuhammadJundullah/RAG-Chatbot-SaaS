@@ -54,11 +54,5 @@ async def root():
 @app.get("/api/health")
 async def health_check(db: AsyncSession = Depends(get_db)):
     # For health checks, user_id and company_id might be unknown or N/A
-    await log_activity(
-        db=db, 
-        user_id=None, 
-        activity_type_category="Kesehatan Sistem",
-        company_id=None, 
-        activity_description="System health check performed.",
-    )
+
     return {"status": "healthy"}
