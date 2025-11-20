@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL_NAME: str
     PINECONE_API_KEY: str
 
+    # iPaymu Payment Gateway settings
+    IPAYMU_VA: str
+    IPAYMU_API_KEY: str
+
     SUPERADMIN_USERNAME: str = "superadmin"
     SUPERADMIN_EMAIL: str = "superadmin@example.com"
     SUPERADMIN_PASSWORD: str = "superadmin"
@@ -33,7 +37,7 @@ class Settings(BaseSettings):
     DEFAULT_SENDER_EMAIL: str
 
     # Application base URL for links
-    APP_BASE_URL: str = "http://localhost:8000"
+    APP_BASE_URL: str = "https://rotten-hairs-shave.loca.lt"
     APP_NAME: str
 
     # Redis settings for Celery

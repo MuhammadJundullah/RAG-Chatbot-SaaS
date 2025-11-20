@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.models import user_model
 from app.schemas import token_schema
 from app.repository.user_repository import user_repository
+from app.services.subscription_service import subscription_service
 
 # The tokenUrl should point to a generic token endpoint
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/user/token")
@@ -88,3 +89,39 @@ async def get_current_employee(current_user: user_model.Users = Depends(get_curr
             detail="The user does not have employee privileges",
         )
     return current_user
+
+async def get_current_active_admin(current_user: user_model.Users = Depends(get_current_user)) -> user_model.Users:
+    """
+    Dependency to ensure the user is an active admin.
+    """
+    if current_user.role != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The user does not have admin privileges",
+        )
+    return current_user
+
+# --- Subscription and Quota Enforcement Dependency ---
+
+async def check_quota_and_subscription(
+    db: AsyncSession = Depends(get_db),
+    current_user: user_model.Users = Depends(get_current_user)
+):
+    """
+    Dependency to be used on endpoints that consume quota.
+    It checks if the user's company has an active subscription and if the quota has not been exceeded.
+    If the checks pass, it increments the usage counter.
+    """
+    if not current_user.company_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not associated with a company."
+        )
+
+    # Superadmins are exempt from quota checks
+    if current_user.role == 'super_admin':
+        return
+
+    # This single call handles all checks: active, expired, and quota exceeded.
+    # It will raise an HTTPException if any check fails.
+    await subscription_service.check_and_increment_usage(db, company_id=current_user.company_id)

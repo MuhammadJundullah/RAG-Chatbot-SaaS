@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.v1.endpoints import auth, chat, documents, company, chatlogs, admin, dashboard
+from app.api.v1.endpoints import auth, chat, documents, company, chatlogs, admin, dashboard, subscription, payment_webhook
 from app.core.database import db_manager
 from app.utils.activity_logger import log_activity 
 from app.core.dependencies import get_db 
@@ -19,7 +19,7 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Register global exception handlers
-register_global_exception_handlers(app) # Call the registration function here
+register_global_exception_handlers(app) 
 
 # The RAGService, S3Client, and DBEngine are initialized on import now.
 @app.on_event("shutdown")
@@ -46,6 +46,8 @@ app.include_router(chatlogs.admin_router, prefix="/api")
 app.include_router(chatlogs.company_admin_router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
+app.include_router(subscription.router, prefix="/api")
+app.include_router(payment_webhook.router, prefix="/api")
 
 @app.get("/api/")
 async def root():

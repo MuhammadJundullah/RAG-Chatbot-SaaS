@@ -3,7 +3,9 @@ from .user_model import Users
 from .chatlog_model import Chatlogs
 from .document_model import Documents
 from .conversation_model import Conversation
-from .log_model import ActivityLog 
+from .log_model import ActivityLog
+from .plan_model import Plan
+from .subscription_model import Subscription
 
 __all__ = [
     "Company",
@@ -11,7 +13,7 @@ __all__ = [
     "Chatlogs",
     "Documents",
     "Conversation",
-    "ActivityLog"
+    "ActivityLog",
+    "Plan",
+    "Subscription",
 ]
-
-print("app/models/__init__.py is being executed.")

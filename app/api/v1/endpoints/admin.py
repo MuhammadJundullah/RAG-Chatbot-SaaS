@@ -7,10 +7,16 @@ import io
 from starlette.responses import StreamingResponse
 
 from app.core.dependencies import get_current_super_admin, get_db
-from app.schemas import company_schema, log_schema
-from app.services import admin_service
+from app.schemas import company_schema, log_schema, subscription_schema, plan_schema
+from app.services import admin_service, subscription_service
+from app.services.plan_service import plan_service
 from app.models.user_model import Users
 from app.models.log_model import ActivityLog
+from app.models.subscription_model import Subscription
+from app.models.plan_model import Plan as PlanModel
+from sqlalchemy.orm import joinedload
+
+
 
 router = APIRouter(
     prefix="/admin",
@@ -50,6 +56,75 @@ async def reject_company(
     Accessible only by super admins.
     """
     return await admin_service.reject_company_service(db, company_id=company_id)
+
+# --- Subscription Management Endpoints for Superadmin ---
+
+@router.get("/subscriptions", response_model=List[subscription_schema.Subscription])
+async def get_all_subscriptions(db: AsyncSession = Depends(get_db)):
+    """
+    Get a list of all company subscriptions.
+    """
+    result = await db.execute(select(Subscription).options(joinedload(Subscription.plan)))
+    subscriptions = result.scalars().all()
+    return subscriptions
+
+@router.post("/subscriptions/{subscription_id}/activate-manual", response_model=subscription_schema.Subscription)
+async def manual_activate_subscription(
+    subscription_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Manually activates a subscription. Use this for offline payments or special cases.
+    """
+    return await subscription_service.activate_subscription(db, subscription_id=subscription_id)
+
+@router.post("/companies/{company_id}/add-topup", response_model=subscription_schema.Subscription)
+async def add_topup_quota(
+    company_id: str,
+    topup_data: subscription_schema.SubscriptionTopUpRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Adds top-up question quota to a company's subscription.
+    """
+    sub = await subscription_service.get_subscription_by_company(db, company_id=company_id)
+    sub.top_up_quota += topup_data.quota
+    await db.commit()
+    await db.refresh(sub)
+    return sub
+
+# --- Plan Management Endpoints for Superadmin ---
+
+@router.post("/plans", response_model=plan_schema.Plan)
+async def create_new_plan(
+    plan_data: plan_schema.PlanCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Create a new subscription plan.
+    """
+    return await plan_service.create_plan(db, plan_data)
+
+@router.put("/plans/{plan_id}", response_model=plan_schema.Plan)
+async def update_existing_plan(
+    plan_id: int,
+    plan_data: plan_schema.PlanUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update an existing subscription plan.
+    """
+    return await plan_service.update_plan(db, plan_id, plan_data)
+
+@router.delete("/plans/{plan_id}", response_model=plan_schema.Plan)
+async def deactivate_existing_plan(
+    plan_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Deactivate a subscription plan (sets is_active to False).
+    """
+    return await plan_service.deactivate_plan(db, plan_id)
 
 @router.get("/activity-logs", response_model=log_schema.PaginatedActivityLogResponse)
 async def get_activity_logs(

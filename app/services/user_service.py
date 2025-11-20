@@ -15,6 +15,8 @@ from datetime import datetime, timedelta
 from app.utils.generators import generate_company_code, generate_reset_token
 from app.utils.email_sender import send_brevo_email
 from app.utils.file_manager import save_uploaded_file, delete_static_file
+from app.services.subscription_service import subscription_service
+from sqlalchemy import func, select
 
 class UserRegistrationError(Exception):
     """Custom exception for registration errors."""
@@ -89,6 +91,20 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
     Handles potential username uniqueness violations from the database.
     If a division name is provided and the division does not exist, it will be created.
     """
+    # Check subscription user limit
+    try:
+        sub = await subscription_service.check_active_subscription(db, company_id=company_id)
+        if sub.plan.max_users != -1:  # -1 means unlimited
+            user_count_query = select(func.count(user_model.Users.id)).where(user_model.Users.company_id == company_id)
+            result = await db.execute(user_count_query)
+            user_count = result.scalar_one()
+
+            if user_count >= sub.plan.max_users:
+                raise UserRegistrationError(f"Cannot add new employee. The maximum user limit of {sub.plan.max_users} for the '{sub.plan.name}' plan has been reached.")
+    except HTTPException as e:
+        # If subscription is not active or found, prevent registration
+        raise UserRegistrationError(f"Cannot add new employee: {e.detail}")
+        
     existing_user_by_email = await user_repository.get_user_by_email(db, email=employee_data.email)
     if existing_user_by_email:
         raise UserRegistrationError("Email is already registered.")

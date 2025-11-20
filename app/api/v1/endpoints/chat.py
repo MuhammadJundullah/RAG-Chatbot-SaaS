@@ -7,7 +7,7 @@ import uuid
 
 from app.schemas import chat_schema, chatlog_schema
 from app.services import chat_service, document_service
-from app.core.dependencies import get_current_user, get_db, get_current_employee
+from app.core.dependencies import get_current_user, get_db, get_current_employee, check_quota_and_subscription
 from app.models.user_model import Users
 from app.schemas.conversation_schema import ConversationListResponse, ConversationUpdateTitle
 from app.repository.chatlog_repository import chatlog_repository
@@ -28,8 +28,9 @@ class ChatDocumentResponse(BaseModel):
 @router.post("/chat", tags=["Chat"])
 async def chat_endpoint(
     request: chat_schema.ChatRequest,
-    current_user: Users = Depends(get_current_employee),
-    db: AsyncSession = Depends(get_db)
+    current_user: Users = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _quota_check: None = Depends(check_quota_and_subscription)
 ):
     response_data = await chat_service.process_chat_message(
         db=db,
@@ -51,8 +52,9 @@ async def chat_endpoint(
 @router.post("/sse/chat", tags=["Chat"])
 async def sse_chat_endpoint(
     request: chat_schema.ChatRequest,
-    current_user: Users = Depends(get_current_employee),
-    db: AsyncSession = Depends(get_db)
+    current_user: Users = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _quota_check: None = Depends(check_quota_and_subscription)
 ):
     """
     Streams AI chat responses using Server-Sent Events (SSE).
@@ -181,7 +183,7 @@ async def list_conversations_endpoint(
 @router.patch("/chat/conversations/{conversation_id}/archive", response_model=ConversationListResponse, tags=["Chat"])
 async def archive_conversation_endpoint(
     conversation_id: str,
-    current_user: Users = Depends(get_current_employee),
+    current_user: Users = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -206,7 +208,7 @@ async def archive_conversation_endpoint(
 async def edit_conversation_title_endpoint(
     conversation_id: str,
     request: ConversationUpdateTitle,
-    current_user: Users = Depends(get_current_employee),
+    current_user: Users = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
