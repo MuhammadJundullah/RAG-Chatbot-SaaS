@@ -157,10 +157,11 @@ class IPaymuService:
         # Ensure we can read the raw body for signature verification
         body_bytes = await request.body()
 
-        # Extract headers provided by iPaymu. Headers are often case-sensitive.
-        ipaymu_signature = request.headers.get('Signature')
-        ipaymu_va = request.headers.get('Va')
-        ipaymu_timestamp = request.headers.get('Timestamp')
+        # Extract headers provided by iPaymu in a case-insensitive way.
+        headers_lower = {k.lower(): v for k, v in request.headers.items()}
+        ipaymu_signature = headers_lower.get("signature")
+        ipaymu_va = headers_lower.get("va")
+        ipaymu_timestamp = headers_lower.get("timestamp")
 
         if not all([ipaymu_signature, ipaymu_va, ipaymu_timestamp]):
             print("Missing iPaymu webhook headers for verification.")
