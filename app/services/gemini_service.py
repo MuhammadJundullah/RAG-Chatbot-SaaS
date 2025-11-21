@@ -1,7 +1,7 @@
 import google.generativeai as genai
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
-from typing import Optional, AsyncGenerator
+from typing import Optional, AsyncGenerator, List
 from app.models import user_model, company_model
 from datetime import date
 
@@ -73,5 +73,43 @@ class GeminiService:
                 yield chunk.text
         except Exception as e:
             print(f"Gemini chat stream error: {str(e)}")
+
+
+    async def recommend_topics_for_division(
+        self,
+        db: AsyncSession,
+        current_user: user_model.Users,
+    ) -> List[str]:
+        """
+        Generate 5 short topics (1-2 words) relevant to the user's division.
+        Falls back to returning whatever the model provides (parsed by comma/newline/semi-colon).
+        """
+        company = await db.get(company_model.Company, current_user.company_id)
+        company_name = company.name if company else "your company"
+        division_label = current_user.division or "general"
+        role_name = current_user.role or "employee"
+
+        prompt = (
+            f"You are drafting discussion topics for an employee in the {division_label} division "
+            f"at {company_name} (role: {role_name}). "
+            "Provide exactly 5 concise topics (2-3 words each), comma-separated only. "
+            "No numbering, no extra text. Using Indonesian language"
+        )
+
+        response_text = ""
+        async for chunk in self.generate_chat_response(
+            question=prompt,
+            db=db,
+            current_user=current_user,
+            context=None,
+            query_results=None,
+            conversation_history=[],
+        ):
+            response_text += chunk
+
+        normalized = response_text.replace(";", ",").replace("\n", ",")
+        topics = [t.strip(" -•\t") for t in normalized.split(",") if t.strip()]
+        return topics[:5]
+
 
 gemini_service = GeminiService()

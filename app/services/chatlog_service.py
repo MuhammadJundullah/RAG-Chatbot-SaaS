@@ -368,25 +368,7 @@ async def recommend_topics_for_division_ai(
     current_user: Users,
 ) -> List[str]:
     """Use the LLM to propose 5 short topics for the user's division."""
-    division_label = current_user.division or "general"
-    prompt = (
-        f"Provide 5 short topics (2-3 words each) that an employee in the {division_label} "
-        "division should discuss. Respond with topics only, comma-separated, no numbering or extra text. gunakan bahasa indonesia aja"
-    )
-
-    response_text = ""
-    async for chunk in gemini_service.generate_chat_response(
-        question=prompt,
-        db=db,
-        current_user=current_user,
-        context=None,
-        query_results=None,
-        conversation_history=[],
-    ):
-        response_text += chunk
-
-    normalized = response_text.replace(";", ",").replace("\n", ",")
-    topics = [t.strip(" -•\t") for t in normalized.split(",") if t.strip()]
+    topics = await gemini_service.recommend_topics_for_division(db=db, current_user=current_user)
 
     if len(topics) < 5:
         fallback = recommend_topics_for_division(current_user.division)
@@ -394,24 +376,3 @@ async def recommend_topics_for_division_ai(
 
     return topics[:5]
 
-
-def recommend_topics_for_division(division: Optional[str]) -> List[str]:
-    """Return five short topic suggestions based on division name (static fallback)."""
-    default_topics = ["Updates", "Tasks", "Policies", "Onboarding", "FAQ"]
-    if not division:
-        return default_topics
-
-    division_key = division.strip().lower()
-    topic_map = {
-        "marketing": ["Campaigns", "Leads", "SEO", "Content", "Budget"],
-        "sales": ["Pipeline", "Leads", "Pricing", "Objections", "Quota"],
-        "hr": ["Recruitment", "Onboarding", "Policies", "Payroll", "Benefits"],
-        "engineering": ["Backlog", "Architecture", "Incidents", "Deployments", "Testing"],
-        "it": ["Assets", "Access", "Tickets", "Security", "Maintenance"],
-        "finance": ["Budget", "Forecast", "Invoices", "Expenses", "Reporting"],
-        "operations": ["SOP", "Vendors", "Logistics", "SLA", "Inventory"],
-        "legal": ["Contracts", "Compliance", "Risk", "Policies", "IP"],
-        "product": ["Roadmap", "Feedback", "Metrics", "Releases", "Discovery"],
-        "support": ["Tickets", "Escalations", "SLA", "Responses", "Knowledge"],
-    }
-    return topic_map.get(division_key, default_topics)
