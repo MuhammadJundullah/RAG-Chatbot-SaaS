@@ -152,11 +152,18 @@ class IPaymuService:
 
     async def verify_webhook_signature(self, request: Request) -> bool:
         """
-        Verifies the incoming webhook signature from iPaymu using the official formula:
-        Signature = HMAC_SHA256(ApiKey, "{METHOD}:{VA}:{SHA256(body)}:{ApiKey}")
+        Verifies the incoming webhook signature from iPaymu.
+        The correct stringToSign format for webhooks is:
+        stringToSign = "{METHOD}:{TRANSACTION_ID}:{SHA256(body)}:{VA}"
+        The signature is then HMAC_SHA256(stringToSign, ApiKey).
         """
-        # Ensure we can read the raw body for signature verification
+        # Ensure we can read the raw body for hashing, then parse for transaction ID
         body_bytes = await request.body()
+        try:
+            payload = json.loads(body_bytes)
+        except json.JSONDecodeError:
+            print("Webhook body is not valid JSON.")
+            return False
 
         # Extract headers provided by iPaymu in a case-insensitive way.
         headers_lower = {k.lower(): v for k, v in request.headers.items()}
@@ -166,21 +173,28 @@ class IPaymuService:
             print("Missing iPaymu webhook signature header.")
             return False
 
-        # Calculate signature per official formula
+        # Extract transaction ID from payload. iPaymu uses 'trx_id' or 'sid' for notifications.
+        transaction_id = payload.get("trx_id") or payload.get("sid")
+        if not transaction_id:
+            print(f"Could not find 'trx_id' or 'sid' in webhook payload. Payload keys: {payload.keys()}")
+            return False
+
+        # Calculate signature with the correct formula for webhooks
         body_hash = self._body_sha256(body_bytes=body_bytes).lower()
         method = request.method.upper()
-        string_to_sign = f"{method}:{self.va}:{body_hash}:{self.api_key}"
+        
+        # Correct format: METHOD:TRX_ID:HASHED_BODY:VA
+        string_to_sign = f"{method}:{transaction_id}:{body_hash}:{self.va}"
         calculated_signature = self._sign(string_to_sign)
 
         if ipaymu_signature.lower() != calculated_signature.lower():
             print(f"Webhook signature mismatch! Received: {ipaymu_signature}")
             print(f"Expected (string_to_sign='{string_to_sign}'): {calculated_signature}")
+            # For debugging, let's also log the incorrect old format to see the difference
+            old_string_to_sign = f"{method}:{self.va}:{body_hash}:{self.api_key}"
+            old_calculated_sig = self._sign(old_string_to_sign)
+            print(f"Debug - Old format would have been (string_to_sign='{old_string_to_sign}'): {old_calculated_sig}")
             return False
-
-        # Optional: Implement timestamp verification to prevent replay attacks.
-        # This requires parsing ipaymu_timestamp and comparing it with current time
-        # within an acceptable tolerance (e.g., 5-10 minutes).
-        # For now, we'll mark as valid if signature matches.
 
         print("--- Webhook signature is valid ---")
         return True
