@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     DEFAULT_SENDER_EMAIL: str
 
     # Application base URL for links
-    APP_BASE_URL: str = "https://nice-moons-film.loca.lt"
+    APP_BASE_URL: str = "https://127.0.0.1:8000"
     APP_NAME: str
 
     # Redis settings for Celery
