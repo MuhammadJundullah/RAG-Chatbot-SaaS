@@ -117,6 +117,8 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
             self.model.answer,
             self.model.created_at,
             self.model.conversation_id,
+            self.model.UsersId,
+            self.model.company_id,
             Users.username
         ).order_by(self.model.created_at.desc()).offset(skip)
 
@@ -125,8 +127,17 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
         
         result = await db.execute(data_query)
         data = [
-            {"id": i, "question": q, "answer": a, "created_at": ca, "conversation_id": conv_id, "username": u}
-            for i, q, a, ca, conv_id, u in result.all()
+            {
+                "id": i,
+                "question": q,
+                "answer": a,
+                "created_at": ca,
+                "conversation_id": conv_id,
+                "UsersId": user_id,
+                "company_id": comp_id,
+                "username": u,
+            }
+            for i, q, a, ca, conv_id, user_id, comp_id, u in result.all()
         ]
         
         return data, total_count
