@@ -214,8 +214,8 @@ async def read_company_by_admin(
 @router.get(
     "/users",
     response_model=PaginatedUserResponse,
-    summary="List company users with pagination",
-    description="Retrieves a list of users within the company, with pagination and optional filters.",
+    summary="List company employees with pagination",
+    description="Retrieves a list of employees within the company, excluding admins, with pagination and optional filters.",
 )
 async def get_company_users_by_admin(
     db: AsyncSession = Depends(get_db),

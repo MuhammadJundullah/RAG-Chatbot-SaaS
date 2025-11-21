@@ -116,11 +116,17 @@ class CompanyRepository(BaseRepository[company_model.Company]):
         username: Optional[str] = None
     ) -> tuple[List[user_model.Users], int]:
         """
-        Retrieves a paginated list of users for a given company, with optional username filtering.
-        Returns the list of users and the total count.
+        Retrieves a paginated list of employees for a given company, with optional username filtering.
+        Admin accounts are excluded from the result set.
         """
-        stmt = select(user_model.Users).where(user_model.Users.company_id == company_id)
-        count_stmt = select(func.count()).select_from(user_model.Users).where(user_model.Users.company_id == company_id)
+        stmt = select(user_model.Users).where(
+            user_model.Users.company_id == company_id,
+            user_model.Users.role == "employee"
+        )
+        count_stmt = select(func.count()).select_from(user_model.Users).where(
+            user_model.Users.company_id == company_id,
+            user_model.Users.role == "employee"
+        )
 
         if username:
             stmt = stmt.where(user_model.Users.username.ilike(f"%{username}%"))

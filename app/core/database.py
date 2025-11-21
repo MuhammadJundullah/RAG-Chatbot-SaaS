@@ -16,7 +16,8 @@ class DatabaseManager:
             pool_size=20,
             max_overflow=10,
             pool_timeout=30,
-            query_cache_size=0
+            query_cache_size=0,
+            pool_pre_ping=True  # Detect stale connections and recycle automatically
         )
 
         self.async_session_maker = async_sessionmaker(
