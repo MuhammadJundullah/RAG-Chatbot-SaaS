@@ -170,6 +170,7 @@ class IPaymuService:
 
         # Recalculate signature using the raw body bytes with a few known patterns.
         body_hash = self._body_sha256(body_bytes=body_bytes)
+        body_str = body_bytes.decode("utf-8")
         method = request.method.upper()
 
         candidate_strings = []
@@ -192,6 +193,9 @@ class IPaymuService:
                 f"{body_hash}:{ipaymu_timestamp}",
                 f"{ipaymu_timestamp}{body_hash}",
                 f"{body_hash}{ipaymu_timestamp}",
+                f"{ipaymu_timestamp}:{body_hash}:{self.api_key}",
+                f"{body_hash}:{ipaymu_timestamp}:{self.api_key}",
+                f"{ipaymu_timestamp}{body_hash}{self.api_key}",
             ])
 
         # External-ID variants (some gateways sign with external id)
@@ -199,11 +203,30 @@ class IPaymuService:
             candidate_strings.extend([
                 f"{ipaymu_external_id}:{ipaymu_timestamp}:{body_hash}",
                 f"{ipaymu_external_id}:{body_hash}:{ipaymu_timestamp}",
+                f"{ipaymu_external_id}:{ipaymu_timestamp}:{body_hash}:{self.api_key}",
+                f"{ipaymu_external_id}:{body_hash}:{ipaymu_timestamp}:{self.api_key}",
             ])
 
-        # Body-only fallback
+        # Raw-body based variants (some callbacks send form-encoded JSON without hashing)
+        if body_str:
+            candidate_strings.extend([
+                body_str,
+                f"{ipaymu_timestamp}:{body_str}",
+                f"{body_str}:{ipaymu_timestamp}",
+                f"{ipaymu_external_id}:{body_str}" if ipaymu_external_id else None,
+                f"{body_str}:{ipaymu_external_id}" if ipaymu_external_id else None,
+                f"{ipaymu_external_id}:{ipaymu_timestamp}:{body_str}" if ipaymu_external_id and ipaymu_timestamp else None,
+                f"{ipaymu_timestamp}:{ipaymu_external_id}:{body_str}" if ipaymu_external_id and ipaymu_timestamp else None,
+                f"{body_str}:{self.api_key}",
+                f"{ipaymu_timestamp}:{body_str}:{self.api_key}" if ipaymu_timestamp else None,
+                f"{body_str}:{ipaymu_timestamp}:{self.api_key}" if ipaymu_timestamp else None,
+            ])
+
+        # Body-hash only fallback
         candidate_strings.append(body_hash)
 
+        # Filter out Nones and build candidate signatures
+        candidate_strings = [s for s in candidate_strings if s is not None]
         candidate_sigs = [self._sign(s) for s in candidate_strings]
 
         if ipaymu_signature not in candidate_sigs:
