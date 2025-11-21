@@ -112,7 +112,7 @@ async def login_for_access_token(
     }
 
 
-@router.get("/users/me", response_model=user_schema.User)
+@router.get("/me", response_model=user_schema.User)
 async def read_users_me(current_user: user_model.Users = Depends(get_current_user)):
     """
     Retrieves the current user's profile.
