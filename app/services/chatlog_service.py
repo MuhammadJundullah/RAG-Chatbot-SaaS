@@ -370,8 +370,8 @@ async def recommend_topics_for_division_ai(
     """Use the LLM to propose 5 short topics for the user's division."""
     division_label = current_user.division or "general"
     prompt = (
-        f"Provide 5 short topics (1-2 words each) that an employee in the {division_label} "
-        "division should discuss. Respond with topics only, comma-separated, no numbering or extra text."
+        f"Provide 5 short topics (2-3 words each) that an employee in the {division_label} "
+        "division should discuss. Respond with topics only, comma-separated, no numbering or extra text. gunakan bahasa indonesia aja"
     )
 
     response_text = ""
