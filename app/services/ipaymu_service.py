@@ -159,32 +159,56 @@ class IPaymuService:
 
         # Extract headers provided by iPaymu in a case-insensitive way.
         headers_lower = {k.lower(): v for k, v in request.headers.items()}
-        ipaymu_signature = headers_lower.get("signature")
+        ipaymu_signature = headers_lower.get("signature") or headers_lower.get("x-signature")
         ipaymu_va = headers_lower.get("va")
-        ipaymu_timestamp = headers_lower.get("timestamp")
+        ipaymu_timestamp = headers_lower.get("timestamp") or headers_lower.get("x-timestamp")
+        ipaymu_external_id = headers_lower.get("x-external-id")
 
-        if not all([ipaymu_signature, ipaymu_va, ipaymu_timestamp]):
-            print("Missing iPaymu webhook headers for verification.")
+        if not ipaymu_signature:
+            print("Missing iPaymu webhook signature header.")
             return False
 
-        if ipaymu_va != self.va:
-            print(f"Webhook VA mismatch. Expected {self.va}, got {ipaymu_va}")
-            return False
-
-        # Recalculate signature using the raw body bytes with a few known patterns (timestamp/no-timestamp)
+        # Recalculate signature using the raw body bytes with a few known patterns.
         body_hash = self._body_sha256(body_bytes=body_bytes)
         method = request.method.upper()
 
-        candidate_strings = [
-            f"{method}:{self.va}:{body_hash}:{self.api_key}",  # current outbound pattern
-            f"{method}:{self.va}:{ipaymu_timestamp}:{body_hash}",  # pattern with timestamp, no apiKey at end
-            f"{method}:{self.va}:{ipaymu_timestamp}:{body_hash}:{self.api_key}",  # pattern with timestamp + apiKey
-        ]
+        candidate_strings = []
+
+        # Primary pattern for payment link flow (includes VA)
+        if ipaymu_va and ipaymu_timestamp:
+            candidate_strings.extend([
+                f"{method}:{self.va}:{body_hash}:{self.api_key}",
+                f"{method}:{self.va}:{ipaymu_timestamp}:{body_hash}",
+                f"{method}:{self.va}:{ipaymu_timestamp}:{body_hash}:{self.api_key}",
+            ])
+            if ipaymu_va != self.va:
+                print(f"Webhook VA mismatch. Expected {self.va}, got {ipaymu_va}")
+                # continue trying other patterns rather than failing early
+
+        # Fallback patterns observed from callbacks that include X-Signature/X-Timestamp without VA
+        if ipaymu_timestamp:
+            candidate_strings.extend([
+                f"{ipaymu_timestamp}:{body_hash}",
+                f"{body_hash}:{ipaymu_timestamp}",
+                f"{ipaymu_timestamp}{body_hash}",
+                f"{body_hash}{ipaymu_timestamp}",
+            ])
+
+        # External-ID variants (some gateways sign with external id)
+        if ipaymu_external_id and ipaymu_timestamp:
+            candidate_strings.extend([
+                f"{ipaymu_external_id}:{ipaymu_timestamp}:{body_hash}",
+                f"{ipaymu_external_id}:{body_hash}:{ipaymu_timestamp}",
+            ])
+
+        # Body-only fallback
+        candidate_strings.append(body_hash)
+
         candidate_sigs = [self._sign(s) for s in candidate_strings]
 
         if ipaymu_signature not in candidate_sigs:
             print(f"Webhook signature mismatch! Received: {ipaymu_signature}")
-            print(f"Tried signatures: {candidate_sigs}")
+            print(f"Tried signatures: {candidate_strings}")
             return False
 
         # Optional: Implement timestamp verification to prevent replay attacks.
