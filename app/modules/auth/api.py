@@ -1,0 +1,120 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.services import user_service
+from app.services.user_service import UserRegistrationError
+from app.core.dependencies import get_db, get_current_user
+from app.schemas import user_schema, token_schema
+from app.utils import auth
+from app.utils.activity_logger import log_activity
+from app.models import user_model
+from sqlalchemy.exc import IntegrityError
+
+router = APIRouter(
+    prefix="/auth",
+    tags=["Authentication"],
+)
+
+
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+async def register(
+    user_data: user_schema.UserRegistration,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Handles registration for new companies.
+    """
+    try:
+        user = await user_service.register_user(db, user_data=user_data)
+
+        company_id_to_log = user.company_id
+        await log_activity(
+            db=db,
+            user_id=user.id,
+            activity_type_category="Data/CRUD",
+            company_id=company_id_to_log,
+            activity_description=f"User '{user.email}' registered as admin for company '{user_data.company_name}'.",
+        )
+
+        if user.role == 'admin':
+            return {"message": f"Company '{user_data.company_name}' and admin user '{user.email}' registered successfully. Pending approval from a super admin."}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Employee self-registration is not allowed. Please contact your company administrator to be registered."
+            )
+
+    except UserRegistrationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=e.detail,
+        )
+    except IntegrityError as e:
+        if "duplicate key value violates unique constraint" in str(e):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Username or email already registered. Please use a different username or email."
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An unexpected error occurred during registration. Please try again later."
+            )
+
+
+@router.post("/user/token", response_model=token_schema.Token)
+async def login_for_access_token(
+    data: user_schema.UserLoginCombined,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Authenticates any user (super admin, admin, or employee) and returns a JWT token.
+    """
+    user = await user_service.authenticate_user(db, email=data.email, username=data.username, password=data.password)
+
+    if not user:
+        await log_activity(
+            db=db,
+            user_id=None,
+            activity_type_category="Login/Akses",
+            company_id=None,
+            activity_description="User login failed.",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect credentials or user is inactive/unauthorized.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token_data_payload = {
+        "sub": str(user.id),
+        "role": user.role,
+        "name": user.name,
+    }
+    if user.company_id:
+        token_data_payload["company_id"] = user.company_id
+    if user.company and user.company.name:
+        token_data_payload["company_name"] = user.company.name
+
+    await log_activity(
+        db=db,
+        user_id=user.id,
+        activity_type_category="Login/Akses",
+        company_id=user.company_id if user.company else None,
+        activity_description=f"User '{user.email}' logged in successfully.",
+    )
+
+    token_data = auth.create_access_token(data=token_data_payload)
+    return {
+        "access_token": token_data["access_token"],
+        "token_type": "bearer",
+        "expires_in": token_data["expires_in"],
+        "user": user,
+    }
+
+
+@router.get("/users/me", response_model=user_schema.User)
+async def read_users_me(current_user: user_model.Users = Depends(get_current_user)):
+    """
+    Retrieves the current user's profile.
+    """
+    return current_user

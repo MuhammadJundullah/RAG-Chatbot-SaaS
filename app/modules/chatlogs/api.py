@@ -1,0 +1,122 @@
+from fastapi import APIRouter, Depends, Query, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Optional
+from datetime import date
+from fastapi.responses import StreamingResponse
+import io
+
+from app.core.dependencies import get_current_user, get_db, get_current_super_admin, get_current_company_admin, get_current_employee
+from app.schemas import chatlog_schema, conversation_schema
+from app.models.user_model import Users
+from app.services import chatlog_service
+from app.models.log_model import ActivityLog
+
+admin_router = APIRouter(
+    prefix="/admin/chatlogs",
+    tags=["Admin-Chatlogs"],
+    dependencies=[Depends(get_current_super_admin)]
+)
+
+company_admin_router = APIRouter(
+    prefix="/company/chatlogs",
+    tags=["Company-Admin-Chatlogs"],
+    dependencies=[Depends(get_current_company_admin)]
+)
+
+user_router = APIRouter(
+    prefix="/chatlogs",
+    tags=["Chatlogs"],
+    dependencies=[Depends(get_current_user)]
+)
+
+
+@admin_router.get("/", response_model=List[chatlog_schema.Chatlog])
+async def read_all_chatlogs_as_admin(
+    db: AsyncSession = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100,
+):
+    return await chatlog_service.get_chatlogs_as_admin(db, skip=skip, limit=limit)
+
+
+@company_admin_router.get("/", response_model=List[chatlog_schema.Chatlog])
+async def read_chatlogs_as_company_admin(
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_company_admin),
+    skip: int = 0,
+    limit: int = 100,
+):
+    return await chatlog_service.get_chatlogs_as_company_admin(db, current_user.company_id, skip=skip, limit=limit)
+
+
+@user_router.get("/", response_model=List[chatlog_schema.Chatlog])
+async def read_chatlogs(
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    skip: int = 0,
+    limit: int = 100,
+):
+    return await chatlog_service.get_chatlogs(db, user_id=current_user.id, skip=skip, limit=limit)
+
+
+@user_router.get("/conversations", response_model=List[conversation_schema.ConversationListResponse])
+async def get_conversations(
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user)
+):
+    return await chatlog_service.get_conversations(db, user_id=current_user.id)
+
+
+@user_router.get("/{conversation_id}", response_model=List[chatlog_schema.Chatlog])
+async def get_conversation_history(
+    conversation_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+    skip: int = 0,
+    limit: int = 100,
+):
+    """
+    Retrieve chat history for a conversation the user participates in.
+    """
+    return await chatlog_service.get_conversation_history_service(
+        db=db,
+        current_user=current_user,
+        conversation_id=conversation_id,
+        skip=skip,
+        limit=limit,
+    )
+
+
+@company_admin_router.get("/export")
+async def export_chatlogs_as_company_admin(
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_company_admin),
+    start_date: Optional[date] = Query(None, description="Start date in YYYY-MM-DD format"),
+    end_date: Optional[date] = Query(None, description="End date in YYYY-MM-DD format"),
+):
+    json_data = await chatlog_service.export_chatlogs_as_company_admin(
+        db, current_user.company_id, start_date=start_date, end_date=end_date
+    )
+    json_bytes = json_data.encode('utf-8')
+    return StreamingResponse(
+        io.BytesIO(json_bytes),
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=chatlogs.json"}
+    )
+
+
+@admin_router.get("/export")
+async def export_chatlogs_as_admin(
+    db: AsyncSession = Depends(get_db),
+    start_date: Optional[date] = Query(None, description="Start date in YYYY-MM-DD format"),
+    end_date: Optional[date] = Query(None, description="End date in YYYY-MM-DD format"),
+):
+    json_data = await chatlog_service.export_chatlogs_as_admin(
+        db, start_date=start_date, end_date=end_date
+    )
+    json_bytes = json_data.encode('utf-8')
+    return StreamingResponse(
+        io.BytesIO(json_bytes),
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=chatlogs.json"}
+    )

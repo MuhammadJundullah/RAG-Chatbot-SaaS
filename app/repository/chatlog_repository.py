@@ -143,13 +143,13 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
         # We also select the conversation_id from the Chatlogs model
         latest_chat_per_conversation = select(
             self.model.conversation_id,
-            self.model.created_at
+            self.model.created_at.label("latest_created_at")
         ).filter(
             self.model.UsersId == user_id
-        ).distinct(self.model.conversation_id).order_by(
+        ).order_by(
             self.model.conversation_id,
             self.model.created_at.desc()
-        ).subquery()
+        ).distinct(self.model.conversation_id).subquery()
 
         # Main query to select distinct conversation_id and its title, ordered by their latest message
         # Join Chatlogs with Conversation
@@ -161,7 +161,7 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
             Conversation,
             latest_chat_per_conversation.c.conversation_id == Conversation.id
         ).order_by(
-            latest_chat_per_conversation.c.created_at.desc()
+            latest_chat_per_conversation.c.latest_created_at.desc()
         )
         result = await db.execute(query.offset(skip).limit(limit))
         return result.all() # Changed from scalars().all() to all()

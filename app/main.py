@@ -2,7 +2,15 @@ from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.v1.endpoints import auth, chat, documents, company, chatlogs, admin, dashboard, subscription, payment_webhook
+from app.modules.auth.api import router as auth_router
+from app.modules.chat.api import router as chat_router
+from app.modules.documents.api import router as documents_router
+from app.modules.company.api import router as company_router
+from app.modules.chatlogs.api import user_router as chatlogs_user_router, admin_router as chatlogs_admin_router, company_admin_router as chatlogs_company_admin_router
+from app.modules.admin.api import router as admin_router
+from app.modules.dashboard.api import router as dashboard_router
+from app.modules.subscription.api import router as subscription_router
+from app.modules.payment.api import router as payment_router
 from app.core.database import db_manager
 from app.utils.activity_logger import log_activity 
 from app.core.dependencies import get_db 
@@ -37,17 +45,17 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(auth.router, prefix="/api")
-app.include_router(chat.router, prefix="/api")
-app.include_router(documents.router, prefix="/api")
-app.include_router(company.router, prefix="/api")
-app.include_router(chatlogs.user_router, prefix="/api")
-app.include_router(chatlogs.admin_router, prefix="/api")
-app.include_router(chatlogs.company_admin_router, prefix="/api")
-app.include_router(admin.router, prefix="/api")
-app.include_router(dashboard.router, prefix="/api")
-app.include_router(subscription.router, prefix="/api")
-app.include_router(payment_webhook.router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")
+app.include_router(documents_router, prefix="/api")
+app.include_router(company_router, prefix="/api")
+app.include_router(chatlogs_user_router, prefix="/api")
+app.include_router(chatlogs_admin_router, prefix="/api")
+app.include_router(chatlogs_company_admin_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
+app.include_router(dashboard_router, prefix="/api")
+app.include_router(subscription_router, prefix="/api")
+app.include_router(payment_router, prefix="/api")
 
 @app.get("/api/")
 async def root():

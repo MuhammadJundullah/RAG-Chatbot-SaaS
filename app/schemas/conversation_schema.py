@@ -14,7 +14,8 @@ class ConversationBase(BaseModel):
     # id is handled by the model's default UUID generation
 
 class ConversationCreate(ConversationBase):
-    id: str # Expecting a UUID string to be passed in
+    id: str  # Expecting a UUID string to be passed in
+    company_id: int
 
 class ConversationListResponse(ConversationBase):
     id: uuid.UUID

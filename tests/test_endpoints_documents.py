@@ -15,7 +15,7 @@ def test_get_documents_endpoint(admin_client: TestClient):
         status=DocumentStatus.UPLOADED,
         content_type="application/pdf"
     )
-    with patch('app.services.document_service.get_all_company_documents_service', return_value=[mock_document]):
+    with patch('app.modules.documents.service.get_all_company_documents_service', return_value=[mock_document]):
         response = admin_client.get("/api/documents/")
         assert response.status_code == 200
         # The endpoint now returns a paginated response
@@ -31,7 +31,7 @@ def test_get_single_document_endpoint(admin_client: TestClient):
         status=DocumentStatus.UPLOADED,
         content_type="application/pdf"
     )
-    with patch('app.services.document_service.read_single_document_service', return_value=mock_document):
+    with patch('app.modules.documents.service.read_single_document_service', return_value=mock_document):
         response = admin_client.get("/api/documents/1")
         assert response.status_code == 200
         assert response.json()["id"] == 1
@@ -45,7 +45,7 @@ def test_upload_document_endpoint(admin_client: TestClient):
         status=DocumentStatus.UPLOADING,
         content_type="text/plain"
     )
-    with patch('app.services.document_service.upload_document_service', return_value=mock_document):
+    with patch('app.modules.documents.service.upload_document_service', return_value=mock_document):
         test_file_content = b"This is a test file."
         response = admin_client.post(
             "/api/documents/upload",
@@ -57,7 +57,7 @@ def test_upload_document_endpoint(admin_client: TestClient):
 
 
 def test_delete_document_endpoint(admin_client: TestClient):
-    with patch('app.services.document_service.delete_document_service', return_value=None):
+    with patch('app.modules.documents.service.delete_document_service', return_value=None):
         response = admin_client.delete("/api/documents/1")
         assert response.status_code == 204
 
@@ -71,7 +71,7 @@ def test_admin_can_get_single_document(admin_client: TestClient):
         content_type="application/pdf",
         tags=["admin", "confidential"]
     )
-    with patch('app.services.document_service.read_single_document_service', return_value=mock_document):
+    with patch('app.modules.documents.service.read_single_document_service', return_value=mock_document):
         response = admin_client.get("/api/documents/1")
         assert response.status_code == 200
         assert response.json()["tags"] == ["admin", "confidential"]
@@ -86,6 +86,6 @@ def test_non_admin_cannot_get_single_document():
 
 
 def test_get_single_document_not_found(admin_client: TestClient):
-    with patch('app.services.document_service.read_single_document_service', side_effect=HTTPException(status_code=404, detail="Document not found")):
+    with patch('app.modules.documents.service.read_single_document_service', side_effect=HTTPException(status_code=404, detail="Document not found")):
         response = admin_client.get("/api/documents/999")
         assert response.status_code == 404

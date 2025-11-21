@@ -1,4 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import List, Optional
 from datetime import date
 from fastapi import HTTPException
@@ -12,6 +13,13 @@ from app.repository.document_repository import document_repository
 from app.repository.user_repository import user_repository
 from app.schemas import chatlog_schema, conversation_schema, document_schema
 from app.models.user_model import Users
+from app.models import chatlog_model
+
+"""
+This module exposes "_service" helpers for internal use and wrapper functions expected by API routes.
+Some routes still import functions like `get_chatlogs` and `get_conversations`, so we provide lightweight
+aliases that delegate to the newer helpers to avoid missing-attribute errors.
+"""
 
 async def get_all_chatlogs_as_admin_service(
     db: AsyncSession,
@@ -257,3 +265,98 @@ async def delete_conversation_service(
     if deleted_count == 0:
         raise HTTPException(status_code=404, detail="Conversation not found or user does not have permission.")
     return {"message": f"Successfully deleted {deleted_count} chatlogs for conversation ID {conversation_id}."}
+
+
+# ---- Wrapper functions used by existing routers ----
+
+async def get_chatlogs_as_admin(db: AsyncSession, skip: int = 0, limit: int = 100):
+    """Backward-compatible wrapper for admin chatlogs endpoint."""
+    return await chatlog_repository.get_all_chatlogs_for_admin(
+        db=db,
+        company_id=None,
+        division_id=None,
+        user_id=None,
+        start_date=None,
+        end_date=None,
+        skip=skip,
+        limit=limit,
+    )
+
+
+async def get_chatlogs_as_company_admin(db: AsyncSession, company_id: int, skip: int = 0, limit: int = 100):
+    """Backward-compatible wrapper for company admin chatlogs endpoint."""
+    data, _ = await chatlog_repository.get_chatlogs_for_company_admin(
+        db=db,
+        company_id=company_id,
+        division_id=None,
+        user_id=None,
+        start_date=None,
+        end_date=None,
+        skip=skip,
+        limit=limit,
+    )
+    return data
+
+
+async def get_chatlogs(db: AsyncSession, user_id: int, skip: int = 0, limit: int = 100):
+    """Backward-compatible wrapper for user chatlogs endpoint."""
+    return await chatlog_repository.get_chatlogs(
+        db=db,
+        company_id=None,
+        user_id=user_id,
+        start_date=None,
+        end_date=None,
+        skip=skip,
+        limit=limit,
+    )
+
+
+async def get_conversations(db: AsyncSession, user_id: int, skip: int = 0, limit: int = 100):
+    """Return conversations for a user, matching the router response model."""
+    return await conversation_repository.get_conversations_for_user(
+        db=db,
+        user_id=user_id,
+        skip=skip,
+        limit=limit,
+    )
+
+
+async def export_chatlogs_as_company_admin(db: AsyncSession, company_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None):
+    """Wrapper used by the company admin export endpoint."""
+    return await export_chatlogs_as_company_admin_service(
+        db=db,
+        current_user=Users(company_id=company_id),  # Minimal object to satisfy signature
+        division_id=None,
+        user_id=None,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+async def export_chatlogs_as_admin(db: AsyncSession, start_date: Optional[date] = None, end_date: Optional[date] = None):
+    """Wrapper used by the super admin export endpoint."""
+    query = select(
+        chatlog_model.Chatlogs.id,
+        chatlog_model.Chatlogs.question,
+        chatlog_model.Chatlogs.answer,
+        chatlog_model.Chatlogs.created_at,
+        chatlog_model.Chatlogs.conversation_id,
+        Users.username,
+    ).join(Users, chatlog_model.Chatlogs.UsersId == Users.id)
+
+    if start_date:
+        query = query.filter(chatlog_model.Chatlogs.created_at >= start_date)
+    if end_date:
+        query = query.filter(chatlog_model.Chatlogs.created_at <= end_date)
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["id", "username", "created_at", "question", "answer", "conversation_id"])
+
+    for chatlog_id, question, answer, created_at, conversation_id, username in rows:
+        writer.writerow([chatlog_id, username, created_at, question, answer, conversation_id])
+
+    return output.getvalue()

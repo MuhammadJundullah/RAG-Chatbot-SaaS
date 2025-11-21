@@ -44,9 +44,12 @@ class ConversationRepository(BaseRepository[Conversation]):
         # Subquery to get the latest chatlog's created_at for each conversation_id for the user
         latest_chat_subquery = select(
             Chatlogs.conversation_id,
-            Chatlogs.created_at.desc().label('latest_created_at')
+            Chatlogs.created_at.label('latest_created_at')
         ).filter(
             Chatlogs.UsersId == user_id
+        ).order_by(
+            Chatlogs.conversation_id,
+            Chatlogs.created_at.desc()
         ).distinct(Chatlogs.conversation_id).subquery()
 
         # Main query to join Conversation with the subquery and order by latest chat
@@ -54,6 +57,7 @@ class ConversationRepository(BaseRepository[Conversation]):
             Conversation.id,
             Conversation.title,
             Conversation.created_at,
+            Conversation.is_archived,
             latest_chat_subquery.c.latest_created_at
         ).join(
             latest_chat_subquery, Conversation.id == latest_chat_subquery.c.conversation_id
@@ -69,6 +73,7 @@ class ConversationRepository(BaseRepository[Conversation]):
                 id=str(row.id), # Convert UUID to string
                 title=row.title,
                 created_at=row.created_at,
+                is_archived=row.is_archived,
                 # latest_message_at=row.latest_created_at # Optional: include latest message time
             ) for row in result.all()
         ]
