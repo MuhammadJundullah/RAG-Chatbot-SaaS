@@ -101,6 +101,18 @@ async def get_conversation_history(
     )
 
 
+@user_router.get("/recommendations/topics", response_model=chatlog_schema.TopicRecommendations)
+async def recommend_topics_for_employee(
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_employee),
+):
+    """
+    Provide five short topic suggestions based on the employee's division.
+    """
+    topics = await chatlog_service.recommend_topics_for_division_ai(db=db, current_user=current_user)
+    return {"topics": topics}
+
+
 @company_admin_router.get("/export")
 async def export_chatlogs_as_company_admin(
     db: AsyncSession = Depends(get_db),

@@ -43,3 +43,7 @@ class ConversationInfoSchema(BaseModel):
     id: str
     title: str
     is_archived: bool
+
+
+class TopicRecommendations(BaseModel):
+    topics: List[str]

@@ -5,7 +5,7 @@ from datetime import datetime
 from .plan_schema import Plan
 
 class SubscriptionBase(BaseModel):
-    company_id: UUID4
+    company_id: int
     plan_id: int
     status: str
     current_question_usage: int
@@ -40,3 +40,5 @@ class SubscriptionUpgradeRequest(BaseModel):
 class SubscriptionTopUpRequest(BaseModel):
     quota: int
 
+class Config:
+    arbitrary_types_allowed = True
