@@ -39,14 +39,28 @@ async def read_all_chatlogs_as_admin(
     return await chatlog_service.get_chatlogs_as_admin(db, skip=skip, limit=limit)
 
 
-@company_admin_router.get("/", response_model=List[chatlog_schema.Chatlog])
+@company_admin_router.get("/", response_model=chatlog_schema.PaginatedChatlogResponse)
 async def read_chatlogs_as_company_admin(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_company_admin),
-    skip: int = 0,
+    page: int = 1,
     limit: int = 100,
 ):
-    return await chatlog_service.get_chatlogs_as_company_admin(db, current_user.company_id, skip=skip, limit=limit)
+    """
+    Paginated chatlogs for the company admin view.
+    """
+    skip = (page - 1) * limit
+    return await chatlog_service.get_chatlogs_as_company_admin_service(
+        db=db,
+        current_user=current_user,
+        division_id=None,
+        user_id=None,
+        start_date=None,
+        end_date=None,
+        skip=skip,
+        limit=limit,
+        page=page,
+    )
 
 
 @user_router.get("/", response_model=List[chatlog_schema.Chatlog])
