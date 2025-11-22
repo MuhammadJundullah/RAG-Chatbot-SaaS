@@ -92,8 +92,8 @@ class IPaymuService:
 
     async def verify_webhook_signature(self, request: Request) -> bool:
         """
-        Memverifikasi signature dengan strategi Normalisasi JSON.
-        Masalah utama biasanya adalah perbedaan spasi/newline pada body.
+        Memverifikasi signature dengan penanganan khusus untuk x-www-form-urlencoded.
+        Mengubah Form Data -> Dict -> JSON String -> Hash.
         """
         # 1. Ambil Raw Bytes
         body_bytes = await request.body()
@@ -106,61 +106,67 @@ class IPaymuService:
             print("DEBUG: Missing Signature Header")
             raise HTTPException(status_code=400, detail="Missing webhook signature")
 
-        # --- STRATEGI HASHING BODY ---
+        # 3. Tentukan Hash Body yang Benar
+        hash_to_use = ""
         
-        # Variasi A: Raw Bytes (Apa adanya)
-        hash_raw = hashlib.sha256(body_bytes).hexdigest().lower()
+        # Cek apakah kontennya Form URL Encoded
+        content_type = headers_lower.get("content-type", "")
+        
+        if "application/json" in content_type:
+            # Jika JSON asli, normalisasi spasi
+            try:
+                json_data = json.loads(body_bytes)
+                clean_json_str = json.dumps(json_data, separators=(',', ':'))
+                hash_to_use = hashlib.sha256(clean_json_str.encode()).hexdigest().lower()
+            except Exception:
+                hash_to_use = hashlib.sha256(body_bytes).hexdigest().lower()
+        else:
+            # --- INI BAGIAN PENTING (FIX UNTUK FORM DATA) ---
+            # Jika Form Data (x-www-form-urlencoded), kita harus convert ke JSON dulu
+            try:
+                from urllib.parse import parse_qs
+                body_str = body_bytes.decode('utf-8')
+                parsed_data = parse_qs(body_str, keep_blank_values=True)
+                flat_data = {k: v[0] for k, v in parsed_data.items()}
+                clean_json_from_form = json.dumps(flat_data, separators=(',', ':'))
+                hash_to_use = hashlib.sha256(clean_json_from_form.encode()).hexdigest().lower()
+                print(f"DEBUG: Converted Form to JSON: {clean_json_from_form}")
+            except Exception as e:
+                print(f"DEBUG: Failed to convert form to JSON: {e}")
+                from urllib.parse import unquote_plus
+                decoded_body = unquote_plus(body_bytes.decode('utf-8'))
+                hash_to_use = hashlib.sha256(decoded_body.encode()).hexdigest().lower()
 
-        # Variasi B: Cleaned JSON (Solusi Paling Ampuh)
-        # Kita parse lalu dump ulang tanpa spasi. Ini menghilangkan \n atau spasi liar.
-        try:
-            json_data = json.loads(body_bytes)
-            # separators=(',', ':') menghapus spasi setelah koma dan titik dua
-            clean_json_str = json.dumps(json_data, separators=(',', ':'))
-            hash_clean = hashlib.sha256(clean_json_str.encode()).hexdigest().lower()
-        except Exception:
-            hash_clean = hash_raw  # Fallback jika bukan JSON
-
+        # 4. Hitung Signature (HMAC-SHA256)
         method = "POST"
+        string_to_sign = f"{method}:{self.va}:{hash_to_use}:{self.api_key}"
         
-        # --- KOMBINASI RUMUS (Berdasarkan Hash Clean & Raw) ---
+        calculated_signature = hmac.new(
+            self.api_key.encode(), 
+            string_to_sign.encode(), 
+            hashlib.sha256
+        ).hexdigest()
 
-        # Rumus 1: HMAC + Cleaned JSON (Sesuai Dokumen + Normalisasi)
-        str_1 = f"{method}:{self.va}:{hash_clean}:{self.api_key}"
-        calc_1 = hmac.new(self.api_key.encode(), str_1.encode(), hashlib.sha256).hexdigest()
+        # --- LOGGING FINAL ---
+        print(f"--- SIGNATURE CHECK ---")
+        print(f"Received:   {ipaymu_signature}")
+        print(f"Calculated: {calculated_signature}")
+        print(f"Body Hash Used: {hash_to_use}")
+        print(f"String Signed:  {string_to_sign}")
+        print(f"-----------------------")
 
-        # Rumus 2: HMAC + Raw Bytes (Sesuai Dokumen + Raw)
-        str_2 = f"{method}:{self.va}:{hash_raw}:{self.api_key}"
-        calc_2 = hmac.new(self.api_key.encode(), str_2.encode(), hashlib.sha256).hexdigest()
-
-        # Rumus 3: SHA256 Biasa + Cleaned JSON (Legacy Style + Normalisasi)
-        str_3 = f"{method}:{self.va}:{hash_clean}:{self.api_key}"
-        calc_3 = hashlib.sha256(str_3.encode()).hexdigest()
-
-        # --- EXTREME LOGGING (Paste hasil ini ke chat jika gagal) ---
-        print(f"\n--- DEEP DEBUG SIGNATURE ---")
-        print(f"Received Sig: {ipaymu_signature}")
-        print(f"Key Used:     {self.api_key[:5]}... (Check Sandbox/Live Key!)")
-        print(f"Body Raw:     {body_bytes}")
-        print(f"Hash Raw:     {hash_raw}")
-        print(f"Hash Clean:   {hash_clean}")
-        print(f"Calc 1 (HMAC+Clean): {calc_1}")
-        print(f"Calc 2 (HMAC+Raw):   {calc_2}")
-        print(f"Calc 3 (SHA256+Clean): {calc_3}")
-        print(f"----------------------------\n")
-
-        # Validasi
-        if ipaymu_signature.lower() == calc_1.lower():
-            print("MATCH: Option 1 (HMAC + Clean JSON)")
+        if ipaymu_signature.lower() == calculated_signature.lower():
+            print("MATCH: Signature Valid!")
             return True
-        if ipaymu_signature.lower() == calc_2.lower():
-            print("MATCH: Option 2 (HMAC + Raw Bytes)")
-            return True
-        if ipaymu_signature.lower() == calc_3.lower():
-            print("MATCH: Option 3 (SHA256 + Clean JSON)")
+            
+        # OPSI TERAKHIR: Coba tanpa memasukkan Key ke dalam string (Standard HMAC)
+        string_alt = f"{method}:{self.va}:{hash_to_use}"
+        calc_alt = hmac.new(self.api_key.encode(), string_alt.encode(), hashlib.sha256).hexdigest()
+        
+        if ipaymu_signature.lower() == calc_alt.lower():
+            print("MATCH: Signature Valid (Alt Formula)!")
             return True
 
-        # Jika sampai sini, gagal total
         raise HTTPException(status_code=400, detail="Invalid webhook signature")
 
 
