@@ -90,32 +90,76 @@ class IPaymuService:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
-    async def verify_webhook_signature(self, request: Request) -> bool:
+    async def verify_webhook_signature(self, request: Request) -> dict:
         """
-        Hybrid Verification:
-        1. Coba Validasi Signature Lokal.
-        2. Jika Gagal, lakukan 'Re-Query' ke API iPaymu untuk memastikan status transaksi.
-        Ini solusi paling aman dan anti-gagal.
+        Verifikasi signature webhook iPaymu (support JSON & form-urlencoded).
+        Return dict data transaksi jika valid.
         """
         body_bytes = await request.body()
-        
-        # Ambil Data Webhook
-        try:
+
+        content_type = request.headers.get("content-type", "")
+
+        if "application/json" in content_type:
+            try:
+                data = json.loads(body_bytes)
+            except json.JSONDecodeError:
+                raise HTTPException(status_code=400, detail="Invalid JSON")
+        else:
             body_str = body_bytes.decode("utf-8")
-            parsed_data = parse_qs(body_str, keep_blank_values=True)
-            trx_id = parsed_data.get("trx_id", [None])[0]
+            parsed = parse_qs(body_str, keep_blank_values=True)
+            data = {k: v[0] if v else "" for k, v in parsed.items()}
 
-            if not trx_id:
-                raise HTTPException(status_code=400, detail="No trx_id in webhook")
+        received_signature = data.pop("aSignature", None)
+        if not received_signature:
+            received_signature = request.headers.get("X-Signature")
 
-        except Exception:
-            raise HTTPException(status_code=400, detail="Failed to parse body")
+        if not received_signature:
+            raise HTTPException(status_code=400, detail="Missing signature")
 
-        # Signature skipping with notice
-        print(f"⚠️ Webhook Signature verification skipped/failed. Falling back to API Check for TRX: {trx_id}")
+        keys_order = [
+            "trx_id",
+            "sid",
+            "reference_id",
+            "status",
+            "status_code",
+            "sub_total",
+            "total",
+            "amount",
+            "fee",
+            "paid_off",
+            "created_at",
+            "expired_at",
+            "paid_at",
+            "settlement_status",
+            "transaction_status_code",
+            "is_escrow",
+            "system_notes",
+            "via",
+            "channel",
+            "payment_no",
+            "buyer_name",
+            "buyer_email",
+            "buyer_phone",
+        ]
 
-        # Fallback check via API
-        return await self._verify_transaction_via_api(trx_id)
+        parts = []
+        for key in keys_order:
+            value = data.get(key)
+            if value is not None:
+                parts.append(str(value))
+
+        string_to_hash = "".join(parts) + self.api_key
+        calculated_signature = hashlib.sha256(string_to_hash.encode("utf-8")).hexdigest()
+
+        if calculated_signature != received_signature.lower():
+            print("Signature mismatch!")
+            print(f"Expected : {calculated_signature}")
+            print(f"Received : {received_signature}")
+            print(f"String   : {string_to_hash}")
+            raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+        print("Webhook signature VALID")
+        return data
 
     async def _verify_transaction_via_api(self, trx_id: str) -> bool:
         """
