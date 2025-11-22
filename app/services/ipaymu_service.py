@@ -92,7 +92,7 @@ class IPaymuService:
 
     async def verify_webhook_signature(self, request: Request) -> bool:
         """
-        Memverifikasi signature dengan Type Casting LENGKAP (ID + Uang).
+        Memverifikasi signature dengan Tipe Data PRESISI (Sesuai Log iPaymu).
         """
         body_bytes = await request.body()
         
@@ -109,21 +109,23 @@ class IPaymuService:
             try:
                 json_data = json.loads(body_bytes)
                 clean_json_str = json.dumps(json_data, separators=(',', ':'))
+                clean_json_str = clean_json_str.replace('/', '\\/') 
                 hash_to_use = hashlib.sha256(clean_json_str.encode()).hexdigest().lower()
             except Exception:
                 hash_to_use = hashlib.sha256(body_bytes).hexdigest().lower()
         else:
-            # --- FIX FINAL: KONVERSI SEMUA ANGKA ---
+            # --- FIX DATA FORM ---
             try:
                 from urllib.parse import parse_qs
                 body_str = body_bytes.decode('utf-8')
                 parsed_data = parse_qs(body_str, keep_blank_values=True)
                 flat_data = {k: v[0] for k, v in parsed_data.items()}
                 
-                # 1. LIST FIELD YANG HARUS JADI INTEGER (Tambahkan field uang di sini)
+                # 1. LIST FIELD YANG WAJIB INTEGER
+                # Berdasarkan Log Turn 22: trx_id, status_code, paid_off adalah INT.
+                # TAPI total, amount, fee, sub_total tetap STRING.
                 int_fields = [
-                    'trx_id', 'status_code', 'transaction_status_code',
-                    'sub_total', 'total', 'amount', 'fee', 'paid_off' 
+                    'trx_id', 'status_code', 'transaction_status_code', 'paid_off'
                 ]
                 
                 for field in int_fields:
@@ -137,17 +139,23 @@ class IPaymuService:
 
                 # 3. Dump JSON Rapat
                 clean_json_from_form = json.dumps(flat_data, separators=(',', ':'))
+                
+                # 4. Escape Slash (Wajib untuk URL)
+                clean_json_from_form = clean_json_from_form.replace('/', '\\/')
+
                 hash_to_use = hashlib.sha256(clean_json_from_form.encode()).hexdigest().lower()
                 
-                print(f"DEBUG: Fixed JSON (Final): {clean_json_from_form}")
+                print(f"DEBUG: JSON Final Structure: {clean_json_from_form}")
 
             except Exception as e:
                 print(f"DEBUG: Conversion Failed: {e}")
+                # Fallback
                 from urllib.parse import unquote_plus
                 decoded_body = unquote_plus(body_bytes.decode('utf-8'))
                 hash_to_use = hashlib.sha256(decoded_body.encode()).hexdigest().lower()
 
         method = "POST"
+        # Rumus Sesuai Dokumen
         string_to_sign = f"{method}:{self.va}:{hash_to_use}:{self.api_key}"
         
         calculated_signature = hmac.new(
@@ -160,10 +168,10 @@ class IPaymuService:
             print("MATCH: Signature Valid!")
             return True
         
-        # --- DEBUG ERROR ---
         print(f"--- SIGNATURE MISMATCH ---")
         print(f"Received:   {ipaymu_signature}")
         print(f"Calculated: {calculated_signature}")
+        print(f"StringSigned: {string_to_sign}")
         raise HTTPException(status_code=400, detail="Invalid webhook signature")
 
 
