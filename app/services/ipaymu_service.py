@@ -92,74 +92,60 @@ class IPaymuService:
 
     async def verify_webhook_signature(self, request: Request) -> dict:
         """
-        Verifikasi signature webhook iPaymu (support JSON & form-urlencoded).
-        Return dict data transaksi jika valid.
+        Verifikasi X-Signature dari webhook iPaymu (sesuai docs callback params).
+        Return data parsed jika valid.
         """
+        api_key = settings.IPAYMU_API_KEY
         body_bytes = await request.body()
+        raw_body = body_bytes.decode("utf-8")
 
         content_type = request.headers.get("content-type", "")
-
-        if "application/json" in content_type:
-            try:
-                data = json.loads(body_bytes)
-            except json.JSONDecodeError:
-                raise HTTPException(status_code=400, detail="Invalid JSON")
+        parsed = None
+        if "x-www-form-urlencoded" in content_type:
+            parsed = parse_qs(raw_body, keep_blank_values=True)
+            data = {
+                k: v[0] if len(v) == 1 else (json.dumps(v) if isinstance(v, list) else "")
+                for k, v in parsed.items()
+            }
+        elif "application/json" in content_type:
+            data = json.loads(raw_body)
         else:
-            body_str = body_bytes.decode("utf-8")
-            parsed = parse_qs(body_str, keep_blank_values=True)
-            data = {k: v[0] if v else "" for k, v in parsed.items()}
+            raise HTTPException(400, "Unsupported content-type")
 
-        received_signature = data.pop("aSignature", None)
-        if not received_signature:
-            received_signature = request.headers.get("X-Signature")
+        received_sig = request.headers.get("X-Signature", "").lower().strip()
+        if not received_sig:
+            raise HTTPException(400, "Missing X-Signature")
 
-        if not received_signature:
-            raise HTTPException(status_code=400, detail="Missing signature")
-
-        keys_order = [
-            "trx_id",
-            "sid",
-            "reference_id",
-            "status",
-            "status_code",
-            "sub_total",
-            "total",
-            "amount",
-            "fee",
-            "paid_off",
-            "created_at",
-            "expired_at",
-            "paid_at",
-            "settlement_status",
-            "transaction_status_code",
-            "is_escrow",
-            "system_notes",
-            "via",
-            "channel",
-            "payment_no",
-            "buyer_name",
-            "buyer_email",
-            "buyer_phone",
-        ]
+        if "aSignature" in data:
+            del data["aSignature"]
 
         parts = []
-        for key in keys_order:
+        key_iter = parsed.keys() if "x-www-form-urlencoded" in content_type and parsed is not None else data.keys()
+        for key in key_iter:
             value = data.get(key)
-            if value is not None:
+            if value is None or value == "":
+                parts.append("")
+            elif isinstance(value, bool):
+                parts.append("true" if value else "false")
+            elif isinstance(value, (int, float)):
+                parts.append(str(value))
+            elif isinstance(value, (list, dict)):
+                parts.append(json.dumps(value, separators=(",", ":")))
+            else:
                 parts.append(str(value))
 
-        string_to_hash = "".join(parts) + self.api_key
-        calculated_signature = hashlib.sha256(string_to_hash.encode("utf-8")).hexdigest()
+        string_to_hash = "".join(parts) + api_key
+        calculated_sig = hashlib.sha256(string_to_hash.encode("utf-8")).hexdigest()
 
-        if calculated_signature != received_signature.lower():
-            print("Signature mismatch!")
-            print(f"Expected : {calculated_signature}")
-            print(f"Received : {received_signature}")
-            print(f"String   : {string_to_hash}")
-            raise HTTPException(status_code=400, detail="Invalid webhook signature")
+        if calculated_sig != received_sig:
+            print(
+                f"SIGNATURE MISMATCH!\nExpected: {calculated_sig}\nReceived: {received_sig}\n"
+                f"String preview: {string_to_hash[:150]}...\nAPI Key used: {api_key[:10]}..."
+            )
+            raise HTTPException(400, "Invalid webhook signature")
 
-        print("Webhook signature VALID")
-        return data
+        print("✓ Webhook signature VALID (per docs callback)")
+        return dict(data)
 
     async def _verify_transaction_via_api(self, trx_id: str) -> bool:
         """
