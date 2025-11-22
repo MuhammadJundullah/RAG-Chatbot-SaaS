@@ -92,37 +92,75 @@ class IPaymuService:
 
     async def verify_webhook_signature(self, request: Request) -> bool:
         """
-        Memverifikasi signature webhook dengan Multi-Check Strategy.
-        Mencoba 3 variasi rumus karena dokumentasi sering ambigu.
+        Memverifikasi signature dengan strategi Normalisasi JSON.
+        Masalah utama biasanya adalah perbedaan spasi/newline pada body.
         """
+        # 1. Ambil Raw Bytes
         body_bytes = await request.body()
-
+        
+        # 2. Ambil Header Signature
         headers_lower = {k.lower(): v for k, v in request.headers.items()}
         ipaymu_signature = headers_lower.get("x-signature") or headers_lower.get("signature")
 
         if not ipaymu_signature:
+            print("DEBUG: Missing Signature Header")
             raise HTTPException(status_code=400, detail="Missing webhook signature")
 
-        body_hash = hashlib.sha256(body_bytes).hexdigest().lower()
+        # --- STRATEGI HASHING BODY ---
+        
+        # Variasi A: Raw Bytes (Apa adanya)
+        hash_raw = hashlib.sha256(body_bytes).hexdigest().lower()
+
+        # Variasi B: Cleaned JSON (Solusi Paling Ampuh)
+        # Kita parse lalu dump ulang tanpa spasi. Ini menghilangkan \n atau spasi liar.
+        try:
+            json_data = json.loads(body_bytes)
+            # separators=(',', ':') menghapus spasi setelah koma dan titik dua
+            clean_json_str = json.dumps(json_data, separators=(',', ':'))
+            hash_clean = hashlib.sha256(clean_json_str.encode()).hexdigest().lower()
+        except Exception:
+            hash_clean = hash_raw  # Fallback jika bukan JSON
+
         method = "POST"
+        
+        # --- KOMBINASI RUMUS (Berdasarkan Hash Clean & Raw) ---
 
-        # Multi-check variations
-        string_v1 = f"{method}:{self.va}:{body_hash}:{self.api_key}"
-        calc_v1 = hmac.new(self.api_key.encode(), string_v1.encode(), hashlib.sha256).hexdigest()
+        # Rumus 1: HMAC + Cleaned JSON (Sesuai Dokumen + Normalisasi)
+        str_1 = f"{method}:{self.va}:{hash_clean}:{self.api_key}"
+        calc_1 = hmac.new(self.api_key.encode(), str_1.encode(), hashlib.sha256).hexdigest()
 
-        string_v2 = f"{method}:{self.va}:{body_hash}"
-        calc_v2 = hmac.new(self.api_key.encode(), string_v2.encode(), hashlib.sha256).hexdigest()
+        # Rumus 2: HMAC + Raw Bytes (Sesuai Dokumen + Raw)
+        str_2 = f"{method}:{self.va}:{hash_raw}:{self.api_key}"
+        calc_2 = hmac.new(self.api_key.encode(), str_2.encode(), hashlib.sha256).hexdigest()
 
-        string_v3 = f"{method}:{self.va}:{body_hash}:{self.api_key}"
-        calc_v3 = hashlib.sha256(string_v3.encode()).hexdigest()
+        # Rumus 3: SHA256 Biasa + Cleaned JSON (Legacy Style + Normalisasi)
+        str_3 = f"{method}:{self.va}:{hash_clean}:{self.api_key}"
+        calc_3 = hashlib.sha256(str_3.encode()).hexdigest()
 
-        if ipaymu_signature.lower() == calc_v1.lower():
+        # --- EXTREME LOGGING (Paste hasil ini ke chat jika gagal) ---
+        print(f"\n--- DEEP DEBUG SIGNATURE ---")
+        print(f"Received Sig: {ipaymu_signature}")
+        print(f"Key Used:     {self.api_key[:5]}... (Check Sandbox/Live Key!)")
+        print(f"Body Raw:     {body_bytes}")
+        print(f"Hash Raw:     {hash_raw}")
+        print(f"Hash Clean:   {hash_clean}")
+        print(f"Calc 1 (HMAC+Clean): {calc_1}")
+        print(f"Calc 2 (HMAC+Raw):   {calc_2}")
+        print(f"Calc 3 (SHA256+Clean): {calc_3}")
+        print(f"----------------------------\n")
+
+        # Validasi
+        if ipaymu_signature.lower() == calc_1.lower():
+            print("MATCH: Option 1 (HMAC + Clean JSON)")
             return True
-        if ipaymu_signature.lower() == calc_v2.lower():
+        if ipaymu_signature.lower() == calc_2.lower():
+            print("MATCH: Option 2 (HMAC + Raw Bytes)")
             return True
-        if ipaymu_signature.lower() == calc_v3.lower():
+        if ipaymu_signature.lower() == calc_3.lower():
+            print("MATCH: Option 3 (SHA256 + Clean JSON)")
             return True
 
+        # Jika sampai sini, gagal total
         raise HTTPException(status_code=400, detail="Invalid webhook signature")
 
 
