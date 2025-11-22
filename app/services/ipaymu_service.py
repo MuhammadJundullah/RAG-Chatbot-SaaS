@@ -92,6 +92,7 @@ class IPaymuService:
 
     async def verify_webhook_signature(self, request: Request) -> dict:
         api_key = settings.IPAYMU_API_KEY.strip()
+
         body_bytes = await request.body()
         raw_body = body_bytes.decode("utf-8")
 
@@ -99,63 +100,48 @@ class IPaymuService:
         if not received_sig:
             raise HTTPException(400, "Missing X-Signature")
 
-        if "application/json" in request.headers.get("content-type", ""):
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
             data = json.loads(raw_body)
         else:
             parsed = parse_qs(raw_body, keep_blank_values=True)
-            data = {k: v[0] if len(v) == 1 else v for k, v in parsed.items()}
-
-        order = [
-            "trx_id",
-            "sid",
-            "reference_id",
-            "status",
-            "status_code",
-            "sub_total",
-            "total",
-            "amount",
-            "fee",
-            "paid_off",
-            "created_at",
-            "expired_at",
-            "paid_at",
-            "settlement_status",
-            "transaction_status_code",
-            "is_escrow",
-            "system_notes",
-            "via",
-            "channel",
-            "payment_no",
-            "buyer_name",
-            "buyer_email",
-            "buyer_phone",
-            "additional_info",
-            "url",
-        ]
+            data = {}
+            for k in parsed:
+                values = parsed[k]
+                if len(values) == 1:
+                    data[k] = values[0]
+                else:
+                    data[k] = values
 
         parts = []
-        for key in order:
-            val = data.get(key)
-            if val is None:
+        for key in data:
+            if key == "aSignature":
                 continue
+            val = data[key]
+
             if isinstance(val, bool):
                 parts.append("true" if val else "false")
-            elif isinstance(val, (list, dict)):
-                parts.append(json.dumps(val, separators=(",", ":")))
             elif isinstance(val, (int, float)):
                 parts.append(str(val))
+            elif isinstance(val, list):
+                parts.append(json.dumps(val, separators=(",", ":")))
+            elif val is None:
+                parts.append("")
             else:
                 parts.append(str(val))
 
         string_to_hash = "".join(parts) + api_key
         calculated_sig = hashlib.sha256(string_to_hash.encode("utf-8")).hexdigest()
 
+        print(f"String length: {len(string_to_hash)}")
+        print(f"Calculated: {calculated_sig}")
+        print(f"Received  : {received_sig}")
+
         if calculated_sig != received_sig:
-            print(f"MISMATCH! Expected {calculated_sig} | Got {received_sig}")
-            print(f"String: {string_to_hash}")
+            print(f"STRING FULL: {string_to_hash}")
             raise HTTPException(400, "Invalid webhook signature")
 
-        print("✓ iPaymu Webhook Signature VALID")
+        print("iPaymu WEBHOOK SIGNATURE VALID!")
         return data
 
     async def _verify_transaction_via_api(self, trx_id: str) -> bool:
