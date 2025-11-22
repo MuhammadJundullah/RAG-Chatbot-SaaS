@@ -68,14 +68,14 @@ async def manual_activate_subscription(
 
 @router.post("/companies/{company_id}/add-topup", response_model=subscription_schema.Subscription)
 async def add_topup_quota(
-    company_id: str,
+    company_id: int,
     topup_data: subscription_schema.SubscriptionTopUpRequest,
     db: AsyncSession = Depends(get_db)
 ):
     sub = await subscription_service.get_subscription_by_company(db, company_id=company_id)
     sub.top_up_quota += topup_data.quota
     await db.commit()
-    await db.refresh(sub)
+    await db.refresh(sub, attribute_names=["plan"])
     return sub
 
 

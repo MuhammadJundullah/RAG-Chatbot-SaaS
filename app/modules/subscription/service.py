@@ -8,16 +8,16 @@ from app.schemas.subscription_schema import SubscriptionStatus, SubscriptionUpgr
 from app.modules.payment.service import ipaymu_service
 
 class SubscriptionService:
-    async def get_subscription_by_company(self, db: AsyncSession, company_id: str) -> Subscription:
+    async def get_subscription_by_company(self, db: AsyncSession, company_id: int) -> Subscription:
         result = await db.execute(
-            select(Subscription).filter(Subscription.company_id == company_id)
+            select(Subscription).options(joinedload(Subscription.plan)).filter(Subscription.company_id == company_id)
         )
         subscription = result.scalars().first()
         if not subscription:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription not found for this company")
         return subscription
 
-    async def get_subscription_status(self, db: AsyncSession, company_id: str) -> SubscriptionStatus:
+    async def get_subscription_status(self, db: AsyncSession, company_id: int) -> SubscriptionStatus:
         sub = await self.get_subscription_by_company(db, company_id)
         plan = await db.get(Plan, sub.plan_id)
         
@@ -36,7 +36,7 @@ class SubscriptionService:
             max_users=plan.max_users
         )
 
-    async def create_subscription_for_payment(self, db: AsyncSession, company_id: str, upgrade_request: SubscriptionUpgradeRequest, user: Users):
+    async def create_subscription_for_payment(self, db: AsyncSession, company_id: int, upgrade_request: SubscriptionUpgradeRequest, user: Users):
         company = await db.get(Company, company_id)
         if not company:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
@@ -82,7 +82,7 @@ class SubscriptionService:
         
         return subscription
 
-    async def check_active_subscription(self, db: AsyncSession, company_id: str) -> Subscription:
+    async def check_active_subscription(self, db: AsyncSession, company_id: int) -> Subscription:
         result = await db.execute(
             select(Subscription).options(joinedload(Subscription.plan)).filter_by(company_id=company_id)
         )
@@ -101,7 +101,7 @@ class SubscriptionService:
         
         return sub
 
-    async def check_and_increment_usage(self, db: AsyncSession, company_id: str):
+    async def check_and_increment_usage(self, db: AsyncSession, company_id: int):
         sub = await self.check_active_subscription(db, company_id)
         plan = sub.plan
 
