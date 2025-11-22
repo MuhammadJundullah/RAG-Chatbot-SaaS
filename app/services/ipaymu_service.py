@@ -104,6 +104,7 @@ class IPaymuService:
         Memverifikasi signature webhook yang masuk dari iPaymu.
         Perbaikan: Menggunakan SHA256 MURNI untuk validasi signature webhook.
         """
+
         body_bytes = await request.body()
         payload = {}
 
@@ -126,7 +127,7 @@ class IPaymuService:
             return False
 
         headers_lower = {k.lower(): v for k, v in request.headers.items()}
-        ipaymu_signature = headers_lower.get("signature")
+        ipaymu_signature = headers_lower.get("x-signature")
 
         if not ipaymu_signature:
             print("Missing iPaymu webhook signature header.")
