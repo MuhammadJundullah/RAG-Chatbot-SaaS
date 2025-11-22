@@ -12,7 +12,7 @@ from app.schemas.subscription_schema import Subscription
 from app.models.user_model import Users
 
 class IPaymuService:
-def __init__(self):
+    def __init__(self):
         self.va = settings.IPAYMU_VA
         self.api_key = settings.IPAYMU_API_KEY
         # Kembali ke Sandbox untuk pengujian
@@ -110,13 +110,16 @@ def __init__(self):
         # Parsing body (diasumsikan iPaymu mengirim form-urlencoded atau JSON)
         content_type = request.headers.get("content-type", "").lower()
         if "application/json" in content_type:
-             try: payload = json.loads(body_bytes)
-             except json.JSONDecodeError: return False
-        else: # Form-urlencoded
+            try:
+                payload = json.loads(body_bytes)
+            except json.JSONDecodeError:
+                return False
+        else:  # Form-urlencoded
             try:
                 form_data = parse_qs(body_bytes.decode('utf-8'))
                 payload = {k: v[0] for k, v in form_data.items() if v}
-            except Exception: return False
+            except Exception:
+                return False
 
         if not payload:
             print("Webhook body is empty or could not be parsed.")
