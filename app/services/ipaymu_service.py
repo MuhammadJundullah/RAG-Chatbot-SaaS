@@ -91,61 +91,72 @@ class IPaymuService:
             raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
     async def verify_webhook_signature(self, request: Request) -> dict:
-        """
-        Verifikasi X-Signature dari webhook iPaymu (sesuai docs callback params).
-        Return data parsed jika valid.
-        """
-        api_key = settings.IPAYMU_API_KEY
+        api_key = settings.IPAYMU_API_KEY.strip()
         body_bytes = await request.body()
         raw_body = body_bytes.decode("utf-8")
-
-        content_type = request.headers.get("content-type", "")
-        parsed = None
-        if "x-www-form-urlencoded" in content_type:
-            parsed = parse_qs(raw_body, keep_blank_values=True)
-            data = {
-                k: v[0] if len(v) == 1 else (json.dumps(v) if isinstance(v, list) else "")
-                for k, v in parsed.items()
-            }
-        elif "application/json" in content_type:
-            data = json.loads(raw_body)
-        else:
-            raise HTTPException(400, "Unsupported content-type")
 
         received_sig = request.headers.get("X-Signature", "").lower().strip()
         if not received_sig:
             raise HTTPException(400, "Missing X-Signature")
 
-        if "aSignature" in data:
-            del data["aSignature"]
+        if "application/json" in request.headers.get("content-type", ""):
+            data = json.loads(raw_body)
+        else:
+            parsed = parse_qs(raw_body, keep_blank_values=True)
+            data = {k: v[0] if len(v) == 1 else v for k, v in parsed.items()}
+
+        order = [
+            "trx_id",
+            "sid",
+            "reference_id",
+            "status",
+            "status_code",
+            "sub_total",
+            "total",
+            "amount",
+            "fee",
+            "paid_off",
+            "created_at",
+            "expired_at",
+            "paid_at",
+            "settlement_status",
+            "transaction_status_code",
+            "is_escrow",
+            "system_notes",
+            "via",
+            "channel",
+            "payment_no",
+            "buyer_name",
+            "buyer_email",
+            "buyer_phone",
+            "additional_info",
+            "url",
+        ]
 
         parts = []
-        key_iter = parsed.keys() if "x-www-form-urlencoded" in content_type and parsed is not None else data.keys()
-        for key in key_iter:
-            value = data.get(key)
-            if value is None or value == "":
-                parts.append("")
-            elif isinstance(value, bool):
-                parts.append("true" if value else "false")
-            elif isinstance(value, (int, float)):
-                parts.append(str(value))
-            elif isinstance(value, (list, dict)):
-                parts.append(json.dumps(value, separators=(",", ":")))
+        for key in order:
+            val = data.get(key)
+            if val is None:
+                continue
+            if isinstance(val, bool):
+                parts.append("true" if val else "false")
+            elif isinstance(val, (list, dict)):
+                parts.append(json.dumps(val, separators=(",", ":")))
+            elif isinstance(val, (int, float)):
+                parts.append(str(val))
             else:
-                parts.append(str(value))
+                parts.append(str(val))
 
         string_to_hash = "".join(parts) + api_key
         calculated_sig = hashlib.sha256(string_to_hash.encode("utf-8")).hexdigest()
 
         if calculated_sig != received_sig:
-            print(
-                f"SIGNATURE MISMATCH!\nExpected: {calculated_sig}\nReceived: {received_sig}\n"
-                f"String preview: {string_to_hash[:150]}...\nAPI Key used: {api_key[:10]}..."
-            )
+            print(f"MISMATCH! Expected {calculated_sig} | Got {received_sig}")
+            print(f"String: {string_to_hash}")
             raise HTTPException(400, "Invalid webhook signature")
 
-        print("✓ Webhook signature VALID (per docs callback)")
-        return dict(data)
+        print("✓ iPaymu Webhook Signature VALID")
+        return data
 
     async def _verify_transaction_via_api(self, trx_id: str) -> bool:
         """
