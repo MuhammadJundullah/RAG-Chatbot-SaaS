@@ -92,7 +92,8 @@ class IPaymuService:
 
     async def verify_webhook_signature(self, request: Request) -> bool:
         """
-        Memverifikasi signature dengan Tipe Data PRESISI (Sesuai Log iPaymu).
+        Memverifikasi signature dengan Brute-Force Strategy.
+        Mencoba variasi: Sorted Keys vs Unsorted, Escaped Slash vs Unescaped.
         """
         body_bytes = await request.body()
         
@@ -102,77 +103,70 @@ class IPaymuService:
         if not ipaymu_signature:
             raise HTTPException(status_code=400, detail="Missing webhook signature")
 
-        hash_to_use = ""
-        content_type = headers_lower.get("content-type", "")
-        
-        if "application/json" in content_type:
+        method = "POST"
+        candidates = []
+
+        # --- SKENARIO 1: JSON ASLI (Jika Content-Type JSON) ---
+        if "application/json" in headers_lower.get("content-type", ""):
             try:
                 json_data = json.loads(body_bytes)
-                clean_json_str = json.dumps(json_data, separators=(',', ':'))
-                clean_json_str = clean_json_str.replace('/', '\\/') 
-                hash_to_use = hashlib.sha256(clean_json_str.encode()).hexdigest().lower()
+                candidates.append(json.dumps(json_data, separators=(',', ':')))
+                candidates.append(json.dumps(json_data, separators=(',', ':')).replace('/', '\\/'))
             except Exception:
-                hash_to_use = hashlib.sha256(body_bytes).hexdigest().lower()
+                pass
+            candidates.append(body_bytes.decode('utf-8'))
+
+        # --- SKENARIO 2: FORM DATA RECONSTRUCTION ---
         else:
-            # --- FIX DATA FORM ---
             try:
                 from urllib.parse import parse_qs
                 body_str = body_bytes.decode('utf-8')
                 parsed_data = parse_qs(body_str, keep_blank_values=True)
                 flat_data = {k: v[0] for k, v in parsed_data.items()}
                 
-                # 1. LIST FIELD YANG WAJIB INTEGER
-                # Berdasarkan Log Turn 22: trx_id, status_code, paid_off adalah INT.
-                # TAPI total, amount, fee, sub_total tetap STRING.
-                int_fields = [
-                    'trx_id', 'status_code', 'transaction_status_code', 'paid_off'
-                ]
-                
+                # Type fixing
+                int_fields = ['trx_id', 'status_code', 'transaction_status_code', 'paid_off']
                 for field in int_fields:
                     if field in flat_data and flat_data[field].isdigit():
                         flat_data[field] = int(flat_data[field])
 
-                # 2. Fix Boolean
                 if 'is_escrow' in flat_data:
                     val = str(flat_data['is_escrow']).lower()
                     flat_data['is_escrow'] = (val == '1' or val == 'true')
-
-                # 3. Dump JSON Rapat
-                clean_json_from_form = json.dumps(flat_data, separators=(',', ':'))
                 
-                # 4. Escape Slash (Wajib untuk URL)
-                clean_json_from_form = clean_json_from_form.replace('/', '\\/')
+                # Variations
+                json_a = json.dumps(flat_data, separators=(',', ':'))
+                candidates.append(json_a.replace('/', '\\/'))
 
-                hash_to_use = hashlib.sha256(clean_json_from_form.encode()).hexdigest().lower()
-                
-                print(f"DEBUG: JSON Final Structure: {clean_json_from_form}")
+                json_b = json.dumps(flat_data, separators=(',', ':'), sort_keys=True)
+                candidates.append(json_b.replace('/', '\\/'))
+
+                candidates.append(json_a)
+                candidates.append(json_b)
 
             except Exception as e:
-                print(f"DEBUG: Conversion Failed: {e}")
-                # Fallback
-                from urllib.parse import unquote_plus
-                decoded_body = unquote_plus(body_bytes.decode('utf-8'))
-                hash_to_use = hashlib.sha256(decoded_body.encode()).hexdigest().lower()
+                print(f"DEBUG: Parsing Failed: {e}")
 
-        method = "POST"
-        # Rumus Sesuai Dokumen
-        string_to_sign = f"{method}:{self.va}:{hash_to_use}:{self.api_key}"
+        # --- VERIFIKASI SEMUA KANDIDAT ---
+        print(f"--- MULTI-CHECK SIGNATURE ---")
+        print(f"Received: {ipaymu_signature}")
         
-        calculated_signature = hmac.new(
-            self.api_key.encode(), 
-            string_to_sign.encode(), 
-            hashlib.sha256
-        ).hexdigest()
+        for i, json_candidate in enumerate(candidates):
+            body_hash = hashlib.sha256(json_candidate.encode()).hexdigest().lower()
+            string_to_sign = f"{method}:{self.va}:{body_hash}:{self.api_key}"
+            calc_sig = hmac.new(
+                self.api_key.encode(), 
+                string_to_sign.encode(), 
+                hashlib.sha256
+            ).hexdigest()
 
-        if ipaymu_signature.lower() == calculated_signature.lower():
-            print("MATCH: Signature Valid!")
-            return True
-        
-        print(f"--- SIGNATURE MISMATCH ---")
-        print(f"Received:   {ipaymu_signature}")
-        print(f"Calculated: {calculated_signature}")
-        print(f"StringSigned: {string_to_sign}")
-        raise HTTPException(status_code=400, detail="Invalid webhook signature")
+            if ipaymu_signature.lower() == calc_sig.lower():
+                print(f"MATCH FOUND at Candidate #{i+1}!")
+                print(f"Winning Body Structure: {json_candidate}")
+                return True
+
+        print("-----------------------------")
+        raise HTTPException(status_code=400, detail="Invalid webhook signature (All variations failed)")
 
 
 ipaymu_service = IPaymuService()
