@@ -101,59 +101,51 @@ class IPaymuService:
 
     async def verify_webhook_signature(self, request: Request) -> bool:
         """
-        Memverifikasi signature webhook yang masuk dari iPaymu.
-        Perbaikan: Menggunakan SHA256 MURNI untuk validasi signature webhook.
+        Memverifikasi signature webhook SESUAI DOKUMENTASI V2.
+        Rumus: HMAC-SHA256(HTTPMethod:VaNumber:Lowercase(SHA-256(RequestBody)):ApiKey, ApiKey)
         """
-
         body_bytes = await request.body()
-        payload = {}
-
-        # Parsing body (diasumsikan iPaymu mengirim form-urlencoded atau JSON)
-        content_type = request.headers.get("content-type", "").lower()
-        if "application/json" in content_type:
-            try:
-                payload = json.loads(body_bytes)
-            except json.JSONDecodeError:
-                return False
-        else:  # Form-urlencoded
-            try:
-                form_data = parse_qs(body_bytes.decode('utf-8'))
-                payload = {k: v[0] for k, v in form_data.items() if v}
-            except Exception:
-                return False
-
-        if not payload:
-            print("Webhook body is empty or could not be parsed.")
-            return False
-
+        
+        # 1. Ambil Header Signature (Cek X-Signature atau Signature)
         headers_lower = {k.lower(): v for k, v in request.headers.items()}
-        ipaymu_signature = headers_lower.get("x-signature")
+        ipaymu_signature = headers_lower.get("x-signature") or headers_lower.get("signature")
 
         if not ipaymu_signature:
             print("Missing iPaymu webhook signature header.")
-            return False
+            # return False # Atau raise error tergantung kebutuhan
+            raise HTTPException(status_code=400, detail="Missing webhook signature")
 
-        transaction_id = payload.get("trx_id") or payload.get("sid")
-        if not transaction_id:
-            print(f"Could not find 'trx_id' or 'sid' in webhook payload.")
-            return False
-
-        # 1. Hitung SHA256 dari body mentah (raw body)
-        body_hash = self._body_sha256(body_bytes=body_bytes).lower()
-        method = request.method.upper()
+        # 2. Hitung Body Hash (SHA256 dari raw body, lowercase)
+        # Dokumen: "Request body di enkripsi menggunakan SHA256"
+        body_hash = hashlib.sha256(body_bytes).hexdigest().lower()
         
-        # 2. Susun stringToSign untuk webhook: {METHOD}:{TRX_ID}:{HASHED_BODY}:{VA}
-        string_to_sign = f"{method}:{transaction_id}:{body_hash}:{self.va}"
+        # 3. Susun StringToSign (Sesuai Dokumen Persis)
+        # Dokumen: HTTPMethod:VaNumber:Lowercase(SHA-256(RequestBody)):ApiKey
+        method = "POST" # Webhook iPaymu selalu POST
         
-        # 3. Hitung Signature: Menggunakan SHA256 MURNI (bukan HMAC)
-        calculated_signature = self._calculate_plain_sha256(string_to_sign)
+        # Perhatikan urutannya: Method : VA : BodyHash : ApiKey
+        string_to_sign = f"{method}:{self.va}:{body_hash}:{self.api_key}"
+        
+        # 4. Hitung Signature menggunakan HMAC-SHA256
+        # Dokumen: "Signature digenerate menggunakan HMAC-256 dengan ApiKey... dan StringToSign"
+        calculated_signature = hmac.new(
+            self.api_key.encode(),          # Key
+            string_to_sign.encode(),        # Message
+            hashlib.sha256                  # Algorithm
+        ).hexdigest()
 
+        # --- Debugging Print (Bisa dihapus nanti) ---
+        print(f"--- DEBUG VERIFY SIGNATURE ---")
+        print(f"Body Hash:      {body_hash}")
+        print(f"String to Sign: {string_to_sign}")
+        print(f"Calculated:     {calculated_signature}")
+        print(f"Received:       {ipaymu_signature}")
+        print(f"------------------------------")
+
+        # 5. Bandingkan
         if ipaymu_signature.lower() != calculated_signature.lower():
-            print(f"Webhook signature mismatch! Received: {ipaymu_signature}")
-            print(f"Expected (string_to_sign='{string_to_sign}'): {calculated_signature}")
-            # Log pesan error Anda di sini
+            print("Webhook signature mismatch!")
             raise HTTPException(status_code=400, detail="Invalid webhook signature")
-            # return False # Jika Anda ingin menangani error di layer lain
 
         print("--- Webhook signature is valid ---")
         return True
