@@ -38,7 +38,7 @@ async def shutdown_event():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://smart-ai-frontend-wine.vercel.app", "https://145.79.15.190"],
+    allow_origins=["http://localhost:5173", "https://smart-ai-frontend-wine.vercel.app", "https://145.79.15.190", "https://smart-ai.rf.gd"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -251,11 +251,14 @@ async def request_password_reset(db: AsyncSession, email: str):
         # Mengembalikan pesan spesifik bahwa email tidak terdaftar.
         # Perlu diingat ini dapat membocorkan informasi tentang email yang terdaftar.
         logging.warning(f"Password reset requested for non-existent email: {email}")
-        return {"message": "Email tidak terdaftar."} # Pesan diubah sesuai permintaan
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email not registered."
+        )
 
     if not user.is_active:
         logging.warning(f"Password reset requested for inactive user: {email}")
-        return {"message": "Jika akun dengan email tersebut ada, tautan reset kata sandi telah dikirim."}
+        return {"message": "Jika akun dengan email tersebut ada, tautan reset kata sandi telah dikirim.", "code": 400}
 
     # Generate token and set expiry
     token = generate_reset_token() # Use helper
@@ -297,7 +300,7 @@ async def request_password_reset(db: AsyncSession, email: str):
             subject=subject,
             html_content=html_content
         )
-        return {"message": "Jika akun dengan email tersebut ada, tautan reset kata sandi telah dikirim."}
+        return {"code": 200, "message": "Jika akun dengan email tersebut ada, tautan reset kata sandi telah dikirim."}
     except HTTPException as e:
         # Tangani HTTPException yang dilempar oleh send_brevo_email
         raise e
@@ -345,4 +348,4 @@ async def reset_password(db: AsyncSession, email: str, token: str, new_password:
     await db.commit()
     await db.refresh(user)
 
-    return {"message": "Kata sandi berhasil direset."}
+    return {"code": 200, "message": "Kata sandi berhasil direset."}

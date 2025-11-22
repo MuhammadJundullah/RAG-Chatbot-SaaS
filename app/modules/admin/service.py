@@ -8,6 +8,8 @@ from app.repository.company_repository import company_repository
 from app.schemas import company_schema
 from app.repository.log_repository import log_repository
 from app.models.log_model import ActivityLog
+from app.utils.sms_sender import send_brevo_sms
+from app.core.config import settings
 
 async def get_companies_service(
     db: AsyncSession,
@@ -22,20 +24,33 @@ async def approve_company_service(
     db: AsyncSession,
     company_id: int
 ):
-    approval_status = await company_repository.approve_company(db, company_id=company_id)
-    
-    if approval_status == "approved":
-        return {"message": f"Company with id {company_id} has been approved."}
-    elif approval_status == "already_active":
+    result = await company_repository.approve_company(db, company_id=company_id)
+
+    if result == "already_active":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Company with id {company_id} is already active."
         )
-    else:
+
+    if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Company with id {company_id} not found."
         )
+
+    company = result
+
+    # Non-blocking SMS notification
+    try:
+        if company.pic_phone_number:
+            sms_text = f"Perusahaan '{company.name}' telah disetujui. Silakan login ke {settings.APP_BASE_URL}."
+            send_brevo_sms(company.pic_phone_number, sms_text)
+    except Exception as e:
+        # Log and continue; do not fail approval
+        import logging
+        logging.error("Failed to send approval SMS for company %s: %s", company_id, e)
+
+    return {"message": f"Company with id {company_id} has been approved."}
 
 async def reject_company_service(
     db: AsyncSession,

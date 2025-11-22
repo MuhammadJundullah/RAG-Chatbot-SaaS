@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
@@ -119,3 +119,30 @@ async def read_users_me(current_user: user_model.Users = Depends(get_current_use
     Retrieves the current user's profile.
     """
     return current_user
+
+
+@router.post("/request-password-reset")
+async def request_password_reset(
+    email: str = Query(..., description="Email akun yang akan di-reset"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Mengirimkan tautan/token reset password via email.
+    """
+    return await user_service.request_password_reset(db, email=email)
+
+
+@router.post("/reset-password")
+async def reset_password(
+    payload: user_schema.PasswordResetRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Mengganti password menggunakan token reset yang valid.
+    """
+    return await user_service.reset_password(
+        db,
+        email=payload.email,
+        token=payload.token,
+        new_password=payload.new_password,
+    )

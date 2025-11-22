@@ -23,7 +23,6 @@ router = APIRouter(
     dependencies=[Depends(get_current_super_admin)],
 )
 
-
 @router.get("/companies", response_model=List[company_schema.Company])
 async def read_companies(
     skip: int = 0,

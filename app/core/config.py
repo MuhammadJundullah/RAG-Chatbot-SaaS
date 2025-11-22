@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     # Brevo (SendGrid) settings
     BREVO_API_KEY: str 
     DEFAULT_SENDER_EMAIL: str
+    BREVO_SMS_SENDER: str = "InfoSMS"
 
     # Application base URL for links
     APP_BASE_URL: str = "https://127.0.0.1:8000"

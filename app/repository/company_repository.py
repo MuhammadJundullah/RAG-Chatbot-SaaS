@@ -41,12 +41,12 @@ class CompanyRepository(BaseRepository[company_model.Company]):
 
         if company.is_active:
             return "already_active"
-        else:
-            company.is_active = True
-            db.add(company)
-            await db.commit()
-            await db.refresh(company)
-            return "approved"
+
+        company.is_active = True
+        db.add(company)
+        await db.commit()
+        await db.refresh(company)
+        return company
 
     async def reject_company(self, db: AsyncSession, company_id: int):
         """Rejects a company registration by deleting the company and its admin."""
