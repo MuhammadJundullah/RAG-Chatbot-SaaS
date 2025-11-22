@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import patch
-from app.services.rag_service import RAGService
-from app.services.gemini_service import GeminiService
-from app.services.user_service import authenticate_user, register_user
+from app.modules.documents.rag_service import RAGService
+from app.modules.chat.gemini_service import GeminiService
+from app.modules.auth.service import authenticate_user, register_user
 from app.models.user_model import Users
 from app.models.company_model import Company
 from app.schemas.user_schema import UserRegistration
@@ -32,7 +32,7 @@ async def test_authenticate_user_success(mock_db_session):
         is_active=True
     )
     
-    with patch('app.services.user_service.user_repository.get_user_by_email', return_value=user), \
+    with patch('app.modules.auth.service.user_repository.get_user_by_email', return_value=user), \
          patch('app.utils.security.verify_password', return_value=True):
         
         result = await authenticate_user(mock_db_session, email="test@example.com", password="password123")
@@ -41,7 +41,7 @@ async def test_authenticate_user_success(mock_db_session):
 
 @pytest.mark.asyncio
 async def test_authenticate_user_failure(mock_db_session):
-    with patch('app.services.user_service.user_repository.get_user_by_email', return_value=None):
+    with patch('app.modules.auth.service.user_repository.get_user_by_email', return_value=None):
         result = await authenticate_user(mock_db_session, email="nonexistent@example.com", password="password123")
         assert result is None
 
@@ -72,9 +72,9 @@ async def test_register_user(mock_db_session):
         is_active=False 
     )
     
-    with patch('app.services.user_service.user_repository.get_user_by_email', return_value=None), \
-         patch('app.services.user_service.user_repository.create_user', return_value=new_user), \
-         patch('app.services.user_service.company_repository.create_company', return_value=new_company), \
+    with patch('app.modules.auth.service.user_repository.get_user_by_email', return_value=None), \
+         patch('app.modules.auth.service.user_repository.create_user', return_value=new_user), \
+         patch('app.modules.auth.service.company_repository.create_company', return_value=new_company), \
          patch('app.utils.security.get_password_hash', return_value="hashed_password"):
         
         result = await register_user(mock_db_session, user_data=user_data)

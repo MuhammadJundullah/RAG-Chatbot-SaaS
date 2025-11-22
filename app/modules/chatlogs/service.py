@@ -14,7 +14,7 @@ from app.repository.user_repository import user_repository
 from app.schemas import chatlog_schema, conversation_schema, document_schema
 from app.models.user_model import Users
 from app.models import chatlog_model
-from app.services.gemini_service import gemini_service
+from app.modules.chat.gemini_service import gemini_service
 
 """
 This module exposes "_service" helpers for internal use and wrapper functions expected by API routes.
@@ -375,4 +375,3 @@ async def recommend_topics_for_division_ai(
         topics.extend([t for t in fallback if t not in topics])
 
     return topics[:5]
-

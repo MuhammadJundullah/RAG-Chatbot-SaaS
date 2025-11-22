@@ -5,7 +5,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.future import select
 from app.models import Subscription, Company, Plan, Users
 from app.schemas.subscription_schema import SubscriptionStatus, SubscriptionUpgradeRequest
-from app.services.ipaymu_service import ipaymu_service
+from app.modules.payment.service import ipaymu_service
 
 class SubscriptionService:
     async def get_subscription_by_company(self, db: AsyncSession, company_id: str) -> Subscription:

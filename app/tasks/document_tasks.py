@@ -4,8 +4,8 @@ import os
 from app.core.celery_app import celery_app
 from app.core.database import DatabaseManager
 import app.repository.document_repository as doc_repo_module
-from app.services import ocr_service
-from app.services.rag_service import RAGService
+from app.modules.documents.ocr_service import extract_text_from_file
+from app.modules.documents.rag_service import RAGService
 from app.models.document_model import DocumentStatus
 
 # --- Logic for failure handling ---
@@ -51,7 +51,7 @@ async def _run_ocr_processing(document_id: int):
                 file_bytes = f.read()
 
             print(f"[OCR Task] Document {document_id} content_type: {doc.content_type}")
-            extracted_text = await ocr_service.extract_text_from_file(file_bytes, doc.content_type)
+            extracted_text = await extract_text_from_file(file_bytes, doc.content_type)
 
             await doc_repo_module.document_repository.update_document_text_and_status(
                 db,

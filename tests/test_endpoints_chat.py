@@ -32,8 +32,8 @@ def test_chat_endpoint():
         app.dependency_overrides[get_current_user] = lambda: mock_user
         try:
             # Mock the dependencies and services
-            with patch('app.services.rag_service.rag_service.get_relevant_context', new_callable=AsyncMock) as mock_get_context, \
-                 patch('app.services.gemini_service.gemini_service.generate_chat_response') as mock_gen_response, \
+            with patch('app.modules.documents.rag_service.rag_service.get_relevant_context', new_callable=AsyncMock) as mock_get_context, \
+                 patch('app.modules.chat.gemini_service.gemini_service.generate_chat_response') as mock_gen_response, \
                  patch('app.repository.chatlog_repository.chatlog_repository.create_chatlog', new_callable=AsyncMock) as mock_create_chatlog:
                 
                 # Mock the RAG service response
@@ -96,8 +96,8 @@ def test_chat_endpoint_without_conversation_id():
         app.dependency_overrides[get_current_user] = lambda: mock_user
         try:
             # Mock the dependencies and services
-            with patch('app.services.rag_service.rag_service.get_relevant_context', new_callable=AsyncMock) as mock_get_context, \
-                 patch('app.services.gemini_service.gemini_service.generate_chat_response') as mock_gen_response, \
+            with patch('app.modules.documents.rag_service.rag_service.get_relevant_context', new_callable=AsyncMock) as mock_get_context, \
+                 patch('app.modules.chat.gemini_service.gemini_service.generate_chat_response') as mock_gen_response, \
                  patch('app.repository.chatlog_repository.chatlog_repository.create_chatlog', new_callable=AsyncMock) as mock_create_chatlog:
                 
                 # Mock the RAG service response

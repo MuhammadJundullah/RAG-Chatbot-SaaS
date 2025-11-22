@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.models import user_model
 from app.schemas import token_schema
 from app.repository.user_repository import user_repository
-from app.services.subscription_service import subscription_service
+from app.modules.subscription.service import subscription_service
 
 # The tokenUrl should point to a generic token endpoint
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/user/token")

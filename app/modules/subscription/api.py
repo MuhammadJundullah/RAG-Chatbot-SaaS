@@ -8,7 +8,7 @@ from app.models.user_model import Users
 from app.models.plan_model import Plan
 from app.schemas.plan_schema import Plan as PlanSchema
 from app.schemas.subscription_schema import SubscriptionStatus, SubscriptionUpgradeRequest
-from app.services.subscription_service import subscription_service
+from app.modules.subscription.service import subscription_service
 
 router = APIRouter()
 

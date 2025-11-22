@@ -4,9 +4,9 @@ from unittest.mock import patch, AsyncMock
 import io
 
 from app.main import app
-from app.services import user_service # Import user_service
+from app.modules.auth import service as user_service
 from app.schemas.user_schema import PaginatedUserResponse
-from app.core.s3_client import s3_client_manager # Import s3_client_manager
+from app.core.s3_client import s3_client_manager
 
 # Assuming conftest.py provides admin_client fixture
 
@@ -292,7 +292,7 @@ async def test_get_company_users_by_admin(
     mock_paginated_response_all = PaginatedUserResponse(
         items=mock_users_data[:2], total=len(mock_users_data), page=1, limit=2
     )
-    with patch("app.services.company_service.get_company_users_paginated", AsyncMock(return_value=mock_paginated_response_all)) as mock_service:
+    with patch("app.modules.company.service.get_company_users_paginated", AsyncMock(return_value=mock_paginated_response_all)) as mock_service:
         response = admin_client.get("/companies/users?page=1&limit=2")
         assert response.status_code == 200
         data = response.json()
@@ -309,7 +309,7 @@ async def test_get_company_users_by_admin(
     mock_paginated_response_filtered = PaginatedUserResponse(
         items=[mock_users_data[0]], total=1, page=1, limit=100
     )
-    with patch("app.services.company_service.get_company_users_paginated", AsyncMock(return_value=mock_paginated_response_filtered)) as mock_service:
+    with patch("app.modules.company.service.get_company_users_paginated", AsyncMock(return_value=mock_paginated_response_filtered)) as mock_service:
         response = admin_client.get("/companies/users?username=userone")
         assert response.status_code == 200
         data = response.json()
@@ -323,7 +323,7 @@ async def test_get_company_users_by_admin(
     mock_paginated_response_empty = PaginatedUserResponse(
         items=[], total=0, page=1, limit=100
     )
-    with patch("app.services.company_service.get_company_users_paginated", AsyncMock(return_value=mock_paginated_response_empty)) as mock_service:
+    with patch("app.modules.company.service.get_company_users_paginated", AsyncMock(return_value=mock_paginated_response_empty)) as mock_service:
         response = admin_client.get("/companies/users?username=nonexistent")
         assert response.status_code == 200
         data = response.json()
@@ -334,7 +334,7 @@ async def test_get_company_users_by_admin(
         )
 
     # Scenario 4: Internal server error from service
-    with patch("app.services.company_service.get_company_users_paginated", AsyncMock(side_effect=Exception("Service error"))) as mock_service:
+    with patch("app.modules.company.service.get_company_users_paginated", AsyncMock(side_effect=Exception("Service error"))) as mock_service:
         response = admin_client.get("/companies/users")
         assert response.status_code == 500
         assert "Service error" in response.json()["detail"]

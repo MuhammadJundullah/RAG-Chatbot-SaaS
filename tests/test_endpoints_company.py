@@ -8,7 +8,7 @@ from app.schemas.chatlog_schema import ChatMessage
 from app.schemas.document_schema import ReferencedDocument
 from datetime import datetime
 import uuid
-from app.services.user_service import EmployeeDeletionError, EmployeeUpdateError
+from app.modules.auth.service import EmployeeDeletionError, EmployeeUpdateError
 from app.schemas.user_schema import User # Import User schema for mock response
 
 # --- Helper Fixtures for Dependency Overrides ---
@@ -39,7 +39,7 @@ def override_get_current_super_admin(app):
 
 def test_read_my_company(admin_client):
     mock_company = Company(id=1, name="Test Company", code="TC", is_active=True)
-    with patch('app.services.company_service.get_company_by_user_service', return_value=mock_company):
+    with patch('app.modules.company.service.get_company_by_user_service', return_value=mock_company):
         response = admin_client.get("/api/v1/companies/me")
         assert response.status_code == 200
         assert response.json()["name"] == "Test Company"
@@ -57,7 +57,7 @@ def test_get_company_users_endpoint(admin_client):
         limit=20,
         total_pages=1
     )
-    with patch('app.services.company_service.get_company_users_paginated', return_value=mock_response):
+    with patch('app.modules.company.service.get_company_users_paginated', return_value=mock_response):
         response = admin_client.get("/api/v1/companies/users?page=1&limit=20")
         assert response.status_code == 200
         data = response.json()
@@ -70,7 +70,7 @@ def test_get_company_users_endpoint(admin_client):
 def test_update_my_company(admin_client):
     update_data = {"name": "Updated Company", "code": "UC"}
     mock_updated = Company(id=1, name="Updated Company", code="UC", is_active=True)
-    with patch('app.services.company_service.update_company_by_admin_service', return_value=mock_updated):
+    with patch('app.modules.company.service.update_company_by_admin_service', return_value=mock_updated):
         response = admin_client.put("/api/v1/companies/me", data=update_data)
         assert response.status_code == 200
         assert response.json()["name"] == "Updated Company"
@@ -81,7 +81,7 @@ def test_get_active_companies(super_admin_client):
         Company(id=1, name="Active Co 1", code="AC1", is_active=True),
         Company(id=2, name="Active Co 2", code="AC2", is_active=True)
     ]
-    with patch('app.services.company_service.get_active_companies_service', return_value=mock_companies):
+    with patch('app.modules.company.service.get_active_companies_service', return_value=mock_companies):
         response = super_admin_client.get("/api/v1/companies/active")
         assert response.status_code == 200
         data = response.json()
@@ -93,7 +93,7 @@ def test_get_pending_approval_companies(super_admin_client):
         Company(id=3, name="Pending Co 1", code="PC1", is_active=False),
         Company(id=4, name="Pending Co 2", code="PC2", is_active=False)
     ]
-    with patch('app.services.company_service.get_pending_approval_companies_service', return_value=mock_companies):
+    with patch('app.modules.company.service.get_pending_approval_companies_service', return_value=mock_companies):
         response = super_admin_client.get("/api/v1/companies/pending-approval")
         assert response.status_code == 200
         data = response.json()
@@ -101,14 +101,14 @@ def test_get_pending_approval_companies(super_admin_client):
 
 @pytest.mark.asyncio
 async def test_delete_employee_by_admin_success(override_get_current_company_admin, admin_client):
-    with patch("app.services.user_service.delete_employee_by_admin", return_value=None) as mock_delete_service:
+    with patch("app.modules.auth.service.delete_employee_by_admin", return_value=None) as mock_delete_service:
         response = admin_client.delete("/api/v1/companies/employees/2")
         assert response.status_code == 204
         mock_delete_service.assert_called_once_with(db=ANY, company_id=1, employee_id=2)
 
 @pytest.mark.asyncio
 async def test_delete_employee_by_admin_not_found(override_get_current_company_admin, admin_client):
-    with patch("app.services.user_service.delete_employee_by_admin", side_effect=EmployeeDeletionError(detail="Employee not found.", status_code=404)) as mock_delete_service:
+    with patch("app.modules.auth.service.delete_employee_by_admin", side_effect=EmployeeDeletionError(detail="Employee not found.", status_code=404)) as mock_delete_service:
         response = admin_client.delete("/api/v1/companies/employees/999")
         assert response.status_code == 404
         assert response.json() == {"detail": "Employee not found."}
@@ -116,7 +116,7 @@ async def test_delete_employee_by_admin_not_found(override_get_current_company_a
 
 @pytest.mark.asyncio
 async def test_delete_employee_by_admin_unauthorized(override_get_current_company_admin, admin_client):
-    with patch("app.services.user_service.delete_employee_by_admin", side_effect=EmployeeDeletionError(detail="Not authorized to delete this employee.", status_code=403)) as mock_delete_service:
+    with patch("app.modules.auth.service.delete_employee_by_admin", side_effect=EmployeeDeletionError(detail="Not authorized to delete this employee.", status_code=403)) as mock_delete_service:
         response = admin_client.delete("/api/v1/companies/employees/3")
         assert response.status_code == 403
         assert response.json() == {"detail": "Not authorized to delete this employee."}
@@ -149,7 +149,7 @@ async def test_get_conversation_details_excludes_s3_path(override_get_current_co
 
     # Mock the service call
     with patch(
-        "app.services.chatlog_service.get_conversation_details_as_company_admin",
+        "app.modules.chatlogs.service.get_conversation_details_as_company_admin",
         return_value=mock_response
     ) as mock_service_call:
         # Make the request to the endpoint
@@ -200,7 +200,7 @@ async def test_register_employee_by_admin(override_get_current_company_admin, ad
         is_active=True,
         profile_picture_url=None
     )
-    mock_register_user = patch("app.services.user_service.register_employee_by_admin", return_value=mock_user)
+    mock_register_user = patch("app.modules.auth.service.register_employee_by_admin", return_value=mock_user)
 
     with mock_register_user as m_register:
         response = admin_client.post("/api/companies/employees/register", data=employee_data)
@@ -242,7 +242,7 @@ async def test_update_employee_by_admin(override_get_current_company_admin, admi
         profile_picture_url=None
     )
 
-    with patch("app.services.user_service.update_employee_by_admin", return_value=mock_updated_user) as mock_update_service:
+    with patch("app.modules.auth.service.update_employee_by_admin", return_value=mock_updated_user) as mock_update_service:
         response = admin_client.put(f"/api/companies/employees/{employee_id}", data=update_data)
         
         assert response.status_code == 200
@@ -255,7 +255,7 @@ async def test_update_employee_by_admin(override_get_current_company_admin, admi
 async def test_update_employee_not_found(override_get_current_company_admin, admin_client):
     employee_id = 999
     update_data = {"name": "Any Name"}
-    with patch("app.services.user_service.update_employee_by_admin", side_effect=EmployeeUpdateError(detail="Employee not found", status_code=404)):
+    with patch("app.modules.auth.service.update_employee_by_admin", side_effect=EmployeeUpdateError(detail="Employee not found", status_code=404)):
         response = admin_client.put(f"/api/companies/employees/{employee_id}", data=update_data)
         assert response.status_code == 404
         assert response.json() == {"detail": "Employee not found"}

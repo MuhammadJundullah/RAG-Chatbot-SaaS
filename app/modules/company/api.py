@@ -7,8 +7,9 @@ from app.core.dependencies import get_db, get_current_company_admin, get_current
 from app.models.user_model import Users
 from app.schemas import company_schema, user_schema
 from app.schemas.user_schema import User, PaginatedUserResponse
-from app.services import company_service, user_service
-from app.services.user_service import EmployeeDeletionError, EmployeeUpdateError
+from app.modules.company import service as company_service
+from app.modules.auth import service as user_service
+from app.modules.auth.service import EmployeeDeletionError, EmployeeUpdateError
 from app.utils.activity_logger import log_activity
 
 router = APIRouter(

@@ -12,8 +12,8 @@ from app.core.dependencies import get_current_user, get_db, get_current_employee
 from app.models.user_model import Users
 from app.schemas.conversation_schema import ConversationListResponse, ConversationUpdateTitle
 from app.repository.chatlog_repository import chatlog_repository
-from app.services.rag_service import rag_service
-from app.services.gemini_service import gemini_service
+from app.modules.documents.rag_service import rag_service
+from app.modules.chat.gemini_service import gemini_service
 from app.repository.conversation_repository import conversation_repository
 from app.schemas.conversation_schema import ConversationCreate
 from app.utils.activity_logger import log_activity

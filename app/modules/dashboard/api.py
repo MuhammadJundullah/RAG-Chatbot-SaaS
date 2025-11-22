@@ -6,7 +6,7 @@ from typing import Optional
 from app.core.dependencies import get_db, get_current_company_admin
 from app.models.user_model import Users
 from app.schemas import dashboard_schema
-from app.services import dashboard_service
+from app.modules.dashboard import service as dashboard_service
 
 router = APIRouter(
     prefix="/dashboard",

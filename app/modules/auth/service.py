@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from app.utils.generators import generate_company_code, generate_reset_token
 from app.utils.email_sender import send_brevo_email
 from app.utils.file_manager import save_uploaded_file, delete_static_file
-from app.services.subscription_service import subscription_service
+from app.modules.subscription.service import subscription_service
 from sqlalchemy import func, select
 
 class UserRegistrationError(Exception):

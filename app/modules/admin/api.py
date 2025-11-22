@@ -9,8 +9,9 @@ from sqlalchemy.orm import joinedload
 
 from app.core.dependencies import get_current_super_admin, get_db
 from app.schemas import company_schema, log_schema, subscription_schema, plan_schema
-from app.services import admin_service, subscription_service
-from app.services.plan_service import plan_service
+from app.modules.admin import service as admin_service
+from app.modules.subscription.service import subscription_service
+from app.modules.admin.plan_service import plan_service
 from app.models.user_model import Users
 from app.models.log_model import ActivityLog
 from app.models.subscription_model import Subscription

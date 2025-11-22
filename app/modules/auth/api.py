@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.services import user_service
-from app.services.user_service import UserRegistrationError
+from sqlalchemy.exc import IntegrityError
+
 from app.core.dependencies import get_db, get_current_user
+from app.models import user_model
+from app.modules.auth import service as user_service
+from app.modules.auth.service import UserRegistrationError
 from app.schemas import user_schema, token_schema
 from app.utils import auth
 from app.utils.activity_logger import log_activity
-from app.models import user_model
-from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(
     prefix="/auth",

@@ -8,7 +8,7 @@ import io
 from app.core.dependencies import get_current_user, get_db, get_current_super_admin, get_current_company_admin, get_current_employee
 from app.schemas import chatlog_schema, conversation_schema
 from app.models.user_model import Users
-from app.services import chatlog_service
+from app.modules.chatlogs import service as chatlog_service
 from app.models.log_model import ActivityLog
 
 admin_router = APIRouter(

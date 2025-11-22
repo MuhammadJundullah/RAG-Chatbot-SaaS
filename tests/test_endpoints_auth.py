@@ -17,9 +17,9 @@ def test_register_endpoint():
         }
         
         # Mock the user service and company repository
-        with patch('app.services.user_service.user_repository.get_user_by_email', return_value=None), \
-             patch('app.services.user_service.user_repository.create_user', new_callable=AsyncMock) as mock_create_user, \
-             patch('app.services.user_service.company_repository.create_company', new_callable=AsyncMock) as mock_create_company, \
+        with patch('app.modules.auth.service.user_repository.get_user_by_email', return_value=None), \
+             patch('app.modules.auth.service.user_repository.create_user', new_callable=AsyncMock) as mock_create_user, \
+             patch('app.modules.auth.service.company_repository.create_company', new_callable=AsyncMock) as mock_create_company, \
              patch('app.utils.security.get_password_hash', return_value="hashed_password"):
             
             # Set up mock return values
@@ -57,7 +57,7 @@ def test_login_endpoint():
         }
         
         # Mock the user service
-        with patch('app.services.user_service.authenticate_user', new_callable=AsyncMock) as mock_auth_user:
+        with patch('app.modules.auth.service.authenticate_user', new_callable=AsyncMock) as mock_auth_user:
             # Create a mock user instance
             user_instance = Users(
                 id=1,

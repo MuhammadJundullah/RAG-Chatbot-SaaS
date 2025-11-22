@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db
 from app.models.subscription_model import Subscription
-from app.services.subscription_service import subscription_service
+from app.modules.subscription.service import subscription_service
 
 router = APIRouter()
 

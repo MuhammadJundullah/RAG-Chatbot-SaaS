@@ -5,7 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from typing import Any, Optional
 import traceback
 import logging
-from app.services.user_service import UserRegistrationError
+from app.modules.auth.service import UserRegistrationError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

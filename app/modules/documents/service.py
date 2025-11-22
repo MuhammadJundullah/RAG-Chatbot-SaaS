@@ -11,8 +11,7 @@ from app.models.document_model import DocumentStatus
 from app.schemas import document_schema
 from app.repository.document_repository import document_repository
 from app.core.config import settings
-from app.services.rag_service import rag_service
-from app.tasks.document_tasks import process_ocr_task, process_embedding_task
+from app.modules.documents.rag_service import rag_service
 from app.utils.activity_logger import log_activity
 
 
@@ -61,6 +60,7 @@ async def upload_document_service(
         activity_description=f"Document '{db_document.title}' (ID: {db_document.id}) uploaded by admin '{current_user.email}'.",
     )
 
+    from app.tasks.document_tasks import process_ocr_task
     process_ocr_task.delay(db_document.id)
 
     return db_document
@@ -89,6 +89,7 @@ async def retry_document_upload_service(
             company_id=company_id_to_log,
             activity_description=f"Document ID {document_id} processing retried by admin '{current_user.email}'.",
         )
+        from app.tasks.document_tasks import process_ocr_task
         process_ocr_task.delay(document_id)
         return updated_doc
 
@@ -158,6 +159,7 @@ async def confirm_document_and_trigger_embedding_service(
         status=DocumentStatus.EMBEDDING
     )
 
+    from app.tasks.document_tasks import process_embedding_task
     process_embedding_task.delay(document_id)
 
     return updated_doc
@@ -183,12 +185,14 @@ async def retry_failed_document_processing_service(
         updated_doc = await document_repository.update_document_status_and_reason(
             db, document_id=document_id, status=DocumentStatus.UPLOADED, reason=None
         )
+        from app.tasks.document_tasks import process_ocr_task
         process_ocr_task.delay(document_id)
         print(f"Document {document_id} has been re-queued for OCR processing.")
     elif db_document.failed_reason and "Embedding" in db_document.failed_reason:
         updated_doc = await document_repository.update_document_status_and_reason(
             db, document_id=document_id, status=DocumentStatus.PENDING_VALIDATION, reason=None
         )
+        from app.tasks.document_tasks import process_embedding_task
         process_embedding_task.delay(document_id)
         print(f"Document {document_id} has been re-queued for embedding.")
     else:
@@ -218,6 +222,7 @@ async def update_document_content_service(
         title=title
     )
 
+    from app.tasks.document_tasks import process_embedding_task
     process_embedding_task.delay(document_id)
     print(f"[Service] Queued embedding task for document ID: {document_id}")
 

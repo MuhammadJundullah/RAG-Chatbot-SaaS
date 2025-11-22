@@ -8,8 +8,8 @@ from app.schemas.conversation_schema import ConversationCreate, ConversationList
 from app.models.user_model import Users
 from app.repository.conversation_repository import conversation_repository
 from app.repository.chatlog_repository import chatlog_repository
-from app.services.rag_service import rag_service
-from app.services.gemini_service import gemini_service
+from app.modules.documents.rag_service import rag_service
+from app.modules.chat.gemini_service import gemini_service
 
 
 class ChatService:
