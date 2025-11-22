@@ -92,26 +92,20 @@ class IPaymuService:
 
     async def verify_webhook_signature(self, request: Request) -> bool:
         """
-        Memverifikasi signature dengan Type Casting.
-        Mengembalikan tipe data (Int/Bool) yang hilang saat transmisi Form Data.
+        Memverifikasi signature dengan Type Casting LENGKAP (ID + Uang).
         """
-        # 1. Ambil Raw Bytes
         body_bytes = await request.body()
         
-        # 2. Ambil Header Signature
         headers_lower = {k.lower(): v for k, v in request.headers.items()}
         ipaymu_signature = headers_lower.get("x-signature") or headers_lower.get("signature")
 
         if not ipaymu_signature:
-            print("DEBUG: Missing Signature Header")
             raise HTTPException(status_code=400, detail="Missing webhook signature")
 
-        # 3. Proses Body Hash
         hash_to_use = ""
         content_type = headers_lower.get("content-type", "")
         
         if "application/json" in content_type:
-            # Jika JSON asli, cukup normalisasi spasi
             try:
                 json_data = json.loads(body_bytes)
                 clean_json_str = json.dumps(json_data, separators=(',', ':'))
@@ -119,37 +113,40 @@ class IPaymuService:
             except Exception:
                 hash_to_use = hashlib.sha256(body_bytes).hexdigest().lower()
         else:
-            # --- FIX UTAMA: KONVERSI FORM DATA KE TIPE DATA ASLI ---
+            # --- FIX FINAL: KONVERSI SEMUA ANGKA ---
             try:
                 from urllib.parse import parse_qs
                 body_str = body_bytes.decode('utf-8')
                 parsed_data = parse_qs(body_str, keep_blank_values=True)
-                
-                # Flatten (ambil value pertama)
                 flat_data = {k: v[0] for k, v in parsed_data.items()}
                 
-                # === MANUAL TYPE FIXING (Agar sama dengan JSON iPaymu) ===
-                int_fields = ['trx_id', 'status_code', 'transaction_status_code']
+                # 1. LIST FIELD YANG HARUS JADI INTEGER (Tambahkan field uang di sini)
+                int_fields = [
+                    'trx_id', 'status_code', 'transaction_status_code',
+                    'sub_total', 'total', 'amount', 'fee', 'paid_off' 
+                ]
+                
                 for field in int_fields:
                     if field in flat_data and flat_data[field].isdigit():
                         flat_data[field] = int(flat_data[field])
 
+                # 2. Fix Boolean
                 if 'is_escrow' in flat_data:
                     val = str(flat_data['is_escrow']).lower()
                     flat_data['is_escrow'] = (val == '1' or val == 'true')
-                
+
+                # 3. Dump JSON Rapat
                 clean_json_from_form = json.dumps(flat_data, separators=(',', ':'))
                 hash_to_use = hashlib.sha256(clean_json_from_form.encode()).hexdigest().lower()
                 
-                print(f"DEBUG: Fixed JSON: {clean_json_from_form}")
-                
+                print(f"DEBUG: Fixed JSON (Final): {clean_json_from_form}")
+
             except Exception as e:
-                print(f"DEBUG: Failed to convert/fix types: {e}")
+                print(f"DEBUG: Conversion Failed: {e}")
                 from urllib.parse import unquote_plus
                 decoded_body = unquote_plus(body_bytes.decode('utf-8'))
                 hash_to_use = hashlib.sha256(decoded_body.encode()).hexdigest().lower()
 
-        # 4. Hitung Signature (HMAC-SHA256)
         method = "POST"
         string_to_sign = f"{method}:{self.va}:{hash_to_use}:{self.api_key}"
         
@@ -159,16 +156,15 @@ class IPaymuService:
             hashlib.sha256
         ).hexdigest()
 
-        # --- DEBUGGING ---
-        if ipaymu_signature.lower() != calculated_signature.lower():
-            print(f"--- SIGNATURE MISMATCH ---")
-            print(f"Received:   {ipaymu_signature}")
-            print(f"Calculated: {calculated_signature}")
-            print(f"Used Body:  {hash_to_use}")
-            raise HTTPException(status_code=400, detail="Invalid webhook signature")
-
-        print("MATCH: Signature Valid!")
-        return True
+        if ipaymu_signature.lower() == calculated_signature.lower():
+            print("MATCH: Signature Valid!")
+            return True
+        
+        # --- DEBUG ERROR ---
+        print(f"--- SIGNATURE MISMATCH ---")
+        print(f"Received:   {ipaymu_signature}")
+        print(f"Calculated: {calculated_signature}")
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
 
 
 ipaymu_service = IPaymuService()
