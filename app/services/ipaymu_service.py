@@ -94,39 +94,42 @@ class IPaymuService:
         api_key = "SANDBOX03B10969-670B-43A6-ABB1-9895509D5018"  # Hardcode for testing
 
         raw_body = (await request.body()).decode("utf-8")
-
-        received_sig = request.headers.get("X-Signature", "").lower()
+        received_sig = request.headers.get("X-Signature", "").lower().strip()
         if not received_sig:
             raise HTTPException(400, "Missing X-Signature")
 
-        parsed = parse_qs(raw_body, keep_blank_values=True)
-
         parts = []
-        for key in parsed:
+        for part in raw_body.split("&"):
+            if "=" not in part:
+                continue
+            key, value = part.split("=", 1)
             if key == "aSignature":
                 continue
-            val = parsed[key][0]
+            from urllib.parse import unquote
+            val = unquote(value)
 
-            if val == "true" or val == "false":
-                parts.append(val)
-            elif val == "[]":
-                parts.append("[]")
+            if val in ("true", "false", "[]"):
+                pass
+            elif val == "":
+                pass
             else:
-                parts.append(val)
+                val = val
+
+            parts.append(val)
 
         string_to_hash = "".join(parts) + api_key
         calculated_sig = hashlib.sha256(string_to_hash.encode("utf-8")).hexdigest()
 
-        print(f"CALC  : {calculated_sig}")
-        print(f"RECV  : {received_sig}")
-        print(f"LEN   : {len(string_to_hash)}")
+        print(f"CALC: {calculated_sig}")
+        print(f"RECV: {received_sig}")
+        print(f"LEN : {len(string_to_hash)}")
 
         if calculated_sig != received_sig:
             print(f"FULL STRING → {string_to_hash}")
             raise HTTPException(400, "Invalid webhook signature")
 
-        print("√ WEBHOOK VALID – iPaymu")
-        return {k: parsed[k][0] if parsed[k] else "" for k in parsed if k != "aSignature"}
+        print("√ IPAYMU WEBHOOK 100% VALID")
+        return {"raw": raw_body}
 
     async def _verify_transaction_via_api(self, trx_id: str) -> bool:
         """
