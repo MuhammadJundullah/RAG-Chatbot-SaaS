@@ -95,4 +95,12 @@ class ConversationRepository(BaseRepository[Conversation]):
             await db.refresh(conversation)
         return conversation
 
+    async def set_archive_status(self, db: AsyncSession, conversation_id: str, is_archived: bool) -> Optional[Conversation]:
+        conversation = await self.get(db, conversation_id)
+        if conversation:
+            conversation.is_archived = is_archived
+            await db.commit()
+            await db.refresh(conversation)
+        return conversation
+
 conversation_repository = ConversationRepository()

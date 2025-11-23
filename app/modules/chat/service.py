@@ -151,10 +151,11 @@ class ChatService:
             limit=limit,
         )
 
-    async def archive_chat(
+    async def set_archive_status(
         self,
         db: AsyncSession,
         conversation_id: str,
+        is_archived: bool,
         current_user: Users,
     ):
         conversation = await self.conversation_repo.get_conversation(db=db, conversation_id=conversation_id)
@@ -168,10 +169,23 @@ class ChatService:
             limit=1,
         )
         if not user_chatlogs:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to archive this conversation")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to change this conversation")
 
-        updated_conversation = await self.conversation_repo.archive_conversation(db=db, conversation_id=conversation_id)
+        updated_conversation = await self.conversation_repo.set_archive_status(db=db, conversation_id=conversation_id, is_archived=is_archived)
         return updated_conversation
+
+    async def archive_chat(
+        self,
+        db: AsyncSession,
+        conversation_id: str,
+        current_user: Users,
+    ):
+        return await self.set_archive_status(
+            db=db,
+            conversation_id=conversation_id,
+            is_archived=True,
+            current_user=current_user,
+        )
 
     async def edit_chat_title(
         self,

@@ -10,7 +10,11 @@ from app.modules.chat.service import chat_service
 from app.modules.documents import service as document_service
 from app.core.dependencies import get_current_user, get_db, get_current_employee, check_quota_and_subscription
 from app.models.user_model import Users
-from app.schemas.conversation_schema import ConversationListResponse, ConversationUpdateTitle
+from app.schemas.conversation_schema import (
+    ConversationArchiveStatusUpdate,
+    ConversationListResponse,
+    ConversationUpdateTitle,
+)
 from app.repository.chatlog_repository import chatlog_repository
 from app.modules.documents.rag_service import rag_service
 from app.modules.chat.gemini_service import gemini_service
@@ -197,6 +201,33 @@ async def archive_conversation_endpoint(
         activity_type_category="Data/CRUD",
         company_id=current_user.company_id,
         activity_description=f"User '{current_user.email}' archived conversation {conversation_id}.",
+    )
+    return updated_conversation
+
+
+@router.patch("/chat/conversations/{conversation_id}/archive-status", response_model=ConversationListResponse, tags=["Chat"])
+async def set_archive_status_endpoint(
+    conversation_id: str,
+    request: ConversationArchiveStatusUpdate,
+    current_user: Users = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Sets the archive status of a specific conversation (archive or unarchive).
+    """
+    updated_conversation = await chat_service.set_archive_status(
+        db=db,
+        conversation_id=conversation_id,
+        is_archived=request.is_archived,
+        current_user=current_user
+    )
+    status_label = "archived" if request.is_archived else "unarchived"
+    await log_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type_category="Data/CRUD",
+        company_id=current_user.company_id,
+        activity_description=f"User '{current_user.email}' {status_label} conversation {conversation_id}.",
     )
     return updated_conversation
 

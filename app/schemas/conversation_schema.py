@@ -7,6 +7,9 @@ from app.schemas import chatlog_schema, document_schema
 class ConversationUpdateTitle(BaseModel):
     title: str
 
+class ConversationArchiveStatusUpdate(BaseModel):
+    is_archived: bool
+
 class ConversationBase(BaseModel):
     title: str
     created_at: Optional[datetime] = None
