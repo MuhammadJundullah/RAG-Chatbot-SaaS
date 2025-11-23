@@ -29,7 +29,7 @@ class CompanyRepository(BaseRepository[company_model.Company]):
         elif status == "pending":
             query = query.filter(not self.model.is_active)
         
-        query = query.offset(skip).limit(limit)
+        query = query.order_by(self.model.created_at.desc()).offset(skip).limit(limit)
         result = await db.execute(query)
         return result.scalars().all()
 

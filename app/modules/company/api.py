@@ -205,6 +205,7 @@ async def read_company_by_admin(
         is_active=company_details.is_active,
         pic_phone_number=company_details.pic_phone_number,
         company_email=company_details.company_email,
+        created_at=str(company_details.created_at) if company_details.created_at else None,
         admin_name=current_user.name,
         admin_email=current_user.email
     )

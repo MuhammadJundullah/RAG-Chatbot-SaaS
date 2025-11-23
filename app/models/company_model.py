@@ -2,7 +2,9 @@ from sqlalchemy import (
     Column,
     Integer,
     String,
-    Boolean
+    Boolean,
+    DateTime,
+    func,
 )
 from sqlalchemy.orm import relationship
 from app.models.base import Base
@@ -18,6 +20,7 @@ class Company(Base):
     is_active = Column(Boolean, default=False)
     address = Column(String(255), nullable=True)
     pic_phone_number = Column(String(50), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
 
     users = relationship("Users", back_populates="company")
     documents = relationship("Documents", back_populates="company")

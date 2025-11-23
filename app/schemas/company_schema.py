@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
+from datetime import datetime
 
 class CompanyBase(BaseModel):
     name: str
@@ -9,6 +10,7 @@ class CompanyBase(BaseModel):
     is_active: bool = False
     pic_phone_number: Optional[str] = None 
     company_email: Optional[str] = None
+    created_at: Optional[datetime] = None
 
 class CompanyCreate(CompanyBase):
     pass
