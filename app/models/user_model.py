@@ -3,7 +3,8 @@ from sqlalchemy import (
     Integer,
     String,
     ForeignKey,
-    DateTime 
+    DateTime,
+    func,
 )
 from sqlalchemy.orm import relationship
 from app.models.base import Base
@@ -22,6 +23,7 @@ class Users(Base):
     division = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True)
     profile_picture_url = Column(String, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
 
     # Added fields for password reset
     reset_token = Column(String(255), nullable=True)

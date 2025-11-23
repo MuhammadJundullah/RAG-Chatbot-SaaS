@@ -19,7 +19,7 @@ async def send_brevo_email(to_email: str, subject: str, html_content: str):
 
     # Tentukan detail pengirim
     # Mengambil dari environment variable atau menggunakan default
-    sender_email = settings.DEFAULT_SENDER_EMAIL if settings.DEFAULT_SENDER_EMAIL else "noreply@yourdomain.com"
+    sender_email = settings.DEFAULT_SENDER_EMAIL if settings.DEFAULT_SENDER_EMAIL else "noreply@smartai.com"
     # Menggunakan nama aplikasi dari settings jika ada, atau placeholder
     sender_name = getattr(settings, 'APP_NAME', 'SmartAI') 
 

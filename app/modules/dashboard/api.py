@@ -3,10 +3,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date
 from typing import Optional
 
-from app.core.dependencies import get_db, get_current_company_admin
+from app.core.dependencies import get_db, get_current_company_admin, get_current_super_admin
 from app.models.user_model import Users
 from app.schemas import dashboard_schema
 from app.modules.dashboard import service as dashboard_service
+from app.modules.dashboard.superadmin_service import superadmin_dashboard_service
 
 router = APIRouter(
     prefix="/dashboard",
@@ -33,3 +34,13 @@ async def get_dashboard_summary(
     )
 
     return {"dashboard_breakdown": summary_data}
+
+
+@router.get(
+    "/admin/summary",
+    response_model=dashboard_schema.SuperAdminDashboardResponse,
+    summary="Super admin dashboard overview",
+    dependencies=[Depends(get_current_super_admin)],
+)
+async def get_superadmin_overview(db: AsyncSession = Depends(get_db)):
+    return await superadmin_dashboard_service.get_overview(db)

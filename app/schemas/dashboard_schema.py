@@ -34,3 +34,20 @@ class DashboardResponseSchema(BaseModel):
 class DashboardBreakdownResponseSchema(BaseModel):
     dashboard_breakdown: DashboardResponseSchema
 
+
+class SuperAdminDashboardResponse(BaseModel):
+    active_company_admins: int
+    active_companies_this_month: int
+    total_users: int
+    user_wow_change_pct: float
+
+    document_distribution: dict
+    document_status_distribution: dict
+
+    chats_this_month: int
+    chat_mom_change_pct: float
+    total_questions_this_month: int
+
+    daily_chat_counts: dict
+
+    top_user_logs: List[dict]
