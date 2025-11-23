@@ -2,8 +2,8 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock
 from app.main import app
 from app.models.user_model import Users
-from app.models.chatlog_model import Chatlogs
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_db, check_quota_and_subscription
+from app.modules.chat import service as chat_service
 
 
 def test_chat_endpoint():
@@ -18,35 +18,18 @@ def test_chat_endpoint():
             company_id=1
         )
         
-        # Mock chatlog
-        mock_chatlog = Chatlogs(
-            id=1,
-            question="Hello, how are you?",
-            answer="I'm doing well, thank you for asking!",
-            UsersId=1,
-            company_id=1,
-            conversation_id="test_conversation"
-        )
-        
         # Use dependency override
         app.dependency_overrides[get_current_user] = lambda: mock_user
+        app.dependency_overrides[get_db] = lambda: AsyncMock()
+        app.dependency_overrides[check_quota_and_subscription] = lambda: None
         try:
             # Mock the dependencies and services
-            with patch('app.modules.documents.rag_service.rag_service.get_relevant_context', new_callable=AsyncMock) as mock_get_context, \
-                 patch('app.modules.chat.gemini_service.gemini_service.generate_chat_response') as mock_gen_response, \
-                 patch('app.repository.chatlog_repository.chatlog_repository.create_chatlog', new_callable=AsyncMock) as mock_create_chatlog:
-                
-                # Mock the RAG service response
-                mock_get_context.return_value = "Relevant context from RAG"
-                
-                # Mock the Gemini service response
-                async def mock_response_generator():
-                    yield "I'm doing well, thank you for asking!"
-                
-                mock_gen_response.return_value = mock_response_generator()
-                
-                # Mock the chatlog repository
-                mock_create_chatlog.return_value = mock_chatlog
+            with patch.object(chat_service.chat_service, "process_chat_message", new_callable=AsyncMock) as mock_process, \
+                 patch("app.modules.chat.api.log_activity", new_callable=AsyncMock):
+                mock_process.return_value = {
+                    "response": "I'm doing well, thank you for asking!",
+                    "conversation_id": "test_conversation",
+                }
                 
                 # Send a chat request
                 chat_data = {
@@ -82,35 +65,18 @@ def test_chat_endpoint_without_conversation_id():
             company_id=1
         )
         
-        # Mock chatlog
-        mock_chatlog = Chatlogs(
-            id=1,
-            question="What can you do?",
-            answer="I can answer questions based on your company documents!",
-            UsersId=1,
-            company_id=1,
-            conversation_id="new_conversation"
-        )
-        
         # Use dependency override
         app.dependency_overrides[get_current_user] = lambda: mock_user
+        app.dependency_overrides[get_db] = lambda: AsyncMock()
+        app.dependency_overrides[check_quota_and_subscription] = lambda: None
         try:
             # Mock the dependencies and services
-            with patch('app.modules.documents.rag_service.rag_service.get_relevant_context', new_callable=AsyncMock) as mock_get_context, \
-                 patch('app.modules.chat.gemini_service.gemini_service.generate_chat_response') as mock_gen_response, \
-                 patch('app.repository.chatlog_repository.chatlog_repository.create_chatlog', new_callable=AsyncMock) as mock_create_chatlog:
-                
-                # Mock the RAG service response
-                mock_get_context.return_value = "Relevant context from RAG"
-                
-                # Mock the Gemini service response
-                async def mock_response_generator():
-                    yield "I can answer questions based on your company documents!"
-                
-                mock_gen_response.return_value = mock_response_generator()
-                
-                # Mock the chatlog repository
-                mock_create_chatlog.return_value = mock_chatlog
+            with patch.object(chat_service.chat_service, "process_chat_message", new_callable=AsyncMock) as mock_process, \
+                 patch("app.modules.chat.api.log_activity", new_callable=AsyncMock):
+                mock_process.return_value = {
+                    "response": "I can answer questions based on your company documents!",
+                    "conversation_id": "generated-id",
+                }
                 
                 # Send a chat request without conversation_id
                 chat_data = {

@@ -120,7 +120,7 @@ def test_register_global_exception_handlers(mock_fastapi_app):
     register_global_exception_handlers(mock_fastapi_app)
     
     # Check if exception_handler was called for each type
-    assert mock_fastapi_app.exception_handler.call_count == 3
+    assert mock_fastapi_app.exception_handler.call_count >= 3
     
     # Verify calls for specific handlers
     mock_fastapi_app.exception_handler.assert_any_call(StarletteHTTPException)

@@ -3,13 +3,23 @@ from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock
 from app.main import app
 from app.models.user_model import Users
-from app.core.dependencies import get_current_user, get_current_company_admin, get_current_super_admin
+from app.core.dependencies import get_current_user, get_current_company_admin, get_current_super_admin, get_db
 from sqlalchemy.ext.asyncio import AsyncSession
+import pytest
 
 
 @pytest.fixture
 def mock_db_session():
     return AsyncMock(spec=AsyncSession)
+
+
+@pytest.fixture(autouse=True)
+def override_get_db(mock_db_session):
+    async def _override():
+        yield mock_db_session
+    app.dependency_overrides[get_db] = _override
+    yield
+    app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.fixture(scope="module")
@@ -28,6 +38,11 @@ def authenticated_client():
     with TestClient(app) as client:
         yield client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def app_instance():
+    return app
 
 
 @pytest.fixture(scope="module")

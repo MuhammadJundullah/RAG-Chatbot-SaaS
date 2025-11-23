@@ -6,8 +6,10 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str
     TEST_DATABASE_URL: Optional[str] = None
-    GEMINI_API_KEY: str
-    GEMINI_MODEL: str
+    TOGETHER_API_KEY: str
+    TOGETHER_MODEL: str
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: Optional[str] = None
     EMBEDDING_MODEL_NAME: str
     PINECONE_API_KEY: str
 

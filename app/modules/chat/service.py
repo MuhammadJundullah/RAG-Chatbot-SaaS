@@ -9,7 +9,7 @@ from app.models.user_model import Users
 from app.repository.conversation_repository import conversation_repository
 from app.repository.chatlog_repository import chatlog_repository
 from app.modules.documents.rag_service import rag_service
-from app.modules.chat.gemini_service import gemini_service
+from app.modules.chat.together_service import together_service
 
 
 class ChatService:
@@ -21,7 +21,7 @@ class ChatService:
     def __init__(
         self,
         rag_client=rag_service,
-        llm_client=gemini_service,
+        llm_client=together_service,
         conversation_repo=conversation_repository,
         chatlog_repo=chatlog_repository,
     ):
@@ -118,10 +118,10 @@ class ChatService:
         async for chunk in self.llm_client.generate_chat_response(
             question=request.message,
             context=rag_context,
-            query_results=None,
             db=db,
             current_user=current_user,
             conversation_history=conversation_history,
+            model_name=request.model,
         ):
             full_response += chunk
 

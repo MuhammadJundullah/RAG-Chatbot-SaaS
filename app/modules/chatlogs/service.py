@@ -14,7 +14,7 @@ from app.repository.user_repository import user_repository
 from app.schemas import chatlog_schema, conversation_schema, document_schema
 from app.models.user_model import Users
 from app.models import chatlog_model
-from app.modules.chat.gemini_service import gemini_service
+from app.modules.chat.together_service import together_service
 
 """
 This module exposes "_service" helpers for internal use and wrapper functions expected by API routes.
@@ -368,7 +368,7 @@ async def recommend_topics_for_division_ai(
     current_user: Users,
 ) -> List[str]:
     """Use the LLM to propose 5 short topics for the user's division."""
-    topics = await gemini_service.recommend_topics_for_division(db=db, current_user=current_user)
+    topics = await together_service.recommend_topics_for_division(db=db, current_user=current_user)
 
     if len(topics) < 5:
         fallback = recommend_topics_for_division(current_user.division)

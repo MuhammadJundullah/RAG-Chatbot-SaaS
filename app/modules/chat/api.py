@@ -17,7 +17,7 @@ from app.schemas.conversation_schema import (
 )
 from app.repository.chatlog_repository import chatlog_repository
 from app.modules.documents.rag_service import rag_service
-from app.modules.chat.gemini_service import gemini_service
+from app.modules.chat.together_service import together_service
 from app.repository.conversation_repository import conversation_repository
 from app.schemas.conversation_schema import ConversationCreate
 from app.utils.activity_logger import log_activity
@@ -115,13 +115,13 @@ async def sse_chat_endpoint(
         document_ids = rag_response["document_ids"]
 
         try:
-            async for chunk in gemini_service.generate_chat_response(
+            async for chunk in together_service.generate_chat_response(
                 question=user_message,
                 context=rag_context,
-                query_results=None,
                 db=db,
                 current_user=current_user,
-                conversation_history=conversation_history
+                conversation_history=conversation_history,
+                model_name=request.model,
             ):
                 full_response += chunk
                 yield f"data: {chunk}\n\n"

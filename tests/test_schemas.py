@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from app.schemas.user_schema import UserRegistration, UserLoginCombined, User
 from app.schemas.company_schema import Company
 from app.schemas.document_schema import DocumentCreate, Document
@@ -119,7 +120,7 @@ def test_chatlog_schema():
         UsersId=1,
         company_id=1,
         conversation_id=test_uuid,
-        created_at=uuid.uuid4()
+        created_at=datetime.utcnow()
     )
     
     assert chatlog.id == 1

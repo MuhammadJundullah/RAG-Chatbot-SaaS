@@ -15,7 +15,7 @@ def test_get_documents_endpoint(admin_client: TestClient):
         status=DocumentStatus.UPLOADED,
         content_type="application/pdf"
     )
-    with patch('app.modules.documents.service.get_all_company_documents_service', return_value=[mock_document]):
+    with patch('app.modules.documents.service.get_all_company_documents_service', return_value=([mock_document], 1)):
         response = admin_client.get("/api/documents/")
         assert response.status_code == 200
         # The endpoint now returns a paginated response
@@ -80,9 +80,11 @@ def test_admin_can_get_single_document(admin_client: TestClient):
 def test_non_admin_cannot_get_single_document():
     # Use a fresh TestClient without admin permissions
     with TestClient(app) as client:
+        # Override dependency to mimic non-admin user lacking permissions
+        app.dependency_overrides[get_current_company_admin] = AsyncMock(side_effect=HTTPException(status_code=403, detail="Forbidden"))
         response = client.get("/api/documents/1")
-        # Endpoint might return 401, 403, or 404 if not authorized or not found
-        assert response.status_code in [401, 403, 404]
+        assert response.status_code == 403
+        app.dependency_overrides.clear()
 
 
 def test_get_single_document_not_found(admin_client: TestClient):

@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch
 from app.modules.documents.rag_service import RAGService
-from app.modules.chat.gemini_service import GeminiService
+from app.modules.chat.together_service import TogetherService
 from app.modules.auth.service import authenticate_user, register_user
 from app.models.user_model import Users
 from app.models.company_model import Company
@@ -13,9 +13,9 @@ def test_rag_service_initialization():
     assert rag_service is not None
 
 
-def test_gemini_service_initialization():
-    gemini_service = GeminiService()
-    assert gemini_service is not None
+def test_together_service_initialization():
+    llm_service = TogetherService()
+    assert llm_service is not None
 
 
 @pytest.mark.asyncio
