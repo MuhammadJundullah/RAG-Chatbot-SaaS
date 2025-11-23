@@ -101,6 +101,22 @@ async def get_conversation_history(
     )
 
 
+@user_router.delete("/{conversation_id}")
+async def delete_conversation(
+    conversation_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user),
+):
+    """
+    Delete all chatlogs for a conversation owned by the current user.
+    """
+    return await chatlog_service.delete_conversation_service(
+        db=db,
+        current_user=current_user,
+        conversation_id=conversation_id,
+    )
+
+
 @user_router.get("/recommendations/topics", response_model=chatlog_schema.TopicRecommendations)
 async def recommend_topics_for_employee(
     db: AsyncSession = Depends(get_db),

@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from fastapi.responses import Response
 from typing import List, Optional
 from datetime import date
 from fastapi import HTTPException
@@ -265,7 +266,7 @@ async def delete_conversation_service(
     )
     if deleted_count == 0:
         raise HTTPException(status_code=404, detail="Conversation not found or user does not have permission.")
-    return {"message": f"Successfully deleted {deleted_count} chatlogs for conversation ID {conversation_id}."}
+    return Response(status_code=204)
 
 
 # ---- Wrapper functions used by existing routers ----
