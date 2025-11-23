@@ -20,6 +20,15 @@ def _is_success(status_val: str | None, status_code: str | None) -> bool:
     return False
 
 
+def _is_expired(status_val: str | None, status_code: str | None) -> bool:
+    """Return True when the webhook indicates payment expired/cancelled."""
+    if status_val and status_val.lower() in {"expired", "cancelled", "canceled"}:
+        return True
+    if status_code and str(status_code) in {"-2"}:
+        return True
+    return False
+
+
 async def _parse_payload(request: Request) -> dict:
     """Best-effort payload parsing for JSON or form-urlencoded."""
     try:
@@ -57,6 +66,10 @@ async def ipaymu_notify(request: Request, db: AsyncSession = Depends(get_db)):
                         await db.commit()
                     if _is_success(status_val, status_code):
                         await subscription_service.activate_subscription(db, subscription_id=sub_id)
+                    elif _is_expired(status_val, status_code):
+                        subscription.status = "expired"
+                        await db.commit()
+                        await db.refresh(subscription)
         except Exception as e:
             print(f"Failed to update subscription from webhook: {e}")
 
