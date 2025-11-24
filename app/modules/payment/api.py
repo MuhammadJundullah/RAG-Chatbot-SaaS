@@ -27,7 +27,7 @@ def _is_expired(status_val: str | None, status_code: str | None) -> bool:
     """Return True when the webhook indicates payment expired/cancelled."""
     if status_val and status_val.lower() in {"expired", "cancelled", "canceled"}:
         return True
-    if status_code and str(status_code) in {"-2", "0"}:
+    if status_code and str(status_code) in {"-2"}:
         return True
     return False
 
@@ -81,7 +81,6 @@ async def ipaymu_notify(request: Request, db: AsyncSession = Depends(get_db)):
                                     db, company_id=transaction.company_id
                                 )
                                 subscription.top_up_quota += transaction.questions_delta or 0
-                                await db.commit()
                             elif transaction.type == "subscription":
                                 subscription = await subscription_service.get_subscription_by_company(
                                     db, company_id=transaction.company_id
@@ -89,12 +88,15 @@ async def ipaymu_notify(request: Request, db: AsyncSession = Depends(get_db)):
                                 subscription.payment_gateway_reference = transaction.payment_reference
                                 await subscription_service.activate_subscription(db, subscription_id=subscription.id)
                     elif _is_expired(status_val, status_code):
-                        transaction.status = "failed"
+                        transaction.status = "expired"
                         if transaction.type == "subscription":
                             subscription = await subscription_service.get_subscription_by_company(
                                 db, company_id=transaction.company_id
                             )
                             subscription.status = "expired"
+                    else:
+                        # Pending/unknown status: mark pending explicitly
+                        transaction.status = "pending_payment"
                     await db.commit()
             except Exception as e:
                 await db.rollback()
