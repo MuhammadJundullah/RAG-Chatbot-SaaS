@@ -86,6 +86,15 @@ async def create_new_plan(
     return await plan_service.create_plan(db, plan_data)
 
 
+@router.get("/plan", response_model=List[plan_schema.Plan])
+async def list_all_plans(
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(select(PlanModel).order_by(PlanModel.price))
+    plans = result.scalars().all()
+    return plans
+
+
 @router.put("/plans/{plan_id}", response_model=plan_schema.Plan)
 async def update_existing_plan(
     plan_id: int,

@@ -43,4 +43,5 @@ async def get_dashboard_summary(
     dependencies=[Depends(get_current_super_admin)],
 )
 async def get_superadmin_overview(db: AsyncSession = Depends(get_db)):
-    return await superadmin_dashboard_service.get_overview(db)
+    data = await superadmin_dashboard_service.get_overview(db)
+    return {"dashboard_summary": data}

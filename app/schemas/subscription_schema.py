@@ -1,6 +1,6 @@
 # app/schemas/subscription_schema.py
 from pydantic import BaseModel, UUID4
-from typing import Optional
+from typing import List, Optional
 from datetime import datetime
 from .plan_schema import Plan
 
@@ -25,20 +25,32 @@ class Subscription(SubscriptionBase):
 
 class SubscriptionStatus(BaseModel):
     plan_name: str
-    status: str
-    start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
-    question_quota: int
-    questions_used: int
+    monthly_quota: int
     top_up_quota: int
-    remaining_questions: int
-    max_users: int
+    total_quota: int
+    remaining_quota: int
+    remaining_quota_percentage: float
+    days_until_renewal: Optional[int] = None
 
 class SubscriptionUpgradeRequest(BaseModel):
     plan_id: int
 
 class SubscriptionTopUpRequest(BaseModel):
     quota: int
+
+class TopUpPackageRequest(BaseModel):
+    package_type: str  # e.g. "large" or "small"
+
+class TopUpPackageResponse(BaseModel):
+    package_type: str
+    questions_added: int
+    price: int
+    subscription: SubscriptionStatus
+
+class PlansWithSubscription(BaseModel):
+    plans: List[Plan]
+    current_subscription: Optional[SubscriptionStatus] = None
 
 class Config:
     arbitrary_types_allowed = True

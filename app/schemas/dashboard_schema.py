@@ -35,7 +35,7 @@ class DashboardBreakdownResponseSchema(BaseModel):
     dashboard_breakdown: DashboardResponseSchema
 
 
-class SuperAdminDashboardResponse(BaseModel):
+class SuperAdminDashboardData(BaseModel):
     active_company_admins: int
     active_companies_this_month: int
     total_users: int
@@ -51,3 +51,7 @@ class SuperAdminDashboardResponse(BaseModel):
     daily_chat_counts: dict
 
     top_user_logs: List[dict]
+
+
+class SuperAdminDashboardResponse(BaseModel):
+    dashboard_summary: SuperAdminDashboardData
