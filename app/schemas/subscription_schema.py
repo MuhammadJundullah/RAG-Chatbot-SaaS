@@ -55,14 +55,25 @@ class TopUpPackageResponse(BaseModel):
     payment_url: str
 
 class CustomPlanRequest(BaseModel):
-    desired_quota: Optional[int] = None
-    max_users: Optional[int] = None
-    notes: Optional[str] = None
+    estimated_employees: Optional[int] = None
+    need_internal_integration: Optional[str] = None
+    special_requests: Optional[str] = None
 
 class CustomPlanResponse(BaseModel):
     request_id: int
     status: str
-    notes: Optional[str] = None
+    special_requests: Optional[str] = None
+
+
+class CustomPlanApprovalRequest(BaseModel):
+    price: int
+    product_name: Optional[str] = "Custom Plan"
+
+
+class CustomPlanApprovalResponse(BaseModel):
+    transaction_id: int
+    status: str
+    payment_url: str
 
 class PlansWithSubscription(BaseModel):
     plans: List[Plan]

@@ -111,9 +111,9 @@ async def request_custom_plan(
         db=db,
         company_id=current_user.company_id,
         user=current_user,
-        desired_quota=payload.desired_quota,
-        max_users=payload.max_users,
-        notes=payload.notes,
+        estimated_employees=payload.estimated_employees,
+        need_internal_integration=payload.need_internal_integration,
+        special_requests=payload.special_requests,
     )
 
 

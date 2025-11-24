@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, distinct
+from sqlalchemy import select, distinct, func
 from typing import List, Optional
 from math import ceil
 import io
@@ -58,6 +58,32 @@ async def get_all_subscriptions(db: AsyncSession = Depends(get_db)):
     return subscriptions
 
 
+@router.get("/custom-plans", response_model=transaction_schema.TransactionListResponse)
+async def list_custom_plan_requests(
+    status: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+):
+    base_filter = Transaction.type == "custom_plan"
+    if status:
+        base_filter = base_filter & (Transaction.status == status)
+
+    stmt = (
+        select(Transaction)
+        .where(base_filter)
+        .order_by(Transaction.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    items = (await db.execute(stmt)).scalars().all()
+
+    total_stmt = select(func.count()).select_from(Transaction).where(base_filter)
+    total = (await db.execute(total_stmt)).scalar_one()
+
+    return transaction_schema.TransactionListResponse(items=items, total=total)
+
+
 @router.post("/subscriptions/{subscription_id}/activate-manual", response_model=subscription_schema.Subscription)
 async def manual_activate_subscription(
     subscription_id: int,
@@ -85,6 +111,25 @@ async def create_new_plan(
     db: AsyncSession = Depends(get_db)
 ):
     return await plan_service.create_plan(db, plan_data)
+
+
+@router.post(
+    "/custom-plans/{transaction_id}/approve",
+    response_model=subscription_schema.CustomPlanApprovalResponse,
+    summary="Set price and generate payment link for a custom plan request",
+)
+async def approve_custom_plan_request(
+    transaction_id: int,
+    payload: subscription_schema.CustomPlanApprovalRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await subscription_service.approve_custom_plan_request(
+        db=db,
+        transaction_id=transaction_id,
+        price=payload.price,
+        product_name=payload.product_name,
+    )
+    return subscription_schema.CustomPlanApprovalResponse(**result)
 
 
 @router.get("/plan", response_model=List[plan_schema.Plan])

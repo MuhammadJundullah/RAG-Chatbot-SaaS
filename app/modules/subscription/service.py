@@ -11,6 +11,7 @@ from app.schemas.subscription_schema import (
     CustomPlanResponse,
 )
 from app.modules.payment.service import ipaymu_service
+from app.utils.email_sender import send_brevo_email
 from app.models.transaction_model import Transaction
 import json
 
@@ -156,9 +157,9 @@ class SubscriptionService:
         db: AsyncSession,
         company_id: int,
         user: Users,
-        desired_quota: int | None,
-        max_users: int | None,
-        notes: str | None,
+        estimated_employees: int | None,
+        need_internal_integration: str | None,
+        special_requests: str | None,
     ) -> CustomPlanResponse:
         transaction = Transaction(
             company_id=company_id,
@@ -168,9 +169,9 @@ class SubscriptionService:
             status="pending_review",
             metadata_json=json.dumps(
                 {
-                    "desired_quota": desired_quota,
-                    "max_users": max_users,
-                    "notes": notes,
+                    "estimated_employees": estimated_employees,
+                    "need_internal_integration": need_internal_integration,
+                    "special_requests": special_requests,
                 }
             ),
         )
@@ -181,8 +182,55 @@ class SubscriptionService:
         return CustomPlanResponse(
             request_id=transaction.id,
             status=transaction.status,
-            notes=notes,
+            special_requests=special_requests,
         )
+
+    async def approve_custom_plan_request(
+        self,
+        db: AsyncSession,
+        transaction_id: int,
+        price: int,
+        product_name: str,
+    ) -> dict:
+        transaction = await db.get(Transaction, transaction_id)
+        if not transaction or transaction.type != "custom_plan":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Custom plan request not found")
+
+        if transaction.status != "pending_review":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Request is not pending review")
+
+        user = await db.get(Users, transaction.user_id) if transaction.user_id else None
+        if not user:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Request does not have a requester user")
+
+        transaction.amount = price
+        transaction.status = "pending_payment"
+        await db.commit()
+        await db.refresh(transaction)
+
+        payment_url, trx_id = await ipaymu_service.create_payment_link_for_transaction(
+            reference_id=str(transaction.id),
+            product_name=product_name,
+            price=price,
+            user=user,
+        )
+
+        transaction.payment_reference = trx_id
+        await db.commit()
+
+        email_subject = "Konfirmasi Permintaan Custom Plan"
+        email_body = (
+            f"<p>Permintaan custom plan Anda telah disetujui.</p>"
+            f"<p>Harga: {price}</p>"
+            f"<p>Silakan selesaikan pembayaran melalui tautan berikut: <a href='{payment_url}'>Bayar di sini</a></p>"
+        )
+        await send_brevo_email(to_email=user.email, subject=email_subject, html_content=email_body)
+
+        return {
+            "transaction_id": transaction.id,
+            "status": transaction.status,
+            "payment_url": payment_url,
+        }
 
     async def activate_subscription(self, db: AsyncSession, subscription_id: int) -> Subscription:
         subscription = await db.get(Subscription, subscription_id)
