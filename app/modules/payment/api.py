@@ -27,7 +27,7 @@ def _is_expired(status_val: str | None, status_code: str | None) -> bool:
     """Return True when the webhook indicates payment expired/cancelled."""
     if status_val and status_val.lower() in {"expired", "cancelled", "canceled"}:
         return True
-    if status_code and str(status_code) in {"-2"}:
+    if status_code and str(status_code) in {"-2", "0"}:
         return True
     return False
 
@@ -71,22 +71,23 @@ async def ipaymu_notify(request: Request, db: AsyncSession = Depends(get_db)):
                     handled = True
                     if trx_id:
                         transaction.payment_reference = trx_id
-                    if _is_success(status_val, status_code) and transaction.status != "paid":
-                        transaction.status = "paid"
-                        transaction.paid_at = datetime.utcnow()
+                    if _is_success(status_val, status_code):
+                        if transaction.status != "paid":
+                            transaction.status = "paid"
+                            transaction.paid_at = datetime.utcnow()
 
-                        if transaction.type == "topup":
-                            subscription = await subscription_service.get_subscription_by_company(
-                                db, company_id=transaction.company_id
-                            )
-                            subscription.top_up_quota += transaction.questions_delta or 0
-                            await db.commit()
-                        elif transaction.type == "subscription":
-                            subscription = await subscription_service.get_subscription_by_company(
-                                db, company_id=transaction.company_id
-                            )
-                            subscription.payment_gateway_reference = transaction.payment_reference
-                            await subscription_service.activate_subscription(db, subscription_id=subscription.id)
+                            if transaction.type == "topup":
+                                subscription = await subscription_service.get_subscription_by_company(
+                                    db, company_id=transaction.company_id
+                                )
+                                subscription.top_up_quota += transaction.questions_delta or 0
+                                await db.commit()
+                            elif transaction.type == "subscription":
+                                subscription = await subscription_service.get_subscription_by_company(
+                                    db, company_id=transaction.company_id
+                                )
+                                subscription.payment_gateway_reference = transaction.payment_reference
+                                await subscription_service.activate_subscription(db, subscription_id=subscription.id)
                     elif _is_expired(status_val, status_code):
                         transaction.status = "failed"
                         if transaction.type == "subscription":
@@ -96,6 +97,7 @@ async def ipaymu_notify(request: Request, db: AsyncSession = Depends(get_db)):
                             subscription.status = "expired"
                     await db.commit()
             except Exception as e:
+                await db.rollback()
                 print(f"Failed to process transaction webhook: {e}")
 
         # Legacy: fall back to subscription reference if no transaction handled
@@ -114,10 +116,12 @@ async def ipaymu_notify(request: Request, db: AsyncSession = Depends(get_db)):
                         await db.commit()
                         await db.refresh(subscription)
             except Exception as e:
+                await db.rollback()
                 print(f"Failed to update subscription from webhook: {e}")
 
         return {"status": "OK", "message": "Webhook received successfully"}
 
     except Exception as e:
+        await db.rollback()
         print(f"Webhook error: {e}")
         return {"status": "OK", "message": "Processed with error"}
