@@ -78,11 +78,15 @@ class SuperAdminDashboardService:
         )
         processing_documents = (total_documents or 0) - (completed_documents or 0) - (failed_documents or 0)
 
+        completed_documents_wow = await self._get_completed_documents_wow(db, today)
+
         document_distribution = {
             "total": total_documents or 0,
             "completed": completed_documents or 0,
             "processing": processing_documents,
             "failed": failed_documents or 0,
+            "completed_documents_change_pct": completed_documents_wow["completed_documents_change_pct"],
+            "completed_documents_change_status": completed_documents_wow["completed_documents_change_status"],
         }
 
         # Chats this month and last month
@@ -121,8 +125,6 @@ class SuperAdminDashboardService:
         # Total questions this month (same as chats)
         total_questions_this_month = chats_this_month
 
-        completed_documents_wow = await self._get_completed_documents_wow(db, today)
-
         # Top 5 user logs
         logs_stmt = (
             select(ActivityLog)
@@ -149,7 +151,6 @@ class SuperAdminDashboardService:
             "user_wow_change_pct": user_wow_change_pct,
             "user_wow_change_pct_status": self._change_status(user_wow_change_pct),
             "document_distribution": document_distribution,
-            "completed_documents_wow": completed_documents_wow,
             "chats_this_month": chats_this_month or 0,
             "chat_mom_change_pct": chat_mom_change_pct,
             "chat_mom_change_pct_status": self._change_status(chat_mom_change_pct),

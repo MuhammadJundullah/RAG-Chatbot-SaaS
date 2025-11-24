@@ -43,7 +43,6 @@ class SuperAdminDashboardData(BaseModel):
     user_wow_change_pct_status: str
 
     document_distribution: dict
-    completed_documents_wow: "SuperAdminDocumentWoWData"
 
     chats_this_month: int
     chat_mom_change_pct: float
@@ -57,11 +56,3 @@ class SuperAdminDashboardData(BaseModel):
 
 class SuperAdminDashboardResponse(BaseModel):
     dashboard_summary: SuperAdminDashboardData
-
-
-class SuperAdminDocumentWoWData(BaseModel):
-    completed_documents_change_pct: float
-    completed_documents_change_status: str
-
-
-SuperAdminDashboardData.model_rebuild()
