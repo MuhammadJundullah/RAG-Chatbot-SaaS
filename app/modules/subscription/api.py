@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import func
 
 from app.core.dependencies import get_db, get_current_company_admin
 from app.models.user_model import Users
 from app.models.plan_model import Plan
+from app.models.transaction_model import Transaction
 from app.schemas.subscription_schema import (
     SubscriptionStatus,
     SubscriptionUpgradeRequest,
@@ -15,6 +17,7 @@ from app.schemas.subscription_schema import (
     CustomPlanRequest,
     CustomPlanResponse,
 )
+from app.schemas.transaction_schema import TransactionListResponse
 from app.modules.subscription.service import subscription_service, TOP_UP_PACKAGES
 
 router = APIRouter()
@@ -112,3 +115,34 @@ async def request_custom_plan(
         max_users=payload.max_users,
         notes=payload.notes,
     )
+
+
+@router.get(
+    "/subscriptions/transactions",
+    response_model=TransactionListResponse,
+    summary="Daftar transaksi milik company admin",
+)
+async def list_my_transactions(
+    limit: int = 100,
+    offset: int = 0,
+    current_user: Users = Depends(get_current_company_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    if not current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is not associated with a company")
+
+    base_filter = Transaction.company_id == current_user.company_id
+    stmt = (
+        select(Transaction)
+        .where(base_filter)
+        .order_by(Transaction.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    result = await db.execute(stmt)
+    items = result.scalars().all()
+
+    total_stmt = select(func.count()).select_from(Transaction).where(base_filter)
+    total = (await db.execute(total_stmt)).scalar_one()
+
+    return TransactionListResponse(items=items, total=total)

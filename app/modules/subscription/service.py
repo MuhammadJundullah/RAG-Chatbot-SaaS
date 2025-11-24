@@ -88,8 +88,6 @@ class SubscriptionService:
             type="subscription",
             plan_id=plan.id,
             amount=plan.price,
-            currency="IDR",
-            gateway="ipaymu",
             status="pending_payment",
         )
         db.add(transaction)
@@ -129,8 +127,6 @@ class SubscriptionService:
             package_type=package_type,
             questions_delta=package["questions"],
             amount=package["price"],
-            currency="IDR",
-            gateway="ipaymu",
             status="pending_payment",
         )
         db.add(transaction)
@@ -164,20 +160,19 @@ class SubscriptionService:
         max_users: int | None,
         notes: str | None,
     ) -> CustomPlanResponse:
-        metadata = {
-            "desired_quota": desired_quota,
-            "max_users": max_users,
-            "notes": notes,
-        }
         transaction = Transaction(
             company_id=company_id,
             user_id=user.id if user else None,
             type="custom_plan",
             amount=0,
-            currency="IDR",
-            gateway="manual",
             status="pending_review",
-            metadata_json=json.dumps(metadata),
+            metadata_json=json.dumps(
+                {
+                    "desired_quota": desired_quota,
+                    "max_users": max_users,
+                    "notes": notes,
+                }
+            ),
         )
         db.add(transaction)
         await db.commit()

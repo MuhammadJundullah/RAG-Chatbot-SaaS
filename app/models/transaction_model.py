@@ -19,8 +19,6 @@ class Transaction(Base):
     questions_delta = Column(Integer, nullable=True)
 
     amount = Column(Integer, nullable=False, default=0)
-    currency = Column(String, nullable=False, default="IDR")
-    gateway = Column(String, nullable=False, default="ipaymu")
     payment_reference = Column(String, nullable=True, index=True)
 
     status = Column(String, nullable=False, default="pending_payment")  # pending_payment|paid|failed|cancelled|pending_review

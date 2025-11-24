@@ -13,8 +13,6 @@ class Transaction(BaseModel):
     package_type: Optional[str] = None
     questions_delta: Optional[int] = None
     amount: int
-    currency: str
-    gateway: str
     payment_reference: Optional[str] = None
     status: str
     metadata_json: Optional[str] = None
@@ -23,3 +21,8 @@ class Transaction(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class TransactionListResponse(BaseModel):
+    items: list[Transaction]
+    total: int
