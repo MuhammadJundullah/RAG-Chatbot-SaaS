@@ -11,8 +11,11 @@ from app.schemas.subscription_schema import (
     PlansWithSubscription,
     TopUpPackageRequest,
     TopUpPackageResponse,
+    TopUpPackageOption,
+    CustomPlanRequest,
+    CustomPlanResponse,
 )
-from app.modules.subscription.service import subscription_service
+from app.modules.subscription.service import subscription_service, TOP_UP_PACKAGES
 
 router = APIRouter()
 
@@ -35,7 +38,16 @@ async def get_available_plans(
         if exc.status_code != status.HTTP_404_NOT_FOUND:
             raise
 
-    return PlansWithSubscription(plans=plans, current_subscription=current_subscription)
+    top_up_packages = [
+        TopUpPackageOption(package_type=key, questions=val["questions"], price=val["price"])
+        for key, val in TOP_UP_PACKAGES.items()
+    ]
+
+    return PlansWithSubscription(
+        plans=plans,
+        current_subscription=current_subscription,
+        top_up_packages=top_up_packages,
+    )
 
 
 @router.get("/subscriptions/my-status", response_model=SubscriptionStatus)
@@ -79,4 +91,24 @@ async def top_up_subscription(
         db=db,
         company_id=current_user.company_id,
         package_type=topup_request.package_type,
+        user=current_user,
+    )
+
+
+@router.post("/subscriptions/custom-plan", response_model=CustomPlanResponse)
+async def request_custom_plan(
+    payload: CustomPlanRequest,
+    current_user: Users = Depends(get_current_company_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    if not current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is not associated with a company")
+
+    return await subscription_service.submit_custom_plan_request(
+        db=db,
+        company_id=current_user.company_id,
+        user=current_user,
+        desired_quota=payload.desired_quota,
+        max_users=payload.max_users,
+        notes=payload.notes,
     )

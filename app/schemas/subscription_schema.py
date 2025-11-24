@@ -39,6 +39,11 @@ class SubscriptionUpgradeRequest(BaseModel):
 class SubscriptionTopUpRequest(BaseModel):
     quota: int
 
+class TopUpPackageOption(BaseModel):
+    package_type: str
+    questions: int
+    price: int
+
 class TopUpPackageRequest(BaseModel):
     package_type: str  # e.g. "large" or "small"
 
@@ -46,11 +51,23 @@ class TopUpPackageResponse(BaseModel):
     package_type: str
     questions_added: int
     price: int
-    subscription: SubscriptionStatus
+    transaction_id: int
+    payment_url: str
+
+class CustomPlanRequest(BaseModel):
+    desired_quota: Optional[int] = None
+    max_users: Optional[int] = None
+    notes: Optional[str] = None
+
+class CustomPlanResponse(BaseModel):
+    request_id: int
+    status: str
+    notes: Optional[str] = None
 
 class PlansWithSubscription(BaseModel):
     plans: List[Plan]
     current_subscription: Optional[SubscriptionStatus] = None
+    top_up_packages: List[TopUpPackageOption]
 
 class Config:
     arbitrary_types_allowed = True

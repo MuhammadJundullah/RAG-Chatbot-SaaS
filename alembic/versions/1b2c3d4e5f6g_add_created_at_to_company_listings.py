@@ -1,7 +1,7 @@
-"""Add created_at to Company listings
+"""Add created_at to Company listings (placeholder, already applied elsewhere)
 
 Revision ID: 1b2c3d4e5f6g
-Revises: 0a1c2b3d4e5f
+Revises: c5634b1f489d
 Create Date: 2025-11-23 14:35:00.000000
 
 """
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '1b2c3d4e5f6g'
-down_revision: Union[str, None] = '0a1c2b3d4e5f'
+revision: str = "1b2c3d4e5f6g"
+down_revision: Union[str, None] = "c5634b1f489d"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

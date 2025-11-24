@@ -90,6 +90,53 @@ class IPaymuService:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
+    async def create_payment_link_for_transaction(
+        self,
+        reference_id: str,
+        product_name: str,
+        price: int,
+        user: Users,
+    ) -> tuple[str, str]:
+        payload = {
+            "product": [product_name],
+            "qty": [1],
+            "price": [price],
+            "returnUrl": self._normalize_url("/payment-success"),
+            "notifyUrl": self._normalize_url("/api/webhooks/ipaymu-notify"),
+            "referenceId": reference_id,
+            "buyerName": user.name,
+            "buyerEmail": user.email,
+        }
+
+        timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        signature = self._get_api_signature("POST", body=payload)
+
+        try:
+            async with httpx.AsyncClient() as client:
+                headers = {
+                    "signature": signature,
+                    "va": self.va,
+                    "Content-Type": "application/json",
+                    "timestamp": timestamp,
+                }
+                response = await client.post(self.payment_url, headers=headers, json=payload)
+                response.raise_for_status()
+                response_data = response.json()
+
+                if response_data.get("Status") == 200:
+                    data = response_data.get("Data")
+                    payment_url = data.get("Url")
+                    trx_id = data.get("TransactionId") or data.get("SessionID")
+                    return payment_url, str(trx_id)
+
+                error_message = response_data.get("Message", "Unknown iPaymu error")
+                raise HTTPException(status_code=500, detail=f"Failed to create payment link: {error_message}")
+
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(status_code=500, detail=f"HTTP error with iPaymu API: {e.response.text}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+
     async def verify_webhook_signature(self, request: Request) -> dict:
         """
         Simplified verifier: always returns 200-style response without failing.

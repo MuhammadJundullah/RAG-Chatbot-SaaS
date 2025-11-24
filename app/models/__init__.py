@@ -6,6 +6,7 @@ from .conversation_model import Conversation
 from .log_model import ActivityLog
 from .plan_model import Plan
 from .subscription_model import Subscription
+from .transaction_model import Transaction
 
 __all__ = [
     "Company",
@@ -16,4 +17,5 @@ __all__ = [
     "ActivityLog",
     "Plan",
     "Subscription",
+    "Transaction",
 ]

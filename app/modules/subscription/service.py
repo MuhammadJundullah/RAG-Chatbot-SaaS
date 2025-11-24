@@ -8,8 +8,11 @@ from app.schemas.subscription_schema import (
     SubscriptionStatus,
     SubscriptionUpgradeRequest,
     TopUpPackageResponse,
+    CustomPlanResponse,
 )
 from app.modules.payment.service import ipaymu_service
+from app.models.transaction_model import Transaction
+import json
 
 TOP_UP_PACKAGES = {
     "large": {"questions": 5000, "price": 50000},
@@ -54,7 +57,13 @@ class SubscriptionService:
             days_until_renewal=days_until_renewal,
         )
 
-    async def create_subscription_for_payment(self, db: AsyncSession, company_id: int, upgrade_request: SubscriptionUpgradeRequest, user: Users):
+    async def create_subscription_for_payment(
+        self,
+        db: AsyncSession,
+        company_id: int,
+        upgrade_request: SubscriptionUpgradeRequest,
+        user: Users,
+    ):
         company = await db.get(Company, company_id)
         if not company:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
@@ -72,18 +81,37 @@ class SubscriptionService:
         else:
             subscription.plan_id = plan.id
             subscription.status = 'pending_payment'
-        
-        await db.commit()
-        await db.refresh(subscription)
 
-        payment_url, trx_id = await ipaymu_service.create_payment_link(subscription, user)
-        
+        transaction = Transaction(
+            company_id=company_id,
+            user_id=user.id if user else None,
+            type="subscription",
+            plan_id=plan.id,
+            amount=plan.price,
+            currency="IDR",
+            gateway="ipaymu",
+            status="pending_payment",
+        )
+        db.add(transaction)
+        await db.commit()
+
+        await db.refresh(subscription)
+        await db.refresh(transaction)
+
+        product_name = f"Subscription - {plan.name}"
+        payment_url, trx_id = await ipaymu_service.create_payment_link_for_transaction(
+            reference_id=str(transaction.id),
+            product_name=product_name,
+            price=plan.price,
+            user=user,
+        )
+        transaction.payment_reference = trx_id
         subscription.payment_gateway_reference = trx_id
         await db.commit()
 
-        return {"payment_url": payment_url}
+        return {"payment_url": payment_url, "transaction_id": transaction.id}
 
-    async def apply_top_up_package(self, db: AsyncSession, company_id: int, package_type: str) -> TopUpPackageResponse:
+    async def apply_top_up_package(self, db: AsyncSession, company_id: int, package_type: str, user: Users) -> TopUpPackageResponse:
         if package_type not in TOP_UP_PACKAGES:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -93,16 +121,72 @@ class SubscriptionService:
         sub = await self.check_active_subscription(db, company_id)
         package = TOP_UP_PACKAGES[package_type]
 
-        sub.top_up_quota += package["questions"]
+        transaction = Transaction(
+            company_id=company_id,
+            user_id=user.id if user else None,
+            type="topup",
+            plan_id=sub.plan_id,
+            package_type=package_type,
+            questions_delta=package["questions"],
+            amount=package["price"],
+            currency="IDR",
+            gateway="ipaymu",
+            status="pending_payment",
+        )
+        db.add(transaction)
         await db.commit()
+        await db.refresh(transaction)
 
-        subscription_status = await self.get_subscription_status(db, company_id)
+        product_name = f"Top-up {package_type.upper()} ({package['questions']} Q)"
+        payment_url, trx_id = await ipaymu_service.create_payment_link_for_transaction(
+            reference_id=str(transaction.id),
+            product_name=product_name,
+            price=package["price"],
+            user=user,
+        )
+        transaction.payment_reference = trx_id
+        await db.commit()
 
         return TopUpPackageResponse(
             package_type=package_type,
             questions_added=package["questions"],
             price=package["price"],
-            subscription=subscription_status,
+            transaction_id=transaction.id,
+            payment_url=payment_url,
+        )
+
+    async def submit_custom_plan_request(
+        self,
+        db: AsyncSession,
+        company_id: int,
+        user: Users,
+        desired_quota: int | None,
+        max_users: int | None,
+        notes: str | None,
+    ) -> CustomPlanResponse:
+        metadata = {
+            "desired_quota": desired_quota,
+            "max_users": max_users,
+            "notes": notes,
+        }
+        transaction = Transaction(
+            company_id=company_id,
+            user_id=user.id if user else None,
+            type="custom_plan",
+            amount=0,
+            currency="IDR",
+            gateway="manual",
+            status="pending_review",
+            metadata_json=json.dumps(metadata),
+        )
+        db.add(transaction)
+        await db.commit()
+        await db.refresh(transaction)
+
+        return CustomPlanResponse(
+            request_id=transaction.id,
+            status=transaction.status,
+            notes=notes,
         )
 
     async def activate_subscription(self, db: AsyncSession, subscription_id: int) -> Subscription:

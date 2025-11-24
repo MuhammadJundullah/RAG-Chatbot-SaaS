@@ -8,7 +8,7 @@ from starlette.responses import StreamingResponse
 from sqlalchemy.orm import joinedload
 
 from app.core.dependencies import get_current_super_admin, get_db
-from app.schemas import company_schema, log_schema, subscription_schema, plan_schema
+from app.schemas import company_schema, log_schema, subscription_schema, plan_schema, transaction_schema
 from app.modules.admin import service as admin_service
 from app.modules.subscription.service import subscription_service
 from app.modules.admin.plan_service import plan_service
@@ -16,6 +16,7 @@ from app.models.user_model import Users
 from app.models.log_model import ActivityLog
 from app.models.subscription_model import Subscription
 from app.models.plan_model import Plan as PlanModel
+from app.models.transaction_model import Transaction
 
 router = APIRouter(
     prefix="/admin",
@@ -196,3 +197,26 @@ async def get_distinct_activity_categories(
             status_code=500,
             detail=f"Terjadi kesalahan saat mengambil kategori distinct: {str(e)}"
         )
+
+
+@router.get("/transactions", response_model=List[transaction_schema.Transaction], summary="Daftar transaksi (super admin)")
+async def list_transactions(
+    db: AsyncSession = Depends(get_db),
+    type: Optional[str] = Query(None, description="Filter berdasarkan type transaksi, contoh: subscription/topup/custom_plan"),
+    status: Optional[str] = Query(None, description="Filter status transaksi"),
+    company_id: Optional[int] = Query(None, description="Filter company_id"),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    stmt = select(Transaction).order_by(Transaction.created_at.desc())
+
+    if type:
+        stmt = stmt.where(Transaction.type == type)
+    if status:
+        stmt = stmt.where(Transaction.status == status)
+    if company_id:
+        stmt = stmt.where(Transaction.company_id == company_id)
+
+    stmt = stmt.limit(limit).offset(offset)
+    result = await db.execute(stmt)
+    return result.scalars().all()
