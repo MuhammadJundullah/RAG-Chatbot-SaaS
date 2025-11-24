@@ -13,6 +13,14 @@ from app.models.log_model import ActivityLog
 
 
 class SuperAdminDashboardService:
+    @staticmethod
+    def _change_status(value: float) -> str:
+        if value > 0:
+            return "up"
+        if value < 0:
+            return "down"
+        return "flat"
+
     async def get_overview(self, db: AsyncSession) -> dict:
         today = date.today()
         start_of_month = today.replace(day=1)
@@ -113,6 +121,8 @@ class SuperAdminDashboardService:
         # Total questions this month (same as chats)
         total_questions_this_month = chats_this_month
 
+        completed_documents_wow = await self._get_completed_documents_wow(db, today)
+
         # Top 5 user logs
         logs_stmt = (
             select(ActivityLog)
@@ -137,17 +147,55 @@ class SuperAdminDashboardService:
             "active_companies_this_month": active_companies_this_month or 0,
             "total_users": total_users or 0,
             "user_wow_change_pct": user_wow_change_pct,
+            "user_wow_change_pct_status": self._change_status(user_wow_change_pct),
             "document_distribution": document_distribution,
+            "completed_documents_wow": completed_documents_wow,
             "chats_this_month": chats_this_month or 0,
             "chat_mom_change_pct": chat_mom_change_pct,
+            "chat_mom_change_pct_status": self._change_status(chat_mom_change_pct),
             "daily_chat_counts": daily_counts,
-            "document_status_distribution": {
-                "completed": completed_documents or 0,
-                "processing": processing_documents or 0,
-                "failed": failed_documents or 0,
-            },
             "total_questions_this_month": total_questions_this_month or 0,
             "top_user_logs": top_logs,
+        }
+
+    async def _get_completed_documents_wow(self, db: AsyncSession, today: date) -> dict:
+        start_of_week = today - timedelta(days=today.weekday())
+        start_of_prev_week = start_of_week - timedelta(days=7)
+        end_of_prev_week = start_of_week - timedelta(days=1)
+
+        start_of_week_dt = datetime.combine(start_of_week, datetime.min.time())
+        end_of_today_dt = datetime.combine(today, datetime.max.time())
+        start_of_prev_week_dt = datetime.combine(start_of_prev_week, datetime.min.time())
+        end_of_prev_week_dt = datetime.combine(end_of_prev_week, datetime.max.time())
+
+        completed_this_week = await db.scalar(
+            select(func.count(Documents.id)).where(
+                Documents.status == DocumentStatus.COMPLETED,
+                Documents.updated_at >= start_of_week_dt,
+                Documents.updated_at <= end_of_today_dt,
+            )
+        )
+
+        completed_last_week = await db.scalar(
+            select(func.count(Documents.id)).where(
+                Documents.status == DocumentStatus.COMPLETED,
+                Documents.updated_at >= start_of_prev_week_dt,
+                Documents.updated_at <= end_of_prev_week_dt,
+            )
+        )
+
+        completed_this_week = completed_this_week or 0
+        completed_last_week = completed_last_week or 0
+        change_count = completed_this_week - completed_last_week
+        change_pct = 0.0
+        if completed_last_week:
+            change_pct = (change_count / completed_last_week) * 100
+        elif completed_this_week > 0:
+            change_pct = 100.0
+
+        return {
+            "completed_documents_change_pct": change_pct,
+            "completed_documents_change_status": self._change_status(change_count if completed_last_week == 0 else change_pct),
         }
 
 
