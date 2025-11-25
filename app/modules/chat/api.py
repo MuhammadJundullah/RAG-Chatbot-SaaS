@@ -4,6 +4,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 import uuid
+import re
 
 from app.schemas import chat_schema, chatlog_schema
 from app.modules.chat.service import chat_service
@@ -69,6 +70,14 @@ async def sse_chat_endpoint(
     async def event_generator():
         BUFFER_CHAR_LIMIT = 180
         END_MARKERS = ["[ENDFINALRESPONSE]", "<|end|>", "</s>"]
+        def clean_text(text: str) -> str:
+            text = text.strip()
+            text = re.sub(r"\s+([,!.?])", r"\1", text)  # remove space before punctuation
+            text = re.sub(r"([,!.?]){2,}", r"\1", text)  # collapse repeated punctuation
+            text = re.sub(r"\s{2,}", " ", text)  # collapse double spaces
+            text = re.sub(r"([.!?])\s+[A-Za-z]{1,2}\.$", r"\1", text)  # drop trailing orphan tokens like 'an.'
+            return text
+
         def should_flush(buf: str) -> bool:
             if len(buf) >= BUFFER_CHAR_LIMIT:
                 return True
@@ -79,6 +88,7 @@ async def sse_chat_endpoint(
         company_id = current_user.company_id
         full_response = ""
         buffer = ""
+        final_response = ""
 
         if not conversation_id_str:
             new_uuid = str(uuid.uuid4())
@@ -141,20 +151,36 @@ async def sse_chat_endpoint(
                 buffer += chunk
 
                 if should_flush(buffer):
-                    yield f"data: {buffer}\n\n"
+                    cleaned = clean_text(buffer)
+                    if cleaned:
+                        final_response += cleaned
+                        yield f"data: {cleaned}\n\n"
                     buffer = ""
         except Exception as e:
             if buffer:
-                yield f"data: {buffer}\n\n"
+                cleaned = clean_text(buffer)
+                if cleaned:
+                    final_response += cleaned
+                    yield f"data: {cleaned}\n\n"
             yield f"data: {{\"error\": \"An error occurred during AI response generation: {str(e)}\"}}\n\n"
             return
 
         if buffer:
-            yield f"data: {buffer}\n\n"
+            cleaned = clean_text(buffer)
+            if cleaned:
+                final_response += cleaned
+                yield f"data: {cleaned}\n\n"
+
+        if not final_response:
+            final_response = clean_text(full_response)
+        else:
+            # If we already streamed cleaned parts, ensure any trailing uncleaned part is included
+            remaining = clean_text(full_response[len(final_response):])
+            final_response += remaining
 
         chatlog_data = chatlog_schema.ChatlogCreate(
             question=user_message,
-            answer=full_response,
+            answer=final_response,
             UsersId=current_user.id,
             company_id=company_id,
             conversation_id=conversation_id_str,
