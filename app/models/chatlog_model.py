@@ -6,7 +6,8 @@ from sqlalchemy import (
     Text,
     DateTime,
     func,
-    JSON
+    JSON,
+    Index,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from app.models.guid import GUID
@@ -16,6 +17,10 @@ from app.models.base import Base
 
 class Chatlogs(Base):
     __tablename__ = "Chatlogs"
+    __table_args__ = (
+        Index("ix_chatlogs_company_created", "company_id", "created_at"),
+        Index("ix_chatlogs_company_user", "company_id", "UsersId"),
+    )
     id = Column(Integer, primary_key=True)
     question = Column(Text)
     answer = Column(Text)

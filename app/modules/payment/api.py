@@ -87,6 +87,7 @@ async def ipaymu_notify(request: Request, db: AsyncSession = Depends(get_db)):
                                 )
                                 subscription.payment_gateway_reference = transaction.payment_reference
                                 await subscription_service.activate_subscription(db, subscription_id=subscription.id)
+                            await db.commit()
                     elif _is_expired(status_val, status_code):
                         transaction.status = "expired"
                         if transaction.type == "subscription":

@@ -8,8 +8,7 @@ from app.repository.company_repository import company_repository
 from app.schemas import company_schema
 from app.repository.log_repository import log_repository
 from app.models.log_model import ActivityLog
-from app.utils.sms_sender import send_brevo_sms
-from app.core.config import settings
+from app.utils.email_sender import send_brevo_email
 
 async def get_companies_service(
     db: AsyncSession,
@@ -40,15 +39,24 @@ async def approve_company_service(
 
     company = result
 
-    # Non-blocking SMS notification
+    # Non-blocking email notification to company admin(s)
     try:
-        if company.pic_phone_number:
-            sms_text = f"Perusahaan '{company.name}' telah disetujui. Silakan login ke {settings.APP_BASE_URL}."
-            send_brevo_sms(company.pic_phone_number, sms_text)
+        # Ambil admin perusahaan
+        from app.repository.user_repository import user_repository
+
+        admins = await user_repository.get_admins_by_company(db, company_id=company_id)
+        emails = [admin.email for admin in admins if admin.email]
+        if emails:
+            subject = "Perusahaan Anda telah disetujui"
+            body = (
+                f"<p>Perusahaan '{company.name}' telah disetujui.</p>"
+                f"<p>Silakan login ke platform untuk mulai menggunakan layanan.</p>"
+            )
+            for email in emails:
+                await send_brevo_email(to_email=email, subject=subject, html_content=body)
     except Exception as e:
-        # Log and continue; do not fail approval
         import logging
-        logging.error("Failed to send approval SMS for company %s: %s", company_id, e)
+        logging.error("Failed to send approval email for company %s: %s", company_id, e)
 
     return {"message": f"Company with id {company_id} has been approved."}
 

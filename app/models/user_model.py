@@ -5,6 +5,7 @@ from sqlalchemy import (
     ForeignKey,
     DateTime,
     func,
+    Index,
 )
 from sqlalchemy.orm import relationship
 from app.models.base import Base
@@ -13,6 +14,11 @@ from sqlalchemy import Boolean
 
 class Users(Base):
     __tablename__ = "Users"
+    __table_args__ = (
+        Index("ix_users_company_role", "company_id", "role"),
+        Index("ix_users_company_active", "company_id", "is_active"),
+        Index("ix_users_role_active", "role", "is_active"),
+    )
     id = Column(Integer, primary_key=True)
     name = Column(String(255))
     username = Column(String(255), unique=True, index=True, nullable=True)

@@ -7,6 +7,7 @@ class PlanBase(BaseModel):
     price: int
     question_quota: int
     max_users: int
+    document_quota: int = -1
     allow_custom_prompts: bool
     api_access: bool
     is_active: bool
@@ -19,6 +20,7 @@ class PlanUpdate(BaseModel):
     price: Optional[int] = None
     question_quota: Optional[int] = None
     max_users: Optional[int] = None
+    document_quota: Optional[int] = None
     allow_custom_prompts: Optional[bool] = None
     api_access: Optional[bool] = None
     is_active: Optional[bool] = None

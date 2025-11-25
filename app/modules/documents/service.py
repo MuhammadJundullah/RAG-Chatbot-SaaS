@@ -13,6 +13,7 @@ from app.repository.document_repository import document_repository
 from app.core.config import settings
 from app.modules.documents.rag_service import rag_service
 from app.utils.activity_logger import log_activity
+from app.modules.subscription.service import subscription_service
 
 
 async def upload_document_service(
@@ -24,6 +25,17 @@ async def upload_document_service(
 ):
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file name provided.")
+
+    subscription = await subscription_service.check_active_subscription(db, current_user.company_id)
+    plan = subscription.plan
+    document_quota = getattr(plan, "document_quota", -1)
+    if document_quota is not None and document_quota >= 0:
+        current_count = await document_repository.count_documents_by_company(db, current_user.company_id)
+        if current_count >= document_quota:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Dokumen sudah mencapai batas maksimum untuk paket Anda ({document_quota}). Silakan hapus dokumen lama atau upgrade paket.",
+            )
 
     temp_dir = pathlib.Path("tmp/smartai_uploads")
     temp_dir.mkdir(parents=True, exist_ok=True)

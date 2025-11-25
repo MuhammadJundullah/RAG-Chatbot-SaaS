@@ -19,6 +19,7 @@ from app.schemas.subscription_schema import (
 )
 from app.schemas.transaction_schema import TransactionListResponse
 from app.modules.subscription.service import subscription_service, TOP_UP_PACKAGES
+from app.schemas.transaction_schema import TransactionReceiptResponse
 
 router = APIRouter()
 
@@ -146,3 +147,32 @@ async def list_my_transactions(
     total = (await db.execute(total_stmt)).scalar_one()
 
     return TransactionListResponse(items=items, total=total)
+
+
+@router.get(
+    "/subscriptions/transactions/{transaction_id}/receipt",
+    response_model=TransactionReceiptResponse,
+    summary="Dapatkan bukti pembayaran atau link bayar",
+)
+async def get_transaction_receipt(
+    transaction_id: int,
+    current_user: Users = Depends(get_current_company_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    tx = await db.get(Transaction, transaction_id)
+    if not tx or tx.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaksi tidak ditemukan")
+
+    if tx.status != "paid":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Transaksi belum dibayar")
+
+    receipt_payload = await subscription_service.fetch_receipt_live(tx) or {}
+    if not receipt_payload:
+        receipt_payload = {"status": "paid", "reference": tx.payment_reference}
+
+    return TransactionReceiptResponse(
+        transaction_id=tx.id,
+        status=tx.status,
+        payment_url=tx.payment_url,
+        receipt=receipt_payload,
+    )

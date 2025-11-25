@@ -5,6 +5,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     func,
+    Index,
 )
 from sqlalchemy.orm import relationship
 from app.models.base import Base
@@ -12,6 +13,10 @@ from app.models.base import Base
 
 class Company(Base):
     __tablename__ = "Company"
+    __table_args__ = (
+        Index("ix_company_is_active", "is_active"),
+        Index("ix_company_created_at", "created_at"),
+    )
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False)
     company_email = Column(String(100), nullable=True, unique=True)

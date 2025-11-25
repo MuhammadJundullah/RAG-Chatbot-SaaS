@@ -18,6 +18,7 @@ class IPaymuService:
         self.api_key = settings.IPAYMU_API_KEY
         # Kembali ke Sandbox untuk pengujian
         self.payment_url = "https://sandbox.ipaymu.com/api/v2/payment"
+        self.transaction_detail_url = "https://sandbox.ipaymu.com/api/v2/transaction"
 
     def _normalize_url(self, path: str) -> str:
         """Memastikan base URL dan path digabungkan dengan bersih."""
@@ -136,6 +137,33 @@ class IPaymuService:
             raise HTTPException(status_code=500, detail=f"HTTP error with iPaymu API: {e.response.text}")
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+
+    async def fetch_transaction_detail(self, transaction_id: str) -> dict | None:
+        """Ambil detail transaksi dari iPaymu untuk kebutuhan bukti pembayaran."""
+        if not transaction_id:
+            return None
+
+        payload = {"transactionId": transaction_id, "account": self.va}
+        timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        signature = self._get_api_signature("POST", body=payload)
+
+        try:
+            async with httpx.AsyncClient() as client:
+                headers = {
+                    "signature": signature,
+                    "va": self.va,
+                    "Content-Type": "application/json",
+                    "timestamp": timestamp,
+                }
+                response = await client.post(self.transaction_detail_url, headers=headers, json=payload)
+                response.raise_for_status()
+                data = response.json()
+                if data.get("Status") == 200 and data.get("Success"):
+                    return data.get("Data")
+                return None
+        except Exception:
+            # Jangan blokir alur utama hanya karena fetch bukti gagal
+            return None
 
     async def verify_webhook_signature(self, request: Request) -> dict:
         """

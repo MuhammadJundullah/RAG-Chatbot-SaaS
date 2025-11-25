@@ -1,11 +1,15 @@
 # app/models/subscription_model.py
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index
 from sqlalchemy.orm import relationship
 
 from .base import Base
 
 class Subscription(Base):
     __tablename__ = 'subscriptions'
+    __table_args__ = (
+        Index("ix_subscriptions_status", "status"),
+        Index("ix_subscriptions_plan_status", "plan_id", "status"),
+    )
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey('Company.id'), nullable=False, unique=True)
     plan_id = Column(Integer, ForeignKey('plans.id'), nullable=False)

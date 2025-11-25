@@ -3,6 +3,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlalchemy.future import select
+from sqlalchemy import func
 from app.models import Subscription, Company, Plan, Users
 from app.schemas.subscription_schema import (
     SubscriptionStatus,
@@ -13,7 +14,7 @@ from app.schemas.subscription_schema import (
 from app.modules.payment.service import ipaymu_service
 from app.utils.email_sender import send_brevo_email
 from app.models.transaction_model import Transaction
-import json
+from app.repository.document_repository import document_repository
 
 TOP_UP_PACKAGES = {
     "large": {"questions": 5000, "price": 50000},
@@ -47,6 +48,28 @@ class SubscriptionService:
             delta_days = (sub.end_date - datetime.utcnow()).days
             days_until_renewal = max(delta_days, 0)
 
+        document_quota = getattr(plan, "document_quota", -1)
+        current_documents = await document_repository.count_documents_by_company(db, company_id)
+        docs_unlimited = document_quota == -1
+        remaining_documents = -1 if docs_unlimited else max(document_quota - current_documents, 0)
+        remaining_docs_percentage = 100.0
+        if not docs_unlimited:
+            remaining_docs_percentage = (
+                (remaining_documents / document_quota * 100) if document_quota > 0 else 0.0
+            )
+
+        # Users quota
+        max_users = plan.max_users
+        user_count_query = select(func.count(Users.id)).where(Users.company_id == company_id)
+        current_users = (await db.execute(user_count_query)).scalar_one()
+        users_unlimited = max_users == -1
+        remaining_users = -1 if users_unlimited else max(max_users - current_users, 0)
+        remaining_users_percentage = 100.0
+        if not users_unlimited:
+            remaining_users_percentage = (
+                (remaining_users / max_users * 100) if max_users > 0 else 0.0
+            )
+
         return SubscriptionStatus(
             plan_name=plan.name,
             end_date=sub.end_date,
@@ -55,6 +78,14 @@ class SubscriptionService:
             total_quota=total_quota,
             remaining_quota=remaining_quota,
             remaining_quota_percentage=remaining_percentage,
+            document_quota=document_quota,
+            current_documents=current_documents,
+            remaining_documents=remaining_documents,
+            remaining_documents_percentage=remaining_docs_percentage,
+            max_users=max_users,
+            current_users=current_users,
+            remaining_users=remaining_users,
+            remaining_users_percentage=remaining_users_percentage,
             days_until_renewal=days_until_renewal,
         )
 
@@ -105,6 +136,7 @@ class SubscriptionService:
             user=user,
         )
         transaction.payment_reference = trx_id
+        transaction.payment_url = payment_url
         subscription.payment_gateway_reference = trx_id
         await db.commit()
 
@@ -142,6 +174,7 @@ class SubscriptionService:
             user=user,
         )
         transaction.payment_reference = trx_id
+        transaction.payment_url = payment_url
         await db.commit()
 
         return TopUpPackageResponse(
@@ -216,6 +249,7 @@ class SubscriptionService:
         )
 
         transaction.payment_reference = trx_id
+        transaction.payment_url = payment_url
         await db.commit()
 
         email_subject = "Konfirmasi Permintaan Custom Plan"
@@ -281,5 +315,10 @@ class SubscriptionService:
         
         sub.current_question_usage += 1
         await db.commit()
+
+    async def fetch_receipt_live(self, transaction: Transaction) -> dict | None:
+        """Ambil bukti transaksi langsung dari iPaymu (tanpa cache)."""
+        trx_id = transaction.payment_reference or str(transaction.id)
+        return await ipaymu_service.fetch_transaction_detail(trx_id)
 
 subscription_service = SubscriptionService()

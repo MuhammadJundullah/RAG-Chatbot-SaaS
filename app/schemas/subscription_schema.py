@@ -31,6 +31,14 @@ class SubscriptionStatus(BaseModel):
     total_quota: int
     remaining_quota: int
     remaining_quota_percentage: float
+    document_quota: int
+    current_documents: int
+    remaining_documents: int
+    remaining_documents_percentage: float
+    max_users: int
+    current_users: int
+    remaining_users: int
+    remaining_users_percentage: float
     days_until_renewal: Optional[int] = None
 
 class SubscriptionUpgradeRequest(BaseModel):

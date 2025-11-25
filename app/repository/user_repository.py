@@ -58,4 +58,14 @@ class UserRepository(BaseRepository[user_model.Users]):
             await db.delete(user)
             await db.commit()
 
+    async def get_admins_by_company(self, db: AsyncSession, company_id: int) -> List[user_model.Users]:
+        result = await db.execute(
+            select(self.model)
+            .filter(
+                self.model.company_id == company_id,
+                self.model.role == "admin",
+            )
+        )
+        return result.scalars().all()
+
 user_repository = UserRepository()

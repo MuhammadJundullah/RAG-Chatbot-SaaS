@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, Enum as SQLAlchemyEnum, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, Enum as SQLAlchemyEnum, DateTime, Index
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -17,6 +17,10 @@ class DocumentStatus(enum.Enum):
 
 class Documents(Base):
     __tablename__ = "Documents"
+    __table_args__ = (
+        Index("ix_documents_company_status", "company_id", "status"),
+        Index("ix_documents_company_updated", "company_id", "updated_at"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True)
