@@ -67,10 +67,18 @@ async def sse_chat_endpoint(
     """
 
     async def event_generator():
+        BUFFER_CHAR_LIMIT = 180
+        END_MARKERS = ["[ENDFINALRESPONSE]", "<|end|>", "</s>"]
+        def should_flush(buf: str) -> bool:
+            if len(buf) >= BUFFER_CHAR_LIMIT:
+                return True
+            return any(buf.endswith(p) for p in [".", "!", "?", "?!", "!?"])
+
         conversation_id_str = request.conversation_id
         user_message = request.message
         company_id = current_user.company_id
         full_response = ""
+        buffer = ""
 
         if not conversation_id_str:
             new_uuid = str(uuid.uuid4())
@@ -123,11 +131,26 @@ async def sse_chat_endpoint(
                 conversation_history=conversation_history,
                 model_name=request.model,
             ):
+                # Sanitize model end markers
+                for marker in END_MARKERS:
+                    chunk = chunk.replace(marker, "")
+                if not chunk:
+                    continue
+
                 full_response += chunk
-                yield f"data: {chunk}\n\n"
+                buffer += chunk
+
+                if should_flush(buffer):
+                    yield f"data: {buffer}\n\n"
+                    buffer = ""
         except Exception as e:
+            if buffer:
+                yield f"data: {buffer}\n\n"
             yield f"data: {{\"error\": \"An error occurred during AI response generation: {str(e)}\"}}\n\n"
             return
+
+        if buffer:
+            yield f"data: {buffer}\n\n"
 
         chatlog_data = chatlog_schema.ChatlogCreate(
             question=user_message,
