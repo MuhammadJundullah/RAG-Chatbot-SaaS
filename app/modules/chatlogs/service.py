@@ -7,6 +7,7 @@ from fastapi import HTTPException
 import math
 import csv
 import io
+import re
 
 from app.repository.chatlog_repository import chatlog_repository
 from app.repository.conversation_repository import conversation_repository
@@ -22,6 +23,61 @@ This module exposes "_service" helpers for internal use and wrapper functions ex
 Some routes still import functions like `get_chatlogs` and `get_conversations`, so we provide lightweight
 aliases that delegate to the newer helpers to avoid missing-attribute errors.
 """
+
+# Basic on-device fallbacks for topic recommendations keyed by division.
+FALLBACK_TOPICS_BY_DIVISION = {
+    "marketing": ["Strategi Kampanye", "Riset Pasar", "Brand Awareness", "Konten Sosial", "Analisis Kompetitor"],
+    "sales": ["Prospek Baru", "Negosiasi Harga", "Follow-Up Klien", "Target Penjualan", "Pipeline Review"],
+    "engineering": ["Refactor Kode", "Review Arsitektur", "Automasi Testing", "Reliabilitas Sistem", "Optimasi Performa"],
+    "it": ["Keamanan Data", "Pemantauan Sistem", "Manajemen Akses", "Backup dan Recovery", "Patching Sistem"],
+    "hr": ["Kesejahteraan Karyawan", "KPI Tim", "Rekrutmen", "Pelatihan Internal", "Kebijakan Perusahaan"],
+    "finance": ["Anggaran Bulanan", "Laporan Keuangan", "Penghematan Biaya", "Proyeksi Kas", "Audit Internal"],
+    "operations": ["Efisiensi Proses", "Manajemen Risiko", "SOP Baru", "Kontrol Kualitas", "Logistik"],
+    "product": ["Peta Jalan Produk", "Umpan Balik Pengguna", "Prioritas Fitur", "Riset UX", "Eksperimen A/B"],
+    "general": ["Kolaborasi Tim", "Inisiatif Baru", "Peningkatan Proses", "Kualitas Layanan", "Komunikasi Internal"],
+}
+
+
+def recommend_topics_for_division(division: Optional[str]) -> List[str]:
+    """
+    Return a small set of sensible default topics when LLM suggestions are insufficient.
+    """
+    if not division:
+        return FALLBACK_TOPICS_BY_DIVISION["general"]
+
+    normalized = division.lower()
+    for key, topics in FALLBACK_TOPICS_BY_DIVISION.items():
+        if key in normalized:
+            return topics
+
+    return FALLBACK_TOPICS_BY_DIVISION["general"]
+
+
+def _sanitize_topics(raw_topics: List[str]) -> List[str]:
+    """
+    Clean LLM topic outputs by removing markers/apologies and keeping short entries only.
+    """
+    cleaned: List[str] = []
+    for topic in raw_topics:
+        if not topic:
+            continue
+        text = topic.strip()
+        text = re.sub(r"\[/?END[^\]]*\]", "", text, flags=re.IGNORECASE)
+        text = text.replace("<|end|>", "")
+        text = text.strip(" -•\t.,;")
+
+        if not text:
+            continue
+
+        lower = text.lower()
+        if any(kw in lower for kw in ["maaf", "tidak memiliki", "no data", "no relevant data"]):
+            continue
+
+        if len(text.split()) > 5:
+            continue
+
+        cleaned.append(text)
+    return cleaned
 
 async def get_all_chatlogs_as_admin_service(
     db: AsyncSession,
@@ -369,7 +425,8 @@ async def recommend_topics_for_division_ai(
     current_user: Users,
 ) -> List[str]:
     """Use the LLM to propose 5 short topics for the user's division."""
-    topics = await together_service.recommend_topics_for_division(db=db, current_user=current_user)
+    raw_topics = await together_service.recommend_topics_for_division(db=db, current_user=current_user)
+    topics = _sanitize_topics(raw_topics)
 
     if len(topics) < 5:
         fallback = recommend_topics_for_division(current_user.division)
