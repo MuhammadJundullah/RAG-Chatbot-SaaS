@@ -132,12 +132,21 @@ class SuperAdminDashboardService:
             .limit(5)
         )
         logs = (await db.execute(logs_stmt)).scalars().all()
+
+        company_map = {}
+        company_ids = {log.company_id for log in logs if log.company_id}
+        if company_ids:
+            company_rows = await db.execute(
+                select(Company.id, Company.name).where(Company.id.in_(company_ids))
+            )
+            company_map = {cid: name for cid, name in company_rows.all()}
+
         top_logs = [
             {
                 "id": log.id,
                 "timestamp": log.timestamp,
                 "user_id": log.user_id,
-                "company_id": log.company_id,
+                "company_name": company_map.get(log.company_id),
                 "activity_type_category": log.activity_type_category,
                 "activity_description": log.activity_description,
             }
