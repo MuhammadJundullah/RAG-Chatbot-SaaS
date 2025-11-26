@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
 
-from app.core.dependencies import get_db, get_current_company_admin
+from app.core.dependencies import get_db, get_current_company_admin, get_current_user
 from app.models.user_model import Users
 from app.models.plan_model import Plan
 from app.models.transaction_model import Transaction
@@ -56,7 +56,7 @@ async def get_available_plans(
 
 @router.get("/subscriptions/my-status", response_model=SubscriptionStatus)
 async def get_my_subscription_status(
-    current_user: Users = Depends(get_current_company_admin),
+    current_user: Users = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     if not current_user.company_id:
