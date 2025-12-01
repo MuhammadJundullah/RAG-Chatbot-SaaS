@@ -50,6 +50,7 @@ async def get_available_plans(
             question_quota=format_quota(plan.question_quota, "pertanyaan / bulan"),
             max_users=format_quota(plan.max_users, "user"),
             document_quota=format_quota(getattr(plan, "document_quota", -1), "dokumen"),
+            recomended_for=plan.recomended_for or "",
             allow_custom_prompts=format_bool(
                 plan.allow_custom_prompts,
                 "Ada Custom Prompt",

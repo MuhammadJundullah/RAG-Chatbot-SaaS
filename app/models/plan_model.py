@@ -14,6 +14,7 @@ class Plan(Base):
     question_quota = Column(Integer, nullable=False) 
     max_users = Column(Integer, nullable=False)
     document_quota = Column(Integer, nullable=True, default=-1)
+    recomended_for = Column(String(255), nullable=True)
     allow_custom_prompts = Column(Boolean, default=False)
     api_access = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
