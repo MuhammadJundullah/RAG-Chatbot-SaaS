@@ -2,7 +2,7 @@
 from pydantic import BaseModel, UUID4
 from typing import List, Optional
 from datetime import datetime
-from .plan_schema import Plan
+from .plan_schema import Plan, PlanPublic
 
 class SubscriptionBase(BaseModel):
     company_id: int
@@ -84,7 +84,7 @@ class CustomPlanApprovalResponse(BaseModel):
     payment_url: str
 
 class PlansWithSubscription(BaseModel):
-    plans: List[Plan]
+    plans: List[PlanPublic]
     current_subscription: Optional[SubscriptionStatus] = None
     top_up_packages: List[TopUpPackageOption]
 

@@ -30,3 +30,18 @@ class Plan(PlanBase):
 
     class Config:
         from_attributes = True
+
+
+class PlanPublic(BaseModel):
+    id: int
+    name: str
+    price: str
+    question_quota: str
+    max_users: str
+    document_quota: str
+    allow_custom_prompts: str
+    api_access: str
+    is_active: str
+
+    class Config:
+        from_attributes = True

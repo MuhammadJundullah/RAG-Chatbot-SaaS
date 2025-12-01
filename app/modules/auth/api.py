@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
@@ -95,6 +96,9 @@ async def login_for_access_token(
         token_data_payload["company_id"] = user.company_id
     if user.company and user.company.name:
         token_data_payload["company_name"] = user.company.name
+    if user.company and user.company.logo_s3_path:
+        token_data_payload["logo_s3_path"] = user.company.logo_s3_path
+    token_data_payload["login_at"] = datetime.utcnow().isoformat() + "Z"
 
     await log_activity(
         db=db,

@@ -17,6 +17,7 @@ from app.schemas.subscription_schema import (
     CustomPlanRequest,
     CustomPlanResponse,
 )
+from app.schemas.plan_schema import PlanPublic
 from app.schemas.transaction_schema import TransactionListResponse
 from app.modules.subscription.service import subscription_service, TOP_UP_PACKAGES
 from app.schemas.transaction_schema import TransactionReceiptResponse
@@ -31,6 +32,34 @@ async def get_available_plans(
 ):
     result = await db.execute(select(Plan).filter(Plan.is_active == True).order_by(Plan.price))
     plans = result.scalars().all()
+
+    def format_quota(value: int | None, label: str) -> str:
+        return "Tanpa batas" if value is None or value == -1 else f"{value} {label}"
+
+    def format_bool(flag: bool, true_label: str, false_label: str) -> str:
+        return true_label if flag else false_label
+
+    def format_price(amount: int) -> str:
+        return f"Rp {amount:,.0f}".replace(",", ".")
+
+    formatted_plans = [
+        PlanPublic(
+            id=plan.id,
+            name=plan.name,
+            price=format_price(plan.price),
+            question_quota=format_quota(plan.question_quota, "pertanyaan / bulan"),
+            max_users=format_quota(plan.max_users, "user"),
+            document_quota=format_quota(getattr(plan, "document_quota", -1), "dokumen"),
+            allow_custom_prompts=format_bool(
+                plan.allow_custom_prompts,
+                "Ada Custom Prompt",
+                "Tidak ada Custom Prompt",
+            ),
+            api_access=format_bool(plan.api_access, "Akses API SmartAI", "Tidak ada akses API SmartAI"),
+            is_active=format_bool(plan.is_active, "Aktif", "Tidak aktif"),
+        )
+        for plan in plans
+    ]
 
     current_subscription = None
     try:
@@ -48,7 +77,7 @@ async def get_available_plans(
     ]
 
     return PlansWithSubscription(
-        plans=plans,
+        plans=formatted_plans,
         current_subscription=current_subscription,
         top_up_packages=top_up_packages,
     )

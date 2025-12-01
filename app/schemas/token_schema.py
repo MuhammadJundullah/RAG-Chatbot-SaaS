@@ -15,3 +15,5 @@ class TokenData(BaseModel):
     division_id: Optional[int] = None
     company_name: Optional[str] = None
     name: Optional[str] = None
+    logo_s3_path: Optional[str] = None
+    login_at: Optional[str] = None
