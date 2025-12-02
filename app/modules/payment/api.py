@@ -82,19 +82,16 @@ async def ipaymu_notify(request: Request, db: AsyncSession = Depends(get_db)):
                                 )
                                 subscription.top_up_quota += transaction.questions_delta or 0
                             elif transaction.type == "subscription":
-                                subscription = await subscription_service.get_subscription_by_company(
-                                    db, company_id=transaction.company_id
-                                )
-                                subscription.payment_gateway_reference = transaction.payment_reference
-                                await subscription_service.activate_subscription(db, subscription_id=subscription.id)
+                                await subscription_service.apply_subscription_payment(db, transaction)
                             await db.commit()
                     elif _is_expired(status_val, status_code):
                         transaction.status = "expired"
                         if transaction.type == "subscription":
-                            subscription = await subscription_service.get_subscription_by_company(
+                            subscription = await subscription_service.get_subscription_by_company_optional(
                                 db, company_id=transaction.company_id
                             )
-                            subscription.status = "expired"
+                            if subscription:
+                                subscription.status = "expired"
                     else:
                         # Pending/unknown status: mark pending explicitly
                         transaction.status = "pending_payment"

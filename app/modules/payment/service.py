@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 from datetime import datetime
+from typing import Optional
 from urllib.parse import parse_qs
 
 import httpx
@@ -25,6 +26,14 @@ class IPaymuService:
         base = settings.APP_BASE_URL.rstrip("/")
         path_clean = path.lstrip("/")
         return f"{base}/{path_clean}"
+
+    def _normalize_optional_url(self, url: Optional[str], fallback_path: str) -> str:
+        """Gunakan URL custom jika disediakan, atau fallback ke path bawaan."""
+        if url:
+            if url.startswith(("http://", "https://")):
+                return url
+            return self._normalize_url(url)
+        return self._normalize_url(fallback_path)
 
     def _body_sha256(self, body: dict = None, body_bytes: bytes = None) -> str:
         """Menghitung SHA256 dari body request."""
@@ -97,12 +106,15 @@ class IPaymuService:
         product_name: str,
         price: int,
         user: Users,
+        return_url: Optional[str] = None,
+        failed_url: Optional[str] = None,
     ) -> tuple[str, str]:
         payload = {
             "product": [product_name],
             "qty": [1],
             "price": [price],
-            "returnUrl": self._normalize_url("/payment-success"),
+            "returnUrl": self._normalize_optional_url(return_url, "/payment-success"),
+            "cancelUrl": self._normalize_optional_url(failed_url, "/payment-failed"),
             "notifyUrl": self._normalize_url("/api/webhooks/ipaymu-notify"),
             "referenceId": reference_id,
             "buyerName": user.name,

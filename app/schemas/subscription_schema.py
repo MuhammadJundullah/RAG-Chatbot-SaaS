@@ -43,6 +43,8 @@ class SubscriptionStatus(BaseModel):
 
 class SubscriptionUpgradeRequest(BaseModel):
     plan_id: int
+    success_return_url: Optional[str] = None
+    failed_return_url: Optional[str] = None
 
 class SubscriptionTopUpRequest(BaseModel):
     quota: int

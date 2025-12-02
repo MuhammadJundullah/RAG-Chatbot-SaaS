@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +31,13 @@ class SubscriptionService:
         if not subscription:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription not found for this company")
         return subscription
+
+    async def get_subscription_by_company_optional(self, db: AsyncSession, company_id: int) -> Subscription | None:
+        """Best-effort lookup without raising when missing."""
+        result = await db.execute(
+            select(Subscription).options(joinedload(Subscription.plan)).filter(Subscription.company_id == company_id)
+        )
+        return result.scalars().first()
 
     async def get_subscription_status(self, db: AsyncSession, company_id: int) -> SubscriptionStatus:
         sub = await self.get_subscription_by_company(db, company_id)
@@ -104,16 +112,6 @@ class SubscriptionService:
         if not plan:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found")
 
-        result = await db.execute(select(Subscription).filter_by(company_id=company_id))
-        subscription = result.scalars().first()
-
-        if not subscription:
-            subscription = Subscription(company_id=company_id, plan_id=plan.id)
-            db.add(subscription)
-        else:
-            subscription.plan_id = plan.id
-            subscription.status = 'pending_payment'
-
         transaction = Transaction(
             company_id=company_id,
             user_id=user.id if user else None,
@@ -125,7 +123,6 @@ class SubscriptionService:
         db.add(transaction)
         await db.commit()
 
-        await db.refresh(subscription)
         await db.refresh(transaction)
 
         product_name = f"Subscription - {plan.name}"
@@ -134,13 +131,39 @@ class SubscriptionService:
             product_name=product_name,
             price=plan.price,
             user=user,
+            return_url=upgrade_request.success_return_url,
+            failed_url=upgrade_request.failed_return_url,
         )
         transaction.payment_reference = trx_id
         transaction.payment_url = payment_url
-        subscription.payment_gateway_reference = trx_id
         await db.commit()
 
         return {"payment_url": payment_url, "transaction_id": transaction.id}
+
+    async def apply_subscription_payment(self, db: AsyncSession, transaction: Transaction):
+        """
+        Terapkan perubahan subscription setelah pembayaran sukses.
+        Membuat subscription baru jika belum ada, atau meng-update plan yang sudah ada.
+        """
+        if not transaction.plan_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Transaction missing plan_id")
+
+        subscription = await self.get_subscription_by_company_optional(db, company_id=transaction.company_id)
+        if not subscription:
+            subscription = Subscription(
+                company_id=transaction.company_id,
+                plan_id=transaction.plan_id,
+                status="pending_payment",
+                payment_gateway_reference=transaction.payment_reference,
+            )
+            db.add(subscription)
+        else:
+            subscription.plan_id = transaction.plan_id
+            subscription.payment_gateway_reference = transaction.payment_reference
+
+        # Pastikan ID tersedia sebelum aktivasi
+        await db.flush()
+        await self.activate_subscription(db, subscription_id=subscription.id)
 
     async def apply_top_up_package(self, db: AsyncSession, company_id: int, package_type: str, user: Users) -> TopUpPackageResponse:
         if package_type not in TOP_UP_PACKAGES:
