@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Index
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy import func
 
@@ -17,7 +17,7 @@ class Transaction(Base):
     company_id = Column(Integer, ForeignKey("Company.id"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("Users.id"), nullable=True, index=True)
 
-    type = Column(String, nullable=False)  # subscription, topup, custom_plan
+    type = Column(String, nullable=False)  # subscription, topup
     plan_id = Column(Integer, ForeignKey("plans.id"), nullable=True)
     package_type = Column(String, nullable=True)
     questions_delta = Column(Integer, nullable=True)
@@ -27,7 +27,6 @@ class Transaction(Base):
     payment_reference = Column(String, nullable=True, index=True)
 
     status = Column(String, nullable=False, default="pending_payment")  # pending_payment|paid|failed|cancelled|pending_review
-    metadata_json = Column(Text, nullable=True)
 
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     paid_at = Column(DateTime, nullable=True)

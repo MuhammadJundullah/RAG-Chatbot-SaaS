@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,10 +9,8 @@ from app.schemas.subscription_schema import (
     SubscriptionStatus,
     SubscriptionUpgradeRequest,
     TopUpPackageResponse,
-    CustomPlanResponse,
 )
 from app.modules.payment.service import ipaymu_service
-from app.utils.email_sender import send_brevo_email
 from app.models.transaction_model import Transaction
 from app.repository.document_repository import document_repository
 
@@ -108,6 +105,9 @@ class SubscriptionService:
         if not company:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
 
+        if not upgrade_request.plan_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="plan_id is required")
+
         plan = await db.get(Plan, upgrade_request.plan_id)
         if not plan:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found")
@@ -165,7 +165,9 @@ class SubscriptionService:
         await db.flush()
         await self.activate_subscription(db, subscription_id=subscription.id)
 
-    async def apply_top_up_package(self, db: AsyncSession, company_id: int, package_type: str, user: Users) -> TopUpPackageResponse:
+    async def create_topup_payment(
+        self, db: AsyncSession, company_id: int, package_type: str, user: Users
+    ) -> TopUpPackageResponse:
         if package_type not in TOP_UP_PACKAGES:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -208,86 +210,11 @@ class SubscriptionService:
             payment_url=payment_url,
         )
 
-    async def submit_custom_plan_request(
-        self,
-        db: AsyncSession,
-        company_id: int,
-        user: Users,
-        estimated_employees: int | None,
-        need_internal_integration: str | None,
-        special_requests: str | None,
-    ) -> CustomPlanResponse:
-        transaction = Transaction(
-            company_id=company_id,
-            user_id=user.id if user else None,
-            type="custom_plan",
-            amount=0,
-            status="pending_review",
-            metadata_json=json.dumps(
-                {
-                    "estimated_employees": estimated_employees,
-                    "need_internal_integration": need_internal_integration,
-                    "special_requests": special_requests,
-                }
-            ),
-        )
-        db.add(transaction)
-        await db.commit()
-        await db.refresh(transaction)
-
-        return CustomPlanResponse(
-            request_id=transaction.id,
-            status=transaction.status,
-            special_requests=special_requests,
-        )
-
-    async def approve_custom_plan_request(
-        self,
-        db: AsyncSession,
-        transaction_id: int,
-        price: int,
-        product_name: str,
-    ) -> dict:
-        transaction = await db.get(Transaction, transaction_id)
-        if not transaction or transaction.type != "custom_plan":
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Custom plan request not found")
-
-        if transaction.status != "pending_review":
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Request is not pending review")
-
-        user = await db.get(Users, transaction.user_id) if transaction.user_id else None
-        if not user:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Request does not have a requester user")
-
-        transaction.amount = price
-        transaction.status = "pending_payment"
-        await db.commit()
-        await db.refresh(transaction)
-
-        payment_url, trx_id = await ipaymu_service.create_payment_link_for_transaction(
-            reference_id=str(transaction.id),
-            product_name=product_name,
-            price=price,
-            user=user,
-        )
-
-        transaction.payment_reference = trx_id
-        transaction.payment_url = payment_url
-        await db.commit()
-
-        email_subject = "Konfirmasi Permintaan Custom Plan"
-        email_body = (
-            f"<p>Permintaan custom plan Anda telah disetujui.</p>"
-            f"<p>Harga: {price}</p>"
-            f"<p>Silakan selesaikan pembayaran melalui tautan berikut: <a href='{payment_url}'>Bayar di sini</a></p>"
-        )
-        await send_brevo_email(to_email=user.email, subject=email_subject, html_content=email_body)
-
-        return {
-            "transaction_id": transaction.id,
-            "status": transaction.status,
-            "payment_url": payment_url,
-        }
+    async def apply_top_up_package(
+        self, db: AsyncSession, company_id: int, package_type: str, user: Users
+    ) -> TopUpPackageResponse:
+        # Backward-compatible wrapper for existing top-up endpoint
+        return await self.create_topup_payment(db, company_id, package_type, user)
 
     async def activate_subscription(self, db: AsyncSession, subscription_id: int) -> Subscription:
         subscription = await db.get(Subscription, subscription_id)

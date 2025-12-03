@@ -1,6 +1,6 @@
 # app/schemas/subscription_schema.py
-from pydantic import BaseModel, UUID4
-from typing import List, Optional
+from pydantic import BaseModel, model_validator
+from typing import List, Optional, Literal
 from datetime import datetime
 from .plan_schema import Plan, PlanPublic
 
@@ -42,9 +42,21 @@ class SubscriptionStatus(BaseModel):
     days_until_renewal: Optional[int] = None
 
 class SubscriptionUpgradeRequest(BaseModel):
-    plan_id: int
+    transaction_type: Literal["subscription", "topup"] = "subscription"
+    plan_id: Optional[int] = None
+    package_type: Optional[str] = None
     success_return_url: Optional[str] = None
     failed_return_url: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_fields(self):
+        if self.transaction_type == "subscription":
+            if not self.plan_id:
+                raise ValueError("plan_id is required for subscription upgrade")
+        if self.transaction_type == "topup":
+            if not self.package_type:
+                raise ValueError("package_type is required for top-up")
+        return self
 
 class SubscriptionTopUpRequest(BaseModel):
     quota: int
@@ -62,27 +74,6 @@ class TopUpPackageResponse(BaseModel):
     questions_added: int
     price: int
     transaction_id: int
-    payment_url: str
-
-class CustomPlanRequest(BaseModel):
-    estimated_employees: Optional[int] = None
-    need_internal_integration: Optional[str] = None
-    special_requests: Optional[str] = None
-
-class CustomPlanResponse(BaseModel):
-    request_id: int
-    status: str
-    special_requests: Optional[str] = None
-
-
-class CustomPlanApprovalRequest(BaseModel):
-    price: int
-    product_name: Optional[str] = "Custom Plan"
-
-
-class CustomPlanApprovalResponse(BaseModel):
-    transaction_id: int
-    status: str
     payment_url: str
 
 class PlansWithSubscription(BaseModel):

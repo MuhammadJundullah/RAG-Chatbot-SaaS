@@ -14,8 +14,6 @@ from app.schemas.subscription_schema import (
     TopUpPackageRequest,
     TopUpPackageResponse,
     TopUpPackageOption,
-    CustomPlanRequest,
-    CustomPlanResponse,
 )
 from app.schemas.plan_schema import PlanPublic
 from app.schemas.transaction_schema import TransactionListResponse
@@ -104,6 +102,14 @@ async def create_payment_for_subscription(
     if not current_user.company_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is not associated with a company")
 
+    if upgrade_request.transaction_type == "topup":
+        return await subscription_service.create_topup_payment(
+            db=db,
+            company_id=current_user.company_id,
+            package_type=upgrade_request.package_type,
+            user=current_user,
+        )
+
     return await subscription_service.create_subscription_for_payment(
         db=db,
         company_id=current_user.company_id,
@@ -129,38 +135,23 @@ async def top_up_subscription(
     )
 
 
-@router.post("/subscriptions/custom-plan", response_model=CustomPlanResponse)
-async def request_custom_plan(
-    payload: CustomPlanRequest,
-    current_user: Users = Depends(get_current_company_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    if not current_user.company_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is not associated with a company")
-
-    return await subscription_service.submit_custom_plan_request(
-        db=db,
-        company_id=current_user.company_id,
-        user=current_user,
-        estimated_employees=payload.estimated_employees,
-        need_internal_integration=payload.need_internal_integration,
-        special_requests=payload.special_requests,
-    )
-
-
 @router.get(
     "/subscriptions/transactions",
     response_model=TransactionListResponse,
     summary="Daftar transaksi milik company admin",
 )
 async def list_my_transactions(
+    page: int = 1,
     limit: int = 100,
-    offset: int = 0,
     current_user: Users = Depends(get_current_company_admin),
     db: AsyncSession = Depends(get_db),
 ):
     if not current_user.company_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is not associated with a company")
+
+    page = max(page, 1)
+    limit = max(limit, 1)
+    offset = (page - 1) * limit
 
     base_filter = Transaction.company_id == current_user.company_id
     stmt = (
@@ -176,7 +167,14 @@ async def list_my_transactions(
     total_stmt = select(func.count()).select_from(Transaction).where(base_filter)
     total = (await db.execute(total_stmt)).scalar_one()
 
-    return TransactionListResponse(items=items, total=total)
+    total_pages = (total + limit - 1) // limit if limit > 0 else 0
+
+    return TransactionListResponse(
+        items=items,
+        total=total,
+        current_page=page,
+        total_pages=total_pages,
+    )
 
 
 @router.get(
@@ -191,6 +189,62 @@ async def get_transaction_receipt(
 ):
     tx = await db.get(Transaction, transaction_id)
     if not tx or tx.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaksi tidak ditemukan")
+
+    if tx.status != "paid":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Transaksi belum dibayar")
+
+    receipt_payload = await subscription_service.fetch_receipt_live(tx) or {}
+    if not receipt_payload:
+        receipt_payload = {"status": "paid", "reference": tx.payment_reference}
+
+    return TransactionReceiptResponse(
+        transaction_id=tx.id,
+        status=tx.status,
+        payment_url=tx.payment_url,
+        receipt=receipt_payload,
+    )
+
+@router.get(
+    "/subscriptions/transactions/receipt",
+    response_model=TransactionReceiptResponse,
+    summary="Dapatkan bukti pembayaran berdasarkan trx_id (payment_reference) atau id transaksi",
+)
+async def get_transaction_receipt_by_reference(
+    trx_id: str | None = None,
+    transaction_id: int | None = None,
+    current_user: Users = Depends(get_current_company_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    if not trx_id and not transaction_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="trx_id atau transaction_id harus diisi",
+        )
+
+    tx = None
+    if trx_id:
+        stmt = select(Transaction).where(
+            Transaction.payment_reference == trx_id,
+            Transaction.company_id == current_user.company_id,
+        )
+        result = await db.execute(stmt)
+        tx = result.scalars().first()
+
+    if not tx and transaction_id:
+        tx = await db.get(Transaction, transaction_id)
+        if tx and tx.company_id != current_user.company_id:
+            tx = None
+
+    if not tx and trx_id and trx_id.isdigit():
+        fallback_stmt = select(Transaction).where(
+            Transaction.id == int(trx_id),
+            Transaction.company_id == current_user.company_id,
+        )
+        fallback_result = await db.execute(fallback_stmt)
+        tx = fallback_result.scalars().first()
+
+    if not tx:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaksi tidak ditemukan")
 
     if tx.status != "paid":
