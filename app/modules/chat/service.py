@@ -94,6 +94,13 @@ class ChatService:
         current_user: Users,
         request: chat_schema.ChatRequest,
     ):
+        END_MARKERS = ["[ENDFINALRESPONSE]", "[END FINAL RESPONSE]", "<|end|>", "</s>"]
+
+        def strip_end_markers(text: str) -> str:
+            for marker in END_MARKERS:
+                text = text.replace(marker, "")
+            return text
+
         conversation_id_str = await self._ensure_conversation_exists(
             db=db,
             conversation_id=request.conversation_id,
@@ -123,7 +130,12 @@ class ChatService:
             conversation_history=conversation_history,
             model_name=request.model,
         ):
-            full_response += chunk
+            cleaned_chunk = strip_end_markers(chunk)
+            if not cleaned_chunk:
+                continue
+            full_response += cleaned_chunk
+
+        full_response = strip_end_markers(full_response).strip()
 
         chatlog_data = chatlog_schema.ChatlogCreate(
             question=request.message,
