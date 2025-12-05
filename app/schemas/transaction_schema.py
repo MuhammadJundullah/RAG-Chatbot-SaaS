@@ -34,4 +34,6 @@ class TransactionReceiptResponse(BaseModel):
     transaction_id: int
     status: str
     payment_url: Optional[str] = None
+    plan_name: Optional[str] = None
     receipt: Optional[dict] = None
+    

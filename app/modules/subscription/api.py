@@ -23,6 +23,19 @@ from app.schemas.transaction_schema import TransactionReceiptResponse
 router = APIRouter()
 
 
+async def _get_transaction_product_name(tx: Transaction, db: AsyncSession) -> str:
+    """Resolve a user-friendly product name for subscription vs top-up."""
+    if tx.type == "subscription":
+        plan = await db.get(Plan, tx.plan_id) if tx.plan_id else None
+        return plan.name if plan else "Subscription Plan"
+    if tx.type == "topup":
+        package = TOP_UP_PACKAGES.get(tx.package_type or "")
+        if package:
+            return f"Top-up {tx.package_type.upper()} ({package['questions']} Q)"
+        return f"Top-up {tx.package_type or ''}".strip()
+    return "Transaction"
+
+
 @router.get("/plans", response_model=PlansWithSubscription)
 async def get_available_plans(
     current_user: Users = Depends(get_current_company_admin),
@@ -108,6 +121,8 @@ async def create_payment_for_subscription(
             company_id=current_user.company_id,
             package_type=upgrade_request.package_type,
             user=current_user,
+            success_return_url=upgrade_request.success_return_url,
+            failed_return_url=upgrade_request.failed_return_url,
         )
 
     return await subscription_service.create_subscription_for_payment(
@@ -197,11 +212,13 @@ async def get_transaction_receipt(
     receipt_payload = await subscription_service.fetch_receipt_live(tx) or {}
     if not receipt_payload:
         receipt_payload = {"status": "paid", "reference": tx.payment_reference}
+    plan_name = await _get_transaction_product_name(tx, db)
 
     return TransactionReceiptResponse(
         transaction_id=tx.id,
         status=tx.status,
         payment_url=tx.payment_url,
+        plan_name=plan_name,
         receipt=receipt_payload,
     )
 
@@ -253,10 +270,12 @@ async def get_transaction_receipt_by_reference(
     receipt_payload = await subscription_service.fetch_receipt_live(tx) or {}
     if not receipt_payload:
         receipt_payload = {"status": "paid", "reference": tx.payment_reference}
+    plan_name = await _get_transaction_product_name(tx, db)
 
     return TransactionReceiptResponse(
         transaction_id=tx.id,
         status=tx.status,
         payment_url=tx.payment_url,
         receipt=receipt_payload,
+        plan_name=plan_name,
     )

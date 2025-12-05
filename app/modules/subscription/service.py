@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from typing import Optional
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -166,7 +167,13 @@ class SubscriptionService:
         await self.activate_subscription(db, subscription_id=subscription.id)
 
     async def create_topup_payment(
-        self, db: AsyncSession, company_id: int, package_type: str, user: Users
+        self,
+        db: AsyncSession,
+        company_id: int,
+        package_type: str,
+        user: Users,
+        success_return_url: Optional[str] = None,
+        failed_return_url: Optional[str] = None,
     ) -> TopUpPackageResponse:
         if package_type not in TOP_UP_PACKAGES:
             raise HTTPException(
@@ -197,6 +204,8 @@ class SubscriptionService:
             product_name=product_name,
             price=package["price"],
             user=user,
+            return_url=success_return_url,
+            failed_url=failed_return_url,
         )
         transaction.payment_reference = trx_id
         transaction.payment_url = payment_url
@@ -211,10 +220,23 @@ class SubscriptionService:
         )
 
     async def apply_top_up_package(
-        self, db: AsyncSession, company_id: int, package_type: str, user: Users
+        self,
+        db: AsyncSession,
+        company_id: int,
+        package_type: str,
+        user: Users,
+        success_return_url: Optional[str] = None,
+        failed_return_url: Optional[str] = None,
     ) -> TopUpPackageResponse:
         # Backward-compatible wrapper for existing top-up endpoint
-        return await self.create_topup_payment(db, company_id, package_type, user)
+        return await self.create_topup_payment(
+            db,
+            company_id,
+            package_type,
+            user,
+            success_return_url=success_return_url,
+            failed_return_url=failed_return_url,
+        )
 
     async def activate_subscription(self, db: AsyncSession, subscription_id: int) -> Subscription:
         subscription = await db.get(Subscription, subscription_id)
