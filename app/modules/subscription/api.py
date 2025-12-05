@@ -18,7 +18,7 @@ from app.schemas.subscription_schema import (
 from app.schemas.plan_schema import PlanPublic
 from app.schemas.transaction_schema import TransactionListResponse
 from app.modules.subscription.service import subscription_service, TOP_UP_PACKAGES
-from app.schemas.transaction_schema import TransactionReceiptResponse
+from app.schemas.transaction_schema import TransactionReceiptResponse, PaymentSuccessResponse
 
 router = APIRouter()
 
@@ -34,6 +34,14 @@ async def _get_transaction_product_name(tx: Transaction, db: AsyncSession) -> st
             return f"Top-up {tx.package_type.upper()} ({package['questions']} Q)"
         return f"Top-up {tx.package_type or ''}".strip()
     return "Transaction"
+
+
+async def _get_subscription_period_and_status_by_company(db: AsyncSession, company_id: int):
+    """Fetch subscription for a company and return period/status safely."""
+    subscription = await subscription_service.get_subscription_by_company_optional(db, company_id=company_id)
+    if not subscription:
+        return None, None, None
+    return subscription.start_date, subscription.end_date, subscription.status
 
 
 @router.get("/plans", response_model=PlansWithSubscription)
@@ -278,4 +286,46 @@ async def get_transaction_receipt_by_reference(
         payment_url=tx.payment_url,
         receipt=receipt_payload,
         plan_name=plan_name,
+    )
+
+
+@router.get(
+    "/subscriptions/transactions/payment-success",
+    response_model=PaymentSuccessResponse,
+    summary="Halaman sukses pembayaran berdasarkan trx_id",
+)
+async def get_payment_success_info(
+    trx_id: str | None = None,
+    current_user: Users = Depends(get_current_company_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    if not trx_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="trx_id harus diisi",
+        )
+
+    stmt = select(Transaction).where(
+        Transaction.payment_reference == trx_id,
+        Transaction.company_id == current_user.company_id,
+    )
+    result = await db.execute(stmt)
+    tx = result.scalars().first()
+
+    if not tx:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaksi tidak ditemukan")
+
+    plan_name = await _get_transaction_product_name(tx, db)
+    active_start, active_end, subscription_status = await _get_subscription_period_and_status_by_company(
+        db, current_user.company_id
+    )
+
+    return PaymentSuccessResponse(
+        transaction_id=tx.id,
+        transaction_type=tx.type,
+        transaction_status=tx.status,
+        plan_name=plan_name,
+        active_start=active_start,
+        active_end=active_end,
+        subscription_status=subscription_status,
     )

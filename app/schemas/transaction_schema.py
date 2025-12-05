@@ -34,6 +34,16 @@ class TransactionReceiptResponse(BaseModel):
     transaction_id: int
     status: str
     payment_url: Optional[str] = None
-    plan_name: Optional[str] = None
     receipt: Optional[dict] = None
+    plan_name: Optional[str] = None
+
+
+class PaymentSuccessResponse(BaseModel):
+    transaction_id: int
+    transaction_type: str
+    transaction_status: str
+    plan_name: Optional[str] = None
+    active_start: Optional[datetime] = None
+    active_end: Optional[datetime] = None
+    subscription_status: Optional[str] = None
     
