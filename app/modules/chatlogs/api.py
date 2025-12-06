@@ -45,6 +45,12 @@ async def read_chatlogs_as_company_admin(
     current_user: Users = Depends(get_current_company_admin),
     page: int = 1,
     limit: int = 100,
+    search: Optional[str] = Query(
+        None,
+        min_length=2,
+        max_length=100,
+        description="Cari di pertanyaan, jawaban, username, atau conversation ID"
+    ),
 ):
     """
     Paginated chatlogs for the company admin view.
@@ -60,6 +66,7 @@ async def read_chatlogs_as_company_admin(
         skip=skip,
         limit=limit,
         page=page,
+        search=search,
     )
 
 

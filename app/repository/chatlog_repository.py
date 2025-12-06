@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import Optional, List
 from datetime import date
-from sqlalchemy import func
+from sqlalchemy import func, or_, cast, String
 from app.models import chatlog_model
 from app.schemas import chatlog_schema
 from app.repository.base_repository import BaseRepository
@@ -90,9 +90,9 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
         end_date: Optional[date] = None,
         skip: int = 0,
         limit: int = 100,
+        search: Optional[str] = None,
     ) -> (List[dict], int):
         from app.models.user_model import Users
-        from sqlalchemy import func
 
         base_query = select(self.model).join(Users, self.model.UsersId == Users.id).filter(self.model.company_id == company_id)
 
@@ -106,6 +106,17 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
             base_query = base_query.filter(self.model.created_at >= start_date)
         if end_date:
             base_query = base_query.filter(self.model.created_at <= end_date)
+
+        if search and search.strip():
+            pattern = f"%{search.strip()}%"
+            base_query = base_query.filter(
+                or_(
+                    self.model.question.ilike(pattern),
+                    self.model.answer.ilike(pattern),
+                    Users.username.ilike(pattern),
+                    cast(self.model.conversation_id, String).ilike(pattern),
+                )
+            )
 
         count_query = base_query.with_only_columns(func.count(self.model.id))
         total_count_result = await db.execute(count_query)

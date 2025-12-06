@@ -322,10 +322,11 @@
 **Deskripsi**: Admin perusahaan melihat riwayat chat semua pengguna di perusahaannya.
 
 **Query Parameters**:
-- `skip`, `limit`: Pagination
+- `page`, `limit`: Pagination
 - `division_id`: Filter berdasarkan divisi
 - `user_id`: Filter berdasarkan user spesifik
 - `start_date`, `end_date`: Filter berdasarkan tanggal
+- `search`: Cari teks di pertanyaan, jawaban, username, atau conversation ID (min 2, max 100 karakter)
 
 **Response**: Sama seperti endpoint chatlog user biasa, tapi mencakup semua pengguna di perusahaan.
 

@@ -111,6 +111,7 @@ async def get_chatlogs_as_company_admin_service(
     skip: int,
     limit: int,
     page: int,
+    search: Optional[str],
 ) -> chatlog_schema.PaginatedChatlogResponse:
     chatlogs_data, total_chat = await chatlog_repository.get_chatlogs_for_company_admin(
         db=db,
@@ -121,6 +122,7 @@ async def get_chatlogs_as_company_admin_service(
         end_date=end_date,
         skip=skip,
         limit=limit,
+        search=search,
     )
     
     total_pages = math.ceil(total_chat / limit) if limit > 0 else 0
