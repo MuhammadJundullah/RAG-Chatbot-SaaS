@@ -16,8 +16,8 @@ from app.models.transaction_model import Transaction
 from app.repository.document_repository import document_repository
 
 TOP_UP_PACKAGES = {
-    "large": {"questions": 5000, "price": 50000},
-    "small": {"questions": 1000, "price": 200000},
+    "large": {"questions": 5000, "price": 200000},
+    "small": {"questions": 1000, "price": 50000},
 }
 
 class SubscriptionService:
