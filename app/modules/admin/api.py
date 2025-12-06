@@ -24,14 +24,23 @@ router = APIRouter(
     dependencies=[Depends(get_current_super_admin)],
 )
 
-@router.get("/companies", response_model=List[company_schema.Company])
+@router.get("/companies", response_model=company_schema.PaginatedCompanyResponse)
 async def read_companies(
-    skip: int = 0,
-    limit: int = 100,
-    status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(100, ge=1, le=1000, description="Items per page"),
+    status: Optional[str] = Query(None, description="Filter status company (active/pending)"),
+    search: Optional[str] = Query(None, min_length=2, max_length=100, description="Cari nama, kode, atau email perusahaan"),
 ):
-    companies = await admin_service.get_companies_service(db, skip=skip, limit=limit, status=status)
+    skip = (page - 1) * limit
+    companies = await admin_service.get_companies_service(
+        db,
+        skip=skip,
+        limit=limit,
+        status=status,
+        page=page,
+        search=search,
+    )
     return companies
 
 

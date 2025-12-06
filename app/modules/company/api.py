@@ -224,7 +224,7 @@ async def get_company_users_by_admin(
     current_user: Users = Depends(get_current_company_admin),
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(100, ge=1, le=1000, description="Items per page"),
-    username: Optional[str] = Query(None, description="Filter by username"),
+    search: Optional[str] = Query(None, min_length=2, max_length=100, description="Cari username, nama, atau email"),
 ):
     try:
         skip = (page - 1) * limit
@@ -234,7 +234,7 @@ async def get_company_users_by_admin(
             skip=skip,
             limit=limit,
             page=page,
-            username=username
+            search=search
         )
         return paginated_users
 

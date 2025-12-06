@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 class CompanyBase(BaseModel):
@@ -39,3 +39,9 @@ class CompanyUpdateMe(BaseModel):
 class CompanyMeResponse(Company):
     admin_name: str
     admin_email: EmailStr
+
+class PaginatedCompanyResponse(BaseModel):
+    companies: List[Company]
+    total_company: int
+    current_page: int
+    total_pages: int

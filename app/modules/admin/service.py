@@ -14,10 +14,24 @@ async def get_companies_service(
     db: AsyncSession,
     skip: int = 0,
     limit: int = 100,
-    status: Optional[str] = None
-) -> List[company_schema.Company]:
-    companies = await company_repository.get_companies(db, skip=skip, limit=limit, status=status)
-    return companies
+    status: Optional[str] = None,
+    page: int = 1,
+    search: Optional[str] = None,
+) -> company_schema.PaginatedCompanyResponse:
+    companies, total_companies = await company_repository.get_companies(
+        db,
+        skip=skip,
+        limit=limit,
+        status=status,
+        search=search,
+    )
+    total_pages = (total_companies + limit - 1) // limit if limit > 0 else 0
+    return company_schema.PaginatedCompanyResponse(
+        companies=companies,
+        total_company=total_companies,
+        current_page=page,
+        total_pages=total_pages,
+    )
 
 async def approve_company_service(
     db: AsyncSession,

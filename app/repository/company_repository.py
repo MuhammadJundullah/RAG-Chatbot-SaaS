@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from app.models import company_model, user_model
 from app.schemas import company_schema
 from app.repository.base_repository import BaseRepository
@@ -21,17 +21,41 @@ class CompanyRepository(BaseRepository[company_model.Company]):
         result = await db.execute(select(self.model).filter(self.model.code == code))
         return result.scalar_one_or_none()
 
-    async def get_companies(self, db: AsyncSession, skip: int = 0, limit: int = 100, status: Optional[str] = None) -> List[company_model.Company]:
-        """Gets a list of companies, with optional filtering by status."""
+    async def get_companies(
+        self,
+        db: AsyncSession,
+        skip: int = 0,
+        limit: int = 100,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> tuple[List[company_model.Company], int]:
+        """Gets a paginated list of companies with optional status and search filtering."""
         query = select(self.model)
+        count_query = select(func.count()).select_from(self.model)
+
         if status == "active":
-            query = query.filter(self.model.is_active)
+            query = query.filter(self.model.is_active.is_(True))
+            count_query = count_query.filter(self.model.is_active.is_(True))
         elif status == "pending":
-            query = query.filter(not self.model.is_active)
+            query = query.filter(self.model.is_active.is_(False))
+            count_query = count_query.filter(self.model.is_active.is_(False))
+
+        if search and search.strip():
+            pattern = f"%{search.strip()}%"
+            filter_clause = or_(
+                self.model.name.ilike(pattern),
+                self.model.code.ilike(pattern),
+                self.model.company_email.ilike(pattern),
+            )
+            query = query.filter(filter_clause)
+            count_query = count_query.filter(filter_clause)
         
         query = query.order_by(self.model.created_at.desc()).offset(skip).limit(limit)
         result = await db.execute(query)
-        return result.scalars().all()
+        companies = result.scalars().all()
+
+        total_companies = await db.scalar(count_query) or 0
+        return companies, total_companies
 
     async def approve_company(self, db: AsyncSession, company_id: int):
         """Activates a company by setting its is_active status to True."""
@@ -113,7 +137,7 @@ class CompanyRepository(BaseRepository[company_model.Company]):
         company_id: int,
         skip: int,
         limit: int,
-        username: Optional[str] = None
+        search: Optional[str] = None
     ) -> tuple[List[user_model.Users], int]:
         """
         Retrieves a paginated list of employees for a given company, with optional username filtering.
@@ -128,9 +152,22 @@ class CompanyRepository(BaseRepository[company_model.Company]):
             user_model.Users.role == "employee"
         )
 
-        if username:
-            stmt = stmt.where(user_model.Users.username.ilike(f"%{username}%"))
-            count_stmt = count_stmt.where(user_model.Users.username.ilike(f"%{username}%"))
+        if search and search.strip():
+            pattern = f"%{search.strip()}%"
+            stmt = stmt.where(
+                or_(
+                    user_model.Users.username.ilike(pattern),
+                    user_model.Users.name.ilike(pattern),
+                    user_model.Users.email.ilike(pattern),
+                )
+            )
+            count_stmt = count_stmt.where(
+                or_(
+                    user_model.Users.username.ilike(pattern),
+                    user_model.Users.name.ilike(pattern),
+                    user_model.Users.email.ilike(pattern),
+                )
+            )
 
         stmt = stmt.offset(skip).limit(limit)
 

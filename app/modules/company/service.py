@@ -37,14 +37,14 @@ async def get_company_users_paginated(
     skip: int,
     limit: int,
     page: int,
-    username: Optional[str] = None
+    search: Optional[str] = None
 ) -> user_schema.PaginatedUserResponse:
     users, total_users = await company_repository.get_company_users_paginated(
         db=db,
         company_id=company_id,
         skip=skip,
         limit=limit,
-        username=username
+        search=search
     )
     total_pages = (total_users + limit - 1) // limit
     return user_schema.PaginatedUserResponse(
