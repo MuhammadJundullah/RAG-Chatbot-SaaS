@@ -330,6 +330,14 @@
 
 **Response**: Sama seperti endpoint chatlog user biasa, tapi mencakup semua pengguna di perusahaan.
 
+#### GET `/company/chatlogs/{conversation_id}` - Detail Riwayat Chat Perusahaan
+**Deskripsi**: Admin perusahaan melihat detail percakapan (termasuk riwayat chat dan dokumen referensi) untuk seorang employee berdasarkan `conversation_id`.
+
+**Path Parameter**:
+- `conversation_id`: UUID percakapan employee.
+
+**Response**: `ConversationDetailResponse` (id, title, is_archived, created_at, username, division_name, chat_history, referenced_documents, company_id).
+
 ---
 
 ### 👑 Chatlog Super Admin (`/api/v1/admin/chatlogs`)

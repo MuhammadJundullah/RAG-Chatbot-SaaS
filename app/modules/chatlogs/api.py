@@ -69,6 +69,22 @@ async def read_chatlogs_as_company_admin(
         search=normalized_search,
     )
 
+@company_admin_router.get("/{conversation_id}", response_model=conversation_schema.ConversationDetailResponse)
+async def get_conversation_details_as_company_admin(
+    conversation_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_company_admin),
+):
+    """
+    Retrieve details for a specific conversation, including chat history and referenced documents.
+    """
+    conversation_details = await chatlog_service.get_conversation_details_as_company_admin(
+        db=db,
+        current_user=current_user,
+        conversation_id=conversation_id,
+    )
+    return {**conversation_details.model_dump(), "company_id": current_user.company_id}
+
 
 @user_router.get("/", response_model=List[chatlog_schema.Chatlog])
 async def read_chatlogs(

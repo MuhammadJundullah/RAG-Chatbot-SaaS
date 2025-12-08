@@ -207,6 +207,7 @@ async def get_conversation_details_as_company_admin(
     return conversation_schema.ConversationDetailResponse(
         conversation_id=conversation.id,
         conversation_title=conversation.title,
+        is_archived=conversation.is_archived,
         conversation_created_at=conversation.created_at,
         username=chat_user.username,
         division_name=division_name,
