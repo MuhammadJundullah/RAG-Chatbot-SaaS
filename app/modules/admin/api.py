@@ -30,16 +30,17 @@ async def read_companies(
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(100, ge=1, le=1000, description="Items per page"),
     status: Optional[str] = Query(None, description="Filter status company (active/pending)"),
-    search: Optional[str] = Query(None, min_length=2, max_length=100, description="Cari nama, kode, atau email perusahaan"),
+    search: Optional[str] = Query(None, max_length=100, description="Cari nama, kode, atau email perusahaan"),
 ):
     skip = (page - 1) * limit
+    normalized_search = search.strip() if search and search.strip() else None
     companies = await admin_service.get_companies_service(
         db,
         skip=skip,
         limit=limit,
         status=status,
         page=page,
-        search=search,
+        search=normalized_search,
     )
     return companies
 

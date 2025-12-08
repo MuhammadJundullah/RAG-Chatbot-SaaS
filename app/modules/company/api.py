@@ -224,17 +224,27 @@ async def get_company_users_by_admin(
     current_user: Users = Depends(get_current_company_admin),
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(100, ge=1, le=1000, description="Items per page"),
-    search: Optional[str] = Query(None, min_length=2, max_length=100, description="Cari username, nama, atau email"),
+    search: Optional[str] = Query(
+        None,
+        max_length=100,
+        description=(
+            "Cari username, nama, atau email. Kosongkan untuk menampilkan semua pengguna; "
+            "pencarian diterapkan jika panjang kata kunci minimal 2 karakter."
+        ),
+    ),
 ):
     try:
         skip = (page - 1) * limit
+        normalized_search = search.strip() if search else None
+        if normalized_search == "" or (normalized_search and len(normalized_search) < 2):
+            normalized_search = None
         paginated_users = await company_service.get_company_users_paginated(
             db=db,
             company_id=current_user.company_id,
             skip=skip,
             limit=limit,
             page=page,
-            search=search
+            search=normalized_search
         )
         return paginated_users
 

@@ -18,12 +18,13 @@ async def get_companies_service(
     page: int = 1,
     search: Optional[str] = None,
 ) -> company_schema.PaginatedCompanyResponse:
+    normalized_search = search.strip() if search and search.strip() else None
     companies, total_companies = await company_repository.get_companies(
         db,
         skip=skip,
         limit=limit,
         status=status,
-        search=search,
+        search=normalized_search,
     )
     total_pages = (total_companies + limit - 1) // limit if limit > 0 else 0
     return company_schema.PaginatedCompanyResponse(

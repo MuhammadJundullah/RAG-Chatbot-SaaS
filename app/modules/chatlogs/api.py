@@ -47,7 +47,6 @@ async def read_chatlogs_as_company_admin(
     limit: int = 100,
     search: Optional[str] = Query(
         None,
-        min_length=2,
         max_length=100,
         description="Cari di pertanyaan, jawaban, username, atau conversation ID"
     ),
@@ -56,6 +55,7 @@ async def read_chatlogs_as_company_admin(
     Paginated chatlogs for the company admin view.
     """
     skip = (page - 1) * limit
+    normalized_search = search.strip() if search and search.strip() else None
     return await chatlog_service.get_chatlogs_as_company_admin_service(
         db=db,
         current_user=current_user,
@@ -66,7 +66,7 @@ async def read_chatlogs_as_company_admin(
         skip=skip,
         limit=limit,
         page=page,
-        search=search,
+        search=normalized_search,
     )
 
 
