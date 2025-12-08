@@ -9,6 +9,8 @@ class ChatlogBase(BaseModel):
     UsersId: int
     company_id: int
     conversation_id: uuid.UUID
+    match_score: Optional[float] = None  # percentage 0-100
+    response_time_ms: Optional[int] = None
 
 class ChatlogCreate(ChatlogBase):
     referenced_document_ids: Optional[List[int]] = None
@@ -27,6 +29,8 @@ class ChatlogResponse(BaseModel):
     question: str
     answer: str
     conversation_id: uuid.UUID
+    match_score: Optional[float] = None
+    response_time_ms: Optional[int] = None
 
 class PaginatedChatlogResponse(BaseModel):
     chatlogs: List[ChatlogResponse]
@@ -38,6 +42,8 @@ class ChatMessage(BaseModel):
     question: str
     answer: str
     created_at: datetime
+    match_score: Optional[float] = None
+    response_time_ms: Optional[int] = None
 
 class ConversationInfoSchema(BaseModel):
     id: str

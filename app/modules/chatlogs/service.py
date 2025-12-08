@@ -188,11 +188,18 @@ async def get_conversation_details_as_company_admin(
 
     division_name = chat_user.division if chat_user.division else None
 
+    match_scores = [cl.match_score for cl in chatlogs if cl.match_score is not None]
+    response_times = [cl.response_time_ms for cl in chatlogs if cl.response_time_ms is not None]
+    avg_match_score = sum(match_scores) / len(match_scores) if match_scores else None
+    avg_response_time_ms = int(sum(response_times) / len(response_times)) if response_times else None
+
     chat_history = [
         chatlog_schema.ChatMessage(
             question=cl.question,
             answer=cl.answer,
-            created_at=cl.created_at
+            created_at=cl.created_at,
+            match_score=cl.match_score,
+            response_time_ms=cl.response_time_ms,
         ) for cl in chatlogs
     ]
     
@@ -214,6 +221,8 @@ async def get_conversation_details_as_company_admin(
         chat_history=chat_history,
         company_id=current_user.company_id,
         referenced_documents=referenced_documents_response,
+        avg_match_score=avg_match_score,
+        avg_response_time_ms=avg_response_time_ms,
     )
 
 async def export_chatlogs_as_company_admin_service(
@@ -309,7 +318,9 @@ async def get_conversation_history_service(
             UsersId=chatlog.UsersId,
             company_id=chatlog.company_id,
             conversation_id=chatlog.conversation_id,
-            created_at=chatlog.created_at
+            created_at=chatlog.created_at,
+            match_score=chatlog.match_score,
+            response_time_ms=chatlog.response_time_ms,
         )
         for chatlog in chat_history_models
     ]

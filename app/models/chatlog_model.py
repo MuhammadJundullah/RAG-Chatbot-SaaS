@@ -8,6 +8,7 @@ from sqlalchemy import (
     func,
     JSON,
     Index,
+    Float,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from app.models.guid import GUID
@@ -29,6 +30,8 @@ class Chatlogs(Base):
     conversation_id = Column(GUID, ForeignKey('Conversation.id'), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     referenced_document_ids = Column(JSON, nullable=True)
+    match_score = Column(Float, nullable=True)  # Stored as percentage (0-100)
+    response_time_ms = Column(Integer, nullable=True)
 
     user = relationship("Users", back_populates="chatlogs")
     company = relationship("Company", back_populates="chatlogs")

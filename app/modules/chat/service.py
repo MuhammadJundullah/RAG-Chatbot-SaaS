@@ -1,5 +1,6 @@
 from typing import List, Optional
 import uuid
+import time
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
@@ -114,12 +115,14 @@ class ChatService:
             user_id=current_user.id,
         )
 
+        start_time = time.monotonic()
         rag_response = await self.rag_client.get_relevant_context(
             query=request.message,
             company_id=current_user.company_id,
         )
         rag_context = rag_response["context"]
         document_ids = rag_response["document_ids"]
+        match_score = rag_response.get("match_score")
 
         full_response = ""
         async for chunk in self.llm_client.generate_chat_response(
@@ -144,6 +147,8 @@ class ChatService:
             company_id=current_user.company_id,
             conversation_id=conversation_id_str,
             referenced_document_ids=document_ids,
+            match_score=match_score,
+            response_time_ms=int((time.monotonic() - start_time) * 1000),
         )
         await self.chatlog_repo.create_chatlog(db=db, chatlog=chatlog_data)
 

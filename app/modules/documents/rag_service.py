@@ -71,10 +71,14 @@ class RAGService:
         
         context_str = ""
         document_ids = []
+        top_score_percent: Optional[float] = None
         
         if response.get('matches'):
             context_list = []
+            scores = []
             for match in response['matches']:
+                if 'score' in match:
+                    scores.append(match['score'])
                 if 'content' in match['metadata']:
                     context_list.append(match['metadata']['content'])
                 if 'document_id' in match['metadata']:
@@ -82,8 +86,16 @@ class RAGService:
             
             context_str = "\n".join(context_list)
             document_ids = list(set(document_ids))
+            if scores:
+                top_score = max(scores)
+                # Convert to percentage for easier downstream consumption
+                top_score_percent = float(top_score) * 100
 
-        return {"context": context_str, "document_ids": document_ids}
+        return {
+            "context": context_str,
+            "document_ids": document_ids,
+            "match_score": top_score_percent,
+        }
 
     async def add_documents(self, documents: List[str], company_id: int, source_filename: str, document_id: str, tags: Optional[List[str]] = None):
         namespace = self._get_namespace(company_id)

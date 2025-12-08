@@ -55,3 +55,5 @@ class ConversationDetailResponse(BaseModel):
     chat_history: List[chatlog_schema.ChatMessage]
     referenced_documents: List[document_schema.ReferencedDocument]
     company_id: int
+    avg_match_score: Optional[float] = None
+    avg_response_time_ms: Optional[int] = None

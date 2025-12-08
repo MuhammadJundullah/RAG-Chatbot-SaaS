@@ -130,7 +130,9 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
             self.model.conversation_id,
             self.model.UsersId,
             self.model.company_id,
-            Users.username
+            Users.username,
+            self.model.match_score,
+            self.model.response_time_ms,
         ).order_by(self.model.created_at.desc()).offset(skip)
 
         if limit >= 0:
@@ -147,8 +149,10 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
                 "UsersId": user_id,
                 "company_id": comp_id,
                 "username": u,
+                "match_score": ms,
+                "response_time_ms": rt_ms,
             }
-            for i, q, a, ca, conv_id, user_id, comp_id, u in result.all()
+            for i, q, a, ca, conv_id, user_id, comp_id, u, ms, rt_ms in result.all()
         ]
         
         return data, total_count

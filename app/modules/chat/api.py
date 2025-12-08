@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 import uuid
 import re
+import time
 
 from app.schemas import chat_schema, chatlog_schema
 from app.modules.chat.service import chat_service
@@ -89,6 +90,7 @@ async def sse_chat_endpoint(
         full_response = ""
         buffer = ""
         final_response = ""
+        start_time = time.monotonic()
 
         if not conversation_id_str:
             new_uuid = str(uuid.uuid4())
@@ -131,6 +133,7 @@ async def sse_chat_endpoint(
         )
         rag_context = rag_response["context"]
         document_ids = rag_response["document_ids"]
+        match_score = rag_response.get("match_score")
 
         try:
             async for chunk in together_service.generate_chat_response(
@@ -184,7 +187,9 @@ async def sse_chat_endpoint(
             UsersId=current_user.id,
             company_id=company_id,
             conversation_id=conversation_id_str,
-            referenced_document_ids=document_ids
+            referenced_document_ids=document_ids,
+            match_score=match_score,
+            response_time_ms=int((time.monotonic() - start_time) * 1000),
         )
         await chatlog_repository.create_chatlog(db=db, chatlog=chatlog_data)
 
