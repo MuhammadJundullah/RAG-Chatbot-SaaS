@@ -2,7 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.models.plan_model import Plan
-from app.schemas.plan_schema import PlanCreate, PlanUpdate
+from app.schemas.plan_schema import PlanCreate, PlanUpdate, PlanPriceUpdate
 
 class PlanService:
     async def get_plan_by_id(self, db: AsyncSession, plan_id: int) -> Plan:
@@ -44,5 +44,26 @@ class PlanService:
         await db.commit()
         await db.refresh(db_plan)
         return db_plan
+
+    async def update_price_by_name(self, db: AsyncSession, name: str, price: int) -> Plan | None:
+        result = await db.execute(select(Plan).filter(Plan.name == name))
+        plan = result.scalars().first()
+        if not plan:
+            return None
+
+        plan.price = price
+        await db.commit()
+        await db.refresh(plan)
+        return plan
+
+    async def bulk_update_prices(self, db: AsyncSession, plans_payload: list[PlanPriceUpdate]) -> list[Plan]:
+        updated: list[Plan] = []
+        for plan_payload in plans_payload:
+            if plan_payload.price is None or plan_payload.name is None:
+                continue
+            plan = await self.update_price_by_name(db, plan_payload.name, plan_payload.price)
+            if plan:
+                updated.append(plan)
+        return updated
 
 plan_service = PlanService()

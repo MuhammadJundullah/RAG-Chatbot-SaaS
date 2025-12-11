@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, distinct
+from sqlalchemy import select, distinct, func
 from typing import List, Optional
 from math import ceil
 import io
@@ -11,12 +11,14 @@ from app.core.dependencies import get_current_super_admin, get_db
 from app.schemas import company_schema, log_schema, subscription_schema, plan_schema, transaction_schema
 from app.modules.admin import service as admin_service
 from app.modules.subscription.service import subscription_service
+from app.modules.subscription.topup_repository import topup_package_repository
 from app.modules.admin.plan_service import plan_service
 from app.models.user_model import Users
 from app.models.log_model import ActivityLog
 from app.models.subscription_model import Subscription
 from app.models.plan_model import Plan as PlanModel
 from app.models.transaction_model import Transaction
+from app.models.company_model import Company
 
 router = APIRouter(
     prefix="/admin",
@@ -115,6 +117,58 @@ async def update_existing_plan(
     return await plan_service.update_plan(db, plan_id, plan_data)
 
 
+@router.get(
+    "/plans-pricing",
+    response_model=subscription_schema.AdminPlansPricing,
+    summary="Gabungan harga plan & topup (superadmin)"
+)
+async def get_plans_pricing(
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(PlanModel).order_by(PlanModel.price))
+    plans = result.scalars().all()
+    topup_packages = await topup_package_repository.list_active(db)
+    top_up_options = [
+        subscription_schema.TopUpPackageOption(
+            package_type=package.package_type,
+            questions=package.questions,
+            price=package.price,
+        )
+        for package in topup_packages
+    ]
+    return subscription_schema.AdminPlansPricing(plans=plans, top_up_packages=top_up_options)
+
+
+@router.patch(
+    "/plans-pricing",
+    response_model=subscription_schema.AdminPlansPricing,
+    summary="Update harga plan & topup sekaligus (superadmin)"
+)
+async def update_plans_pricing(
+    payload: subscription_schema.PlansPricingUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    if payload.plans:
+        await plan_service.bulk_update_prices(db, payload.plans)
+
+    if payload.top_up_packages:
+        for package_payload in payload.top_up_packages:
+            updated = await topup_package_repository.update_by_type(
+                db,
+                package_payload.package_type,
+                price=package_payload.price,
+                questions=package_payload.questions,
+                is_active=package_payload.is_active,
+            )
+            if not updated:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Top-up package '{package_payload.package_type}' not found",
+                )
+
+    return await get_plans_pricing(db)
+
+
 @router.delete("/plans/{plan_id}", response_model=plan_schema.Plan)
 async def deactivate_existing_plan(
     plan_id: int,
@@ -209,24 +263,72 @@ async def get_distinct_activity_categories(
         )
 
 
-@router.get("/transactions", response_model=List[transaction_schema.Transaction], summary="Daftar transaksi (super admin)")
+@router.get(
+    "/transactions",
+    response_model=transaction_schema.AdminTransactionListResponse,
+    summary="Daftar transaksi (super admin)",
+)
 async def list_transactions(
     db: AsyncSession = Depends(get_db),
     type: Optional[str] = Query(None, description="Filter berdasarkan type transaksi, contoh: subscription/topup"),
     status: Optional[str] = Query(None, description="Filter status transaksi"),
     company_id: Optional[int] = Query(None, description="Filter company_id"),
-    limit: int = Query(100, ge=1, le=500),
-    offset: int = Query(0, ge=0),
+    page: int = Query(1, ge=1, description="Nomor halaman"),
+    limit: int = Query(100, ge=1, le=500, description="Jumlah data per halaman"),
 ):
-    stmt = select(Transaction).order_by(Transaction.created_at.desc())
+    offset = (page - 1) * limit
+    filters = []
 
     if type:
-        stmt = stmt.where(Transaction.type == type)
+        filters.append(Transaction.type == type)
     if status:
-        stmt = stmt.where(Transaction.status == status)
+        filters.append(Transaction.status == status)
     if company_id:
-        stmt = stmt.where(Transaction.company_id == company_id)
+        filters.append(Transaction.company_id == company_id)
 
-    stmt = stmt.limit(limit).offset(offset)
+    stmt = (
+        select(Transaction, Company.name.label("company_name"))
+        .join(Company, Transaction.company_id == Company.id)
+        .order_by(Transaction.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+
+    for condition in filters:
+        stmt = stmt.where(condition)
+
     result = await db.execute(stmt)
-    return result.scalars().all()
+    rows = result.all()
+
+    items = [
+        transaction_schema.AdminTransaction(
+            id=tx.id,
+            company_name=company_name,
+            user_id=tx.user_id,
+            type=tx.type,
+            plan_id=tx.plan_id,
+            package_type=tx.package_type,
+            questions_delta=tx.questions_delta,
+            amount=tx.amount,
+            payment_url=tx.payment_url,
+            payment_reference=tx.payment_reference,
+            status=tx.status,
+            created_at=tx.created_at,
+            paid_at=tx.paid_at,
+        )
+        for tx, company_name in rows
+    ]
+
+    count_stmt = select(func.count()).select_from(Transaction).join(Company, Transaction.company_id == Company.id)
+    for condition in filters:
+        count_stmt = count_stmt.where(condition)
+    total_transaction = (await db.execute(count_stmt)).scalar_one()
+
+    total_pages = (total_transaction + limit - 1) // limit if limit > 0 else 0
+
+    return transaction_schema.AdminTransactionListResponse(
+        items=items,
+        total_transaction=total_transaction,
+        current_page=page,
+        total_pages=total_pages,
+    )

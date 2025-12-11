@@ -34,6 +34,11 @@ class Plan(PlanBase):
         from_attributes = True
 
 
+class PlanPriceUpdate(BaseModel):
+    name: str
+    price: int
+
+
 class PlanPublic(BaseModel):
     id: int
     name: str

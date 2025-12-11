@@ -1,26 +1,35 @@
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlalchemy.future import select
 from sqlalchemy import func
-from app.models import Subscription, Company, Plan, Users
+from app.models import Subscription, Company, Plan, Users, TopUpPackage
 from app.schemas.subscription_schema import (
     SubscriptionStatus,
     SubscriptionUpgradeRequest,
     TopUpPackageResponse,
+    TopUpPackageOption,
 )
 from app.modules.payment.service import ipaymu_service
 from app.models.transaction_model import Transaction
 from app.repository.document_repository import document_repository
-
-TOP_UP_PACKAGES = {
-    "large": {"questions": 5000, "price": 200000},
-    "small": {"questions": 1000, "price": 50000},
-}
+from app.modules.subscription.topup_repository import topup_package_repository
 
 class SubscriptionService:
+    async def list_active_topup_packages(self, db: AsyncSession) -> List[TopUpPackage]:
+        return await topup_package_repository.list_active(db)
+
+    async def get_topup_package(self, db: AsyncSession, package_type: str) -> TopUpPackage:
+        package = await topup_package_repository.get_by_type(db, package_type)
+        if not package or not package.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Top-up package not found",
+            )
+        return package
+
     async def get_subscription_by_company(self, db: AsyncSession, company_id: int) -> Subscription:
         result = await db.execute(
             select(Subscription).options(joinedload(Subscription.plan)).filter(Subscription.company_id == company_id)
@@ -175,14 +184,8 @@ class SubscriptionService:
         success_return_url: Optional[str] = None,
         failed_return_url: Optional[str] = None,
     ) -> TopUpPackageResponse:
-        if package_type not in TOP_UP_PACKAGES:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid top-up package type"
-            )
-
+        package = await self.get_topup_package(db, package_type)
         sub = await self.check_active_subscription(db, company_id)
-        package = TOP_UP_PACKAGES[package_type]
 
         transaction = Transaction(
             company_id=company_id,
@@ -190,19 +193,19 @@ class SubscriptionService:
             type="topup",
             plan_id=sub.plan_id,
             package_type=package_type,
-            questions_delta=package["questions"],
-            amount=package["price"],
+            questions_delta=package.questions,
+            amount=package.price,
             status="pending_payment",
         )
         db.add(transaction)
         await db.commit()
         await db.refresh(transaction)
 
-        product_name = f"Top-up {package_type.upper()} ({package['questions']} Q)"
+        product_name = f"Top-up {package_type.upper()} ({package.questions} Q)"
         payment_url, trx_id = await ipaymu_service.create_payment_link_for_transaction(
             reference_id=str(transaction.id),
             product_name=product_name,
-            price=package["price"],
+            price=package.price,
             user=user,
             return_url=success_return_url,
             failed_url=failed_return_url,
@@ -213,8 +216,8 @@ class SubscriptionService:
 
         return TopUpPackageResponse(
             package_type=package_type,
-            questions_added=package["questions"],
-            price=package["price"],
+            questions_added=package.questions,
+            price=package.price,
             transaction_id=transaction.id,
             payment_url=payment_url,
         )

@@ -2,7 +2,7 @@
 from pydantic import BaseModel, model_validator
 from typing import List, Optional, Literal
 from datetime import datetime
-from .plan_schema import Plan, PlanPublic
+from .plan_schema import Plan, PlanPublic, PlanPriceUpdate
 
 class SubscriptionBase(BaseModel):
     company_id: int
@@ -66,6 +66,12 @@ class TopUpPackageOption(BaseModel):
     questions: int
     price: int
 
+class TopUpPackageUpdate(BaseModel):
+    package_type: str
+    price: Optional[int] = None
+    questions: Optional[int] = None
+    is_active: Optional[bool] = None
+
 class TopUpPackageRequest(BaseModel):
     package_type: str  # e.g. "large" or "small"
 
@@ -80,6 +86,14 @@ class PlansWithSubscription(BaseModel):
     plans: List[PlanPublic]
     current_subscription: Optional[SubscriptionStatus] = None
     top_up_packages: List[TopUpPackageOption]
+
+class AdminPlansPricing(BaseModel):
+    plans: List[Plan]
+    top_up_packages: List[TopUpPackageOption]
+
+class PlansPricingUpdateRequest(BaseModel):
+    plans: Optional[List[PlanPriceUpdate]] = None
+    top_up_packages: Optional[List[TopUpPackageUpdate]] = None
 
 class Config:
     arbitrary_types_allowed = True

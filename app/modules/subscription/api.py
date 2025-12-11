@@ -17,7 +17,8 @@ from app.schemas.subscription_schema import (
 )
 from app.schemas.plan_schema import PlanPublic
 from app.schemas.transaction_schema import TransactionListResponse
-from app.modules.subscription.service import subscription_service, TOP_UP_PACKAGES
+from app.modules.subscription.service import subscription_service
+from app.modules.subscription.topup_repository import topup_package_repository
 from app.schemas.transaction_schema import TransactionReceiptResponse, PaymentSuccessResponse
 
 router = APIRouter()
@@ -29,9 +30,9 @@ async def _get_transaction_product_name(tx: Transaction, db: AsyncSession) -> st
         plan = await db.get(Plan, tx.plan_id) if tx.plan_id else None
         return plan.name if plan else "Subscription Plan"
     if tx.type == "topup":
-        package = TOP_UP_PACKAGES.get(tx.package_type or "")
+        package = await topup_package_repository.get_by_type(db, tx.package_type or "")
         if package:
-            return f"Top-up {tx.package_type.upper()} ({package['questions']} Q)"
+            return f"Top-up {package.package_type.upper()} ({package.questions} Q)"
         return f"Top-up {tx.package_type or ''}".strip()
     return "Transaction"
 
@@ -91,9 +92,10 @@ async def get_available_plans(
         if exc.status_code != status.HTTP_404_NOT_FOUND:
             raise
 
+    top_up_packages_db = await subscription_service.list_active_topup_packages(db)
     top_up_packages = [
-        TopUpPackageOption(package_type=key, questions=val["questions"], price=val["price"])
-        for key, val in TOP_UP_PACKAGES.items()
+        TopUpPackageOption(package_type=p.package_type, questions=p.questions, price=p.price)
+        for p in top_up_packages_db
     ]
 
     return PlansWithSubscription(

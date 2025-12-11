@@ -7,6 +7,7 @@ from .log_model import ActivityLog
 from .plan_model import Plan
 from .subscription_model import Subscription
 from .transaction_model import Transaction
+from .topup_package_model import TopUpPackage
 
 __all__ = [
     "Company",
@@ -18,4 +19,5 @@ __all__ = [
     "Plan",
     "Subscription",
     "Transaction",
+    "TopUpPackage",
 ]
