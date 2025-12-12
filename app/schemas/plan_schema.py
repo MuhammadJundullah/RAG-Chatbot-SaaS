@@ -1,4 +1,5 @@
 # app/schemas/plan_schema.py
+from datetime import datetime
 from pydantic import BaseModel
 from typing import Optional
 
@@ -29,6 +30,7 @@ class PlanUpdate(BaseModel):
 
 class Plan(PlanBase):
     id: int
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -50,6 +52,7 @@ class PlanPublic(BaseModel):
     allow_custom_prompts: str
     api_access: str
     is_active: str
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

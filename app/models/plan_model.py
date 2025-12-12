@@ -1,5 +1,5 @@
 # app/models/plan_model.py
-from sqlalchemy import Column, Integer, String, Boolean, Index
+from sqlalchemy import Column, Integer, String, Boolean, Index, DateTime, func
 from .base import Base
 
 class Plan(Base):
@@ -18,3 +18,4 @@ class Plan(Base):
     allow_custom_prompts = Column(Boolean, default=False)
     api_access = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

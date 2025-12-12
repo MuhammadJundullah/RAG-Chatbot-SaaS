@@ -65,6 +65,7 @@ class TopUpPackageOption(BaseModel):
     package_type: str
     questions: int
     price: int
+    updated_at: Optional[datetime] = None
 
 class TopUpPackageUpdate(BaseModel):
     package_type: str
@@ -90,6 +91,7 @@ class PlansWithSubscription(BaseModel):
 class AdminPlansPricing(BaseModel):
     plans: List[Plan]
     top_up_packages: List[TopUpPackageOption]
+    updated_at: Optional[datetime] = None
 
 class PlansPricingUpdateRequest(BaseModel):
     plans: Optional[List[PlanPriceUpdate]] = None

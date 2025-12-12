@@ -1,5 +1,5 @@
 # app/models/topup_package_model.py
-from sqlalchemy import Column, Integer, String, Boolean, Index
+from sqlalchemy import Column, Integer, String, Boolean, Index, DateTime, func
 
 from .base import Base
 
@@ -16,3 +16,4 @@ class TopUpPackage(Base):
     questions = Column(Integer, nullable=False)
     price = Column(Integer, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

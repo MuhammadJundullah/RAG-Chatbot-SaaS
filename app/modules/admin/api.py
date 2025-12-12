@@ -133,10 +133,21 @@ async def get_plans_pricing(
             package_type=package.package_type,
             questions=package.questions,
             price=package.price,
+            updated_at=package.updated_at,
         )
         for package in topup_packages
     ]
-    return subscription_schema.AdminPlansPricing(plans=plans, top_up_packages=top_up_options)
+    updated_at_candidates = [
+        *(plan.updated_at for plan in plans if getattr(plan, "updated_at", None)),
+        *(package.updated_at for package in topup_packages if getattr(package, "updated_at", None)),
+    ]
+    latest_updated_at = max(updated_at_candidates) if updated_at_candidates else None
+
+    return subscription_schema.AdminPlansPricing(
+        plans=plans,
+        top_up_packages=top_up_options,
+        updated_at=latest_updated_at,
+    )
 
 
 @router.patch(
