@@ -46,6 +46,30 @@ class Settings(BaseSettings):
     # Redis settings for Celery
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # Speech settings
+    SPEECH_WHISPER_MODEL: str = "base"
+    SPEECH_WHISPER_DEVICE: Optional[str] = None
+    SPEECH_MAX_AUDIO_MB: int = 15
+    SPEECH_MAX_AUDIO_DURATION_SEC: int = 60
+    SPEECH_STORE_AUDIO_LOCAL: bool = False
+    SPEECH_AUDIO_DIR: str = "tmp/audio"
+
+    # TTS settings (e.g., HuggingFace inference for mms/tts-ind)
+    TTS_API_BASE_URL: Optional[str] = None
+    TTS_API_TOKEN: Optional[str] = None
+    TTS_DEFAULT_VOICE_ID: Optional[str] = None
+    TTS_DEFAULT_SPEED: Optional[float] = None
+    # Local TTS (Piper)
+    TTS_PROVIDER: str = "http"  # options: http, piper
+    PIPER_BIN: Optional[str] = None
+    PIPER_MODEL_PATH: Optional[str] = None
+    PIPER_SAMPLE_RATE: Optional[int] = None
+    PIPER_OUTPUT_FORMAT: str = "wav"  # wav or mp3
+    PIPER_USE_CUDA: bool = False
+    # Local TTS (Meta MMS)
+    TTS_MMS_MODEL_ID: Optional[str] = None  # e.g., facebook/mms-tts-ind
+    TTS_MMS_DEVICE: Optional[str] = None  # e.g., cpu or cuda
+
 def get_settings():
     return Settings()
 

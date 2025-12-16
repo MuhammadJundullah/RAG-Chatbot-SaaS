@@ -321,6 +321,12 @@ async def get_conversation_history_service(
             created_at=chatlog.created_at,
             match_score=chatlog.match_score,
             response_time_ms=chatlog.response_time_ms,
+            input_type=chatlog.input_type,
+            input_audio_path=chatlog.input_audio_path,
+            output_audio_path=chatlog.output_audio_path,
+            stt_request_id=chatlog.stt_request_id,
+            tts_request_id=chatlog.tts_request_id,
+            input_duration_ms=chatlog.input_duration_ms,
         )
         for chatlog in chat_history_models
     ]

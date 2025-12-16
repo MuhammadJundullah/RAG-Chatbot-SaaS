@@ -94,6 +94,7 @@ class ChatService:
         db: AsyncSession,
         current_user: Users,
         request: chat_schema.ChatRequest,
+        chatlog_extra: Optional[dict] = None,
     ):
         END_MARKERS = ["[ENDFINALRESPONSE]", "[END FINAL RESPONSE]", "<|end|>", "</s>"]
 
@@ -140,6 +141,8 @@ class ChatService:
 
         full_response = strip_end_markers(full_response).strip()
 
+        extra = chatlog_extra or {}
+        input_type = extra.pop("input_type", "text")
         chatlog_data = chatlog_schema.ChatlogCreate(
             question=request.message,
             answer=full_response,
@@ -149,10 +152,16 @@ class ChatService:
             referenced_document_ids=document_ids,
             match_score=match_score,
             response_time_ms=int((time.monotonic() - start_time) * 1000),
+            input_type=input_type,
+            **extra,
         )
-        await self.chatlog_repo.create_chatlog(db=db, chatlog=chatlog_data)
+        created_chatlog = await self.chatlog_repo.create_chatlog(db=db, chatlog=chatlog_data)
 
-        return {"response": full_response, "conversation_id": conversation_id_str}
+        return {
+            "response": full_response,
+            "conversation_id": conversation_id_str,
+            "chatlog_id": created_chatlog.id if created_chatlog else None,
+        }
 
     async def get_conversations_with_titles(
         self,

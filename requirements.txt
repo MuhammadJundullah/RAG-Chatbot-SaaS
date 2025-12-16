@@ -19,6 +19,9 @@ Pillow
 pytesseract
 PyMuPDF
 torch>2.2
+transformers==4.41.1
+numba==0.59.1
+llvmlite==0.42.0
 boto3==1.34.51
 aiobotocore==2.12.0
 celery==5.3.6
@@ -29,3 +32,5 @@ gunicorn
 sib-api-v3-sdk
 pydantic[email]
 future
+openai-whisper
+numpy==1.26.4

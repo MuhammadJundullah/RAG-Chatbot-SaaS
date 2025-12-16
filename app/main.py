@@ -11,10 +11,12 @@ from app.modules.admin.api import router as admin_router
 from app.modules.dashboard.api import router as dashboard_router
 from app.modules.subscription.api import router as subscription_router
 from app.modules.payment.api import router as payment_router
+from app.modules.speech.api import router as speech_router
 from app.core.database import db_manager
 from app.utils.activity_logger import log_activity 
 from app.core.dependencies import get_db 
 from app.core.global_error_handler import register_global_exception_handlers 
+from app.core.config import settings
 
 # No complex lifespan needed with gevent and simple singleton initialization
 app = FastAPI(
@@ -25,6 +27,9 @@ app = FastAPI(
 
 # Mount static files directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
+# Optional: serve stored audio files if enabled
+if getattr(settings, "SPEECH_STORE_AUDIO_LOCAL", False):
+    app.mount("/audio", StaticFiles(directory=getattr(settings, "SPEECH_AUDIO_DIR", "tmp/audio")), name="audio")
 
 # Register global exception handlers
 register_global_exception_handlers(app) 
@@ -56,6 +61,7 @@ app.include_router(admin_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(subscription_router, prefix="/api")
 app.include_router(payment_router, prefix="/api")
+app.include_router(speech_router, prefix="/api")
 
 @app.get("/api/")
 async def root():
