@@ -29,7 +29,7 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 # Optional: serve stored audio files if enabled
 if getattr(settings, "SPEECH_STORE_AUDIO_LOCAL", False):
-    app.mount("/audio", StaticFiles(directory=getattr(settings, "SPEECH_AUDIO_DIR", "tmp/audio")), name="audio")
+    app.mount("/tmp/audio", StaticFiles(directory=getattr(settings, "SPEECH_AUDIO_DIR", "tmp/audio")), name="audio")
 
 # Register global exception handlers
 register_global_exception_handlers(app) 
