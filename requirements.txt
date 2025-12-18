@@ -33,4 +33,5 @@ sib-api-v3-sdk
 pydantic[email]
 future
 openai-whisper
+piper-tts
 numpy==1.26.4

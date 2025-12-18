@@ -353,3 +353,10 @@
 - `start_date`, `end_date`: Filter berdasarkan tanggal
 
 **Response**: Sama seperti endpoint chatlog lainnya, tapi mencakup seluruh sistem.
+
+## 🔊 Speech (TTS/STT)
+- STT: Whisper lokal (`SPEECH_WHISPER_MODEL`, default `base`).
+- TTS: Diset ke Piper untuk footprint rendah di CPU-only server. Langkah singkat:
+  - Unduh binary Piper dan model ONNX (pilih voice yang diinginkan, mis. suara Indonesia *low*).
+  - Set env: `TTS_PROVIDER=piper`, `PIPER_BIN=/path/to/piper`, `PIPER_MODEL_PATH=/path/to/model.onnx`, opsional `PIPER_SAMPLE_RATE`, `PIPER_OUTPUT_FORMAT` (`wav`/`mp3`), `PIPER_USE_CUDA=false` untuk CPU.
+  - Restart layanan. Aplikasi akan mem-pipe teks ke Piper CLI dan mengembalikan audio.

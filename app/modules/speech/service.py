@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
+import logging
 
 from app.core.config import settings
 from app.models.user_model import Users
@@ -26,6 +27,7 @@ class SpeechService:
     """
     Orchestrates STT (Whisper) and TTS flows while reusing the existing chat pipeline.
     """
+    logger = logging.getLogger(__name__)
 
     ALLOWED_CONTENT_TYPES = {
         "audio/mpeg",
@@ -80,6 +82,7 @@ class SpeechService:
         prefix: str,
         original_filename: Optional[str],
         force: bool = False,
+        content_type: Optional[str] = None,
     ) -> Optional[str]:
         """
         Store audio locally if configured. Returns the stored path or None.
@@ -89,7 +92,18 @@ class SpeechService:
 
         os.makedirs(self.audio_dir, exist_ok=True)
         ext = ".wav"
-        if original_filename and "." in original_filename:
+        if content_type:
+            ct_map = {
+                "audio/wav": ".wav",
+                "audio/x-wav": ".wav",
+                "audio/mpeg": ".mp3",
+                "audio/mp3": ".mp3",
+                "audio/ogg": ".ogg",
+                "audio/webm": ".webm",
+                "audio/mp4": ".mp4",
+            }
+            ext = ct_map.get(content_type.lower(), ext)
+        elif original_filename and "." in original_filename:
             ext = f".{original_filename.split('.')[-1]}"
         filename = f"{prefix}_{uuid.uuid4()}{ext}"
         path = os.path.join(self.audio_dir, filename)
@@ -204,17 +218,28 @@ class SpeechService:
         content_type = None
         chatlog_id = chat_result.get("chatlog_id")
         if self.tts_client and self.tts_client.enabled and text_response:
+            # Info log agar mudah dilihat di log default (bukan debug)
+            preview = text_response.replace("\n", " ")[:200]
+            self.logger.info("TTS input text len=%s preview=%.200s", len(text_response), preview)
             audio_bytes, content_type, tts_metadata = await self.text_to_speech(
                 text=text_response,
                 voice_id=None,
                 speed=None,
             )
+            self.logger.info(
+                "TTS output content_type=%s bytes=%s",
+                content_type,
+                len(audio_bytes) if audio_bytes else 0,
+            )
             stored_output_path = self._maybe_store_audio(
                 audio_bytes,
                 prefix="output",
-                original_filename="tts.mp3",
+                original_filename=None,
                 force=True,  # always store output to expose path in response
+                content_type=content_type,
             )
+            if stored_output_path:
+                self.logger.info("Stored TTS output to %s", stored_output_path)
             if chatlog_id:
                 await chatlog_repository.update_audio_fields(
                     db=db,

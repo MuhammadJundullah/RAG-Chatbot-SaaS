@@ -40,9 +40,9 @@ class PiperTTSClient:
         if not self.enabled:
             raise RuntimeError("Piper TTS is not configured or model file is missing.")
 
-        args = [self.piper_bin, "-m", self.model_path, "--output_format", self.output_format]
-        if self.sample_rate:
-            args.extend(["--sample_rate", str(self.sample_rate)])
+        # Note: Python CLI of Piper (piper-tts package) does not support --output_format/--sample_rate.
+        # Passing unknown args will be treated as text input, so keep args minimal.
+        args = [self.piper_bin, "-m", self.model_path]
         if speed:
             args.extend(["--length_scale", str(speed)])
         if self.use_cuda:
@@ -53,8 +53,14 @@ class PiperTTSClient:
 
         args.extend(["-f", out_path])
 
-        # Piper reads text from stdin
-        proc = subprocess.run(args, input=text.encode("utf-8"), capture_output=True)
+        # Piper reads text from stdin; ensure its shared libs are discoverable (macOS needs DYLD path)
+        env = os.environ.copy()
+        bin_dir = os.path.dirname(self.piper_bin) or "."
+        existing_dyld = env.get("DYLD_LIBRARY_PATH") or ""
+        # Piper bundles libpiper_phonemize.* alongside the binary; include the bin dir in DYLD_LIBRARY_PATH.
+        env["DYLD_LIBRARY_PATH"] = f"{bin_dir}:{existing_dyld}" if existing_dyld else bin_dir
+
+        proc = subprocess.run(args, input=text.encode("utf-8"), capture_output=True, env=env)
         if proc.returncode != 0:
             raise RuntimeError(f"Piper synthesis failed: {proc.stderr.decode('utf-8', errors='ignore')}")
 
@@ -63,4 +69,3 @@ class PiperTTSClient:
             data = f.read()
         os.remove(out_path)
         return data, content_type
-
