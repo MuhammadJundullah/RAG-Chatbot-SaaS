@@ -143,7 +143,7 @@ async def read_users_me(current_user: user_model.Users = Depends(get_current_use
 
 @router.post("/request-password-reset")
 async def request_password_reset(
-    email: str = Query(..., description="Email akun yang akan di-reset"),
+    email: str = Query(..., description="Company email yang akan di-reset"),
     db: AsyncSession = Depends(get_db),
 ):
     """

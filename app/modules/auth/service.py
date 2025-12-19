@@ -258,19 +258,26 @@ async def request_password_reset(db: AsyncSession, email: str):
     Initiates the password reset process for a user.
     Generates a token, stores it, and sends a reset email.
     """
-    user = await user_repository.get_user_by_email(db, email=email)
-
-    if not user:
+    company = await company_repository.get_company_by_email(db, company_email=email)
+    if not company or not company.company_email:
         # Mengembalikan pesan spesifik bahwa email tidak terdaftar.
         # Perlu diingat ini dapat membocorkan informasi tentang email yang terdaftar.
-        logging.warning(f"Password reset requested for non-existent email: {email}")
+        logging.warning(f"Password reset requested for non-existent company email: {email}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email not registered."
+            detail="Email company tidak terdaftar.",
+        )
+
+    user = await user_repository.get_first_admin_by_company(db, company_id=company.id)
+    if not user:
+        logging.warning(f"Password reset requested for company without admin: {company.id}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Admin perusahaan tidak ditemukan.",
         )
 
     if not user.is_active:
-        logging.warning(f"Password reset requested for inactive user: {email}")
+        logging.warning(f"Password reset requested for inactive user: {user.email}")
         return {"message": "Jika akun dengan email tersebut ada, tautan reset kata sandi telah dikirim.", "code": 400}
 
     # Generate token and set expiry
@@ -286,7 +293,7 @@ async def request_password_reset(db: AsyncSession, email: str):
     await db.refresh(user)
 
     # Prepare email content
-    reset_link = f"{settings.APP_BASE_URL}/auth/reset-password?token={token}&email={user.email}"
+    reset_link = f"{settings.APP_BASE_URL}/auth/reset-password?token={token}&email={company.company_email}"
     
     # Fetch company name for personalization, if available
     company_name = user.company.name if user.company else "Platform Kami"
@@ -309,7 +316,7 @@ async def request_password_reset(db: AsyncSession, email: str):
     # Kirim email menggunakan Brevo
     try:
         await send_brevo_email( 
-            to_email=user.email,
+            to_email=company.company_email,
             subject=subject,
             html_content=html_content
         )
@@ -318,7 +325,7 @@ async def request_password_reset(db: AsyncSession, email: str):
         # Tangani HTTPException yang dilempar oleh send_brevo_email
         raise e
     except Exception as e:
-        logging.error(f"An unexpected error occurred during password reset email sending to {user.email}: {e}")
+        logging.error(f"An unexpected error occurred during password reset email sending to {company.company_email}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Terjadi kesalahan tak terduga saat mengirim email reset kata sandi."
@@ -329,7 +336,14 @@ async def reset_password(db: AsyncSession, email: str, token: str, new_password:
     """
     Resets the user's password after token verification.
     """
-    user = await user_repository.get_user_by_email(db, email=email)
+    company = await company_repository.get_company_by_email(db, company_email=email)
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tautan reset kata sandi tidak valid atau sudah kedaluwarsa.",
+        )
+
+    user = await user_repository.get_first_admin_by_company(db, company_id=company.id)
 
     if not user:
         raise HTTPException(
