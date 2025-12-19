@@ -40,12 +40,7 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
     Orchestrates the business logic for registering a new user.
     Can either create a new company or assign to an existing one.
     """
-    # Business Logic: Check if user already exists by email or username
-    existing_user_by_email = await user_repository.get_user_by_email(db, email=user_data.email)
-    if existing_user_by_email:
-        raise UserRegistrationError("Email is already registered.")
-    
-    # For initial admin registration, use email as username if username is not provided
+    # Business Logic: Check if username already exists
     username_to_use = user_data.username if user_data.username else user_data.email
     existing_user_by_username = await user_repository.get_user_by_username(db, username=username_to_use)
     if existing_user_by_username:
@@ -55,17 +50,23 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
     
     # Business Logic: New Company Registration
     if user_data.company_name:
-        # Business Logic: Check if company name already exists
+        # Business Logic: Check if company name/email already exists
         existing_company = await company_repository.get_company_by_name(db, name=user_data.company_name)
         if existing_company:
             raise UserRegistrationError("Company name is already registered.")
+        # Gunakan email input sebagai company_email (Users.email tidak diisi)
+        company_email_to_use = user_data.company_email or user_data.email
+        existing_company_email = await company_repository.get_company_by_email(db, company_email=company_email_to_use)
+        if existing_company_email:
+            raise UserRegistrationError("Company email is already registered.")
 
         # Data Layer: Create new company object
         company_code = generate_company_code() # Use helper
         new_company_obj = company_model.Company(
             name=user_data.company_name,
             code=company_code,
-            pic_phone_number=user_data.pic_phone_number
+            pic_phone_number=user_data.pic_phone_number,
+            company_email=company_email_to_use,
         )
         db.add(new_company_obj)
         await db.flush()  
@@ -210,7 +211,11 @@ async def update_employee_by_admin(
     await db.refresh(employee)
     return employee
 
-async def authenticate_user(db: AsyncSession, password: str, email: Optional[str] = None, username: Optional[str] = None) -> Optional[user_model.Users]:
+async def authenticate_user(
+    db: AsyncSession,
+    password: str,
+    company_email: Optional[str] = None,
+) -> Optional[user_model.Users]:
     """
     Authenticates a user by email or username and password.
     - Fetches the user by email or username.
@@ -219,10 +224,10 @@ async def authenticate_user(db: AsyncSession, password: str, email: Optional[str
     Returns the user object if authentication is successful, otherwise None.
     """
     user = None
-    if username:
-        user = await user_repository.get_user_by_username(db, username=username)
-    elif email:
-        user = await user_repository.get_user_by_email(db, email=email)
+    if company_email:
+        company = await company_repository.get_company_by_email(db, company_email=company_email)
+        if company:
+            user = await user_repository.get_first_admin_by_company(db, company_id=company.id)
     
     if not user or not verify_password(password, user.password):
         return None
@@ -235,7 +240,10 @@ async def authenticate_user(db: AsyncSession, password: str, email: Optional[str
     if user.role in ['admin', 'employee']:
         # Ensure company relationship is loaded for the user
         if not user.company or not user.company.is_active:
-            return None
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Company is inactive."
+            )
         return user
         
     return None

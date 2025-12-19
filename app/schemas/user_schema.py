@@ -10,10 +10,12 @@ class UserBase(BaseModel):
 
 class UserRegistration(BaseModel):
     name: str
-    email: str
+    email: EmailStr  # digunakan sebagai email admin
     username: Optional[str] = None
-    password: str    
-    company_name: Optional[str] = None
+    password: str
+    company_name: str
+    # gunakan field email untuk company_email agar form tetap satu input
+    company_email: Optional[EmailStr] = None
     pic_phone_number: Optional[str] = None
     company_id: Optional[int] = None
 
@@ -45,17 +47,9 @@ class AdminCreate(BaseModel):
 
 
 class UserLoginCombined(BaseModel):
-    email: Optional[str] = None
-    username: Optional[str] = None
+    # Menggunakan field "email" untuk company_email sesuai kebutuhan form
+    email: EmailStr
     password: str
-
-    @model_validator(mode='after')
-    def check_email_or_username(self) -> 'UserLoginCombined':
-        if not self.email and not self.username:
-            raise ValueError('Either email or username must be provided')
-        if self.email and self.username:
-            raise ValueError('Only one of email or username can be provided')
-        return self
 
 
 class EmployeeRegistrationByAdmin(BaseModel):
@@ -84,3 +78,10 @@ class PaginatedUserResponse(BaseModel):
     total_users: int
     current_page: int
     total_pages: int
+
+
+class AdminSuperadminUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    username: Optional[str] = None
+    password: Optional[str] = None

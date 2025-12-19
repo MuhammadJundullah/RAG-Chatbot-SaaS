@@ -68,4 +68,21 @@ class UserRepository(BaseRepository[user_model.Users]):
         )
         return result.scalars().all()
 
+    async def get_all_admins(self, db: AsyncSession) -> List[user_model.Users]:
+        result = await db.execute(
+            select(self.model).filter(self.model.role == "admin")
+        )
+        return result.scalars().all()
+
+    async def get_first_admin_by_company(self, db: AsyncSession, company_id: int) -> Optional[user_model.Users]:
+        result = await db.execute(
+            select(self.model)
+            .filter(
+                self.model.company_id == company_id,
+                self.model.role == "admin",
+            )
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
 user_repository = UserRepository()

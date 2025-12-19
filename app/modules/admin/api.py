@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, Form, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, distinct, func
 from typing import List, Optional
@@ -19,6 +19,8 @@ from app.models.subscription_model import Subscription
 from app.models.plan_model import Plan as PlanModel
 from app.models.transaction_model import Transaction
 from app.models.company_model import Company
+from app.schemas import user_schema
+from app.utils.activity_logger import log_activity
 
 router = APIRouter(
     prefix="/admin",
@@ -46,21 +48,132 @@ async def read_companies(
     )
     return companies
 
-
-@router.patch("/companies/{company_id}/approve")
-async def approve_company(
-    company_id: int,
-    db: AsyncSession = Depends(get_db)
+@router.get("/companies/admins", response_model=List[user_schema.User])
+async def get_all_company_admins(
+    db: AsyncSession = Depends(get_db),
 ):
-    return await admin_service.approve_company_service(db, company_id=company_id)
+    return await admin_service.get_all_company_admins_service(db)
 
 
-@router.patch("/companies/{company_id}/reject")
-async def reject_company(
-    company_id: int,
-    db: AsyncSession = Depends(get_db)
+@router.post("/companies", response_model=company_schema.CompanyDetailWithAdmins)
+async def create_company_by_superadmin(
+    payload: company_schema.CompanySuperadminCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_super_admin),
 ):
-    return await admin_service.reject_company_service(db, company_id=company_id)
+    result = await admin_service.create_company_by_superadmin_service(db, payload=payload)
+    await log_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type_category="Data/CRUD",
+        company_id=result.id,
+        activity_description=f"Superadmin created company {result.name}.",
+    )
+    return result
+
+
+@router.get("/companies/{company_id}", response_model=company_schema.CompanyDetailWithAdmins)
+async def get_company_detail(
+    company_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    return await admin_service.get_company_detail_with_admins(db, company_id=company_id)
+
+@router.get("/companies/admins/{user_id}", response_model=user_schema.User)
+async def get_company_admin_detail(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    return await admin_service.get_company_admin_by_id_service(db, user_id=user_id)
+
+
+@router.put("/companies/{company_id}", response_model=company_schema.CompanyDetailWithAdmins)
+async def update_company_by_superadmin(
+    company_id: int,
+    name: Optional[str] = Form(None),
+    company_email: Optional[str] = Form(None),
+    admin_name: Optional[str] = Form(None),
+    admin_email: Optional[str] = Form(None),
+    admin_password: Optional[str] = Form(None),
+    code: Optional[str] = Form(None),
+    address: Optional[str] = Form(None),
+    logo_file: Optional[UploadFile] = File(None),
+    pic_phone_number: Optional[str] = Form(None),
+    is_active: Optional[bool] = Form(None),
+    admin_id: Optional[int] = Form(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_super_admin),
+):
+    payload = company_schema.CompanySuperadminUpdate(
+        name=name,
+        code=code,
+        address=address,
+        company_email=company_email,
+        pic_phone_number=pic_phone_number,
+        is_active=is_active,
+        admin_name=admin_name,
+        admin_email=admin_email,
+        admin_password=admin_password,
+    )
+    result = await admin_service.update_company_by_superadmin_service(
+        db=db,
+        company_id=company_id,
+        payload=payload,
+        logo_file=logo_file,
+        target_admin_id=admin_id,
+    )
+    await log_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type_category="Data/CRUD",
+        company_id=company_id,
+        activity_description=f"Superadmin updated company {company_id}.",
+    )
+    return result
+
+
+@router.put("/companies/admins/{user_id}", response_model=user_schema.User)
+async def update_company_admin_by_superadmin(
+    user_id: int,
+    payload: user_schema.AdminSuperadminUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_super_admin),
+):
+    admin = await admin_service.update_company_admin_by_superadmin_service(
+        db=db,
+        admin_id=user_id,
+        payload=payload,
+    )
+    await log_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type_category="Data/CRUD",
+        company_id=admin.company_id,
+        activity_description=f"Superadmin updated admin {user_id} for company {admin.company_id}.",
+    )
+    return admin
+
+
+@router.patch("/companies/{company_id}/status", response_model=company_schema.Company)
+async def update_company_status(
+    company_id: int,
+    payload: company_schema.CompanyStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_super_admin),
+):
+    company = await admin_service.update_company_status_service(
+        db=db,
+        company_id=company_id,
+        is_active=payload.is_active,
+    )
+    await log_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type_category="Data/CRUD",
+        company_id=company_id,
+        activity_description=f"Superadmin set company {company_id} status to {payload.is_active}.",
+    )
+    return company
 
 
 @router.get("/subscriptions", response_model=List[subscription_schema.Subscription])

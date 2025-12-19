@@ -45,3 +45,51 @@ class PaginatedCompanyResponse(BaseModel):
     total_company: int
     current_page: int
     total_pages: int
+
+
+class CompanyAdminSummary(BaseModel):
+    id: int
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    username: Optional[str] = None
+    role: Optional[str] = None
+    company_id: Optional[int] = None
+    is_active: Optional[bool] = None
+
+    class Config:
+        from_attributes = True
+
+
+class CompanySuperadminUpdate(BaseModel):
+    name: Optional[str] = None
+    code: Optional[str] = None
+    address: Optional[str] = None
+    company_email: Optional[EmailStr] = None
+    pic_phone_number: Optional[str] = None
+    is_active: Optional[bool] = None
+    admin_name: Optional[str] = None
+    admin_email: Optional[EmailStr] = None
+    admin_password: Optional[str] = None
+
+
+class CompanySuperadminCreate(BaseModel):
+    name: str
+    company_email: EmailStr
+    admin_name: str
+    admin_email: EmailStr
+    admin_password: str
+    code: Optional[str] = None
+    address: Optional[str] = None
+    pic_phone_number: Optional[str] = None
+    is_active: bool = True
+
+
+class CompanyDetailWithAdmins(Company):
+    admins: List[CompanyAdminSummary] = []
+
+    class Config:
+        from_attributes = True
+
+
+class CompanyStatusUpdate(BaseModel):
+    is_active: bool

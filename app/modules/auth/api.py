@@ -34,7 +34,9 @@ async def register(
             user_id=user.id,
             activity_type_category="Data/CRUD",
             company_id=company_id_to_log,
-            activity_description=f"User '{user.email}' registered as admin for company '{user_data.company_name}'.",
+            activity_description=(
+                f"Admin registered for company '{user_data.company_name}' with company email '{user_data.email}'."
+            ),
         )
 
         if user.role == 'admin':
@@ -71,7 +73,21 @@ async def login_for_access_token(
     """
     Authenticates any user (super admin, admin, or employee) and returns a JWT token.
     """
-    user = await user_service.authenticate_user(db, email=data.email, username=data.username, password=data.password)
+    try:
+        user = await user_service.authenticate_user(
+            db,
+            company_email=data.email,
+            password=data.password,
+        )
+    except HTTPException as e:
+        await log_activity(
+            db=db,
+            user_id=None,
+            activity_type_category="Login/Akses",
+            company_id=None,
+            activity_description=f"User login blocked: {e.detail}",
+        )
+        raise e
 
     if not user:
         await log_activity(
@@ -105,7 +121,7 @@ async def login_for_access_token(
         user_id=user.id,
         activity_type_category="Login/Akses",
         company_id=user.company_id if user.company else None,
-        activity_description=f"User '{user.email}' logged in successfully.",
+        activity_description=f"User login successfully for company '{user.company.company_email if user.company else ''}'.",
     )
 
     token_data = auth.create_access_token(data=token_data_payload)

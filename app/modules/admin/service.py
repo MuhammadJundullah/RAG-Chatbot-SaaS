@@ -1,14 +1,22 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Tuple, Optional
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, UploadFile
 import csv # Import csv
 import io # Import io
+import os
+import uuid
 
 from app.repository.company_repository import company_repository
 from app.schemas import company_schema
 from app.repository.log_repository import log_repository
 from app.models.log_model import ActivityLog
 from app.utils.email_sender import send_brevo_email
+from app.repository.user_repository import user_repository
+from app.utils.security import get_password_hash
+from app.schemas import user_schema
+from app.models.company_model import Company
+from app.utils.generators import generate_company_code
+from app.models import user_model
 
 async def get_companies_service(
     db: AsyncSession,
@@ -56,9 +64,6 @@ async def approve_company_service(
 
     # Non-blocking email notification to company admin(s)
     try:
-        # Ambil admin perusahaan
-        from app.repository.user_repository import user_repository
-
         admins = await user_repository.get_admins_by_company(db, company_id=company_id)
         emails = [admin.email for admin in admins if admin.email]
         if emails:
@@ -200,3 +205,281 @@ async def export_activity_logs_service(
         ])
 
     return output.getvalue()
+
+
+async def get_company_detail_with_admins(
+    db: AsyncSession,
+    company_id: int
+) -> company_schema.CompanyDetailWithAdmins:
+    company = await company_repository.get_company(db, company_id=company_id)
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Company with id {company_id} not found."
+        )
+    admins = await user_repository.get_admins_by_company(db, company_id=company_id)
+    return company_schema.CompanyDetailWithAdmins(
+        **company_schema.Company.from_orm(company).model_dump(),
+        admins=[company_schema.CompanyAdminSummary.from_orm(admin) for admin in admins],
+    )
+
+
+async def get_company_admins_service(
+    db: AsyncSession,
+    company_id: int
+):
+    company = await company_repository.get_company(db, company_id=company_id)
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Company with id {company_id} not found."
+        )
+    return await user_repository.get_admins_by_company(db, company_id=company_id)
+
+
+async def get_all_company_admins_service(db: AsyncSession):
+    return await user_repository.get_all_admins(db)
+
+
+async def get_company_admin_by_id_service(
+    db: AsyncSession,
+    user_id: int
+):
+    admin = await user_repository.get_user(db, user_id)
+    if not admin or admin.role != "admin" or not admin.company_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Admin not found."
+        )
+    return admin
+
+
+async def _read_logo_file(logo_file: UploadFile, max_size_mb: int = 2) -> bytes:
+    content = await logo_file.read()
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Logo file is empty."
+        )
+    if len(content) > max_size_mb * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Logo file exceeds {max_size_mb} MB."
+        )
+    allowed_types = {"image/png", "image/jpeg", "image/jpg"}
+    if logo_file.content_type and logo_file.content_type.lower() not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Logo file type must be PNG or JPEG."
+        )
+    return content
+
+
+async def update_company_by_superadmin_service(
+    db: AsyncSession,
+    company_id: int,
+    payload: company_schema.CompanySuperadminUpdate,
+    logo_file: Optional[UploadFile],
+    target_admin_id: Optional[int] = None,
+):
+    company = await company_repository.get_company(db, company_id=company_id)
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Company with id {company_id} not found."
+        )
+
+    admins = await user_repository.get_admins_by_company(db, company_id=company_id)
+    target_admin = None
+    if target_admin_id:
+        target_admin = next((a for a in admins if a.id == target_admin_id), None)
+        if not target_admin:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Admin with id {target_admin_id} not found for this company."
+            )
+    else:
+        target_admin = admins[0] if admins else None
+
+    logo_path_to_update = company.logo_s3_path
+    if logo_file and logo_file.filename:
+        UPLOAD_DIR = "static/company_logos"
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        content = await _read_logo_file(logo_file)
+        file_extension = os.path.splitext(logo_file.filename)[1] or ".png"
+        filename = f"{uuid.uuid4()}{file_extension}"
+        file_path = os.path.join(UPLOAD_DIR, filename)
+        with open(file_path, "wb") as f:
+            f.write(content)
+        logo_path_to_update = f"/{file_path}"
+        if company.logo_s3_path:
+            old_file_path = company.logo_s3_path.lstrip('/')
+            if os.path.exists(old_file_path) and old_file_path != file_path:
+                try:
+                    os.remove(old_file_path)
+                except OSError:
+                    pass
+
+    update_data = {
+        "name": payload.name,
+        "code": payload.code,
+        "address": payload.address,
+        "company_email": payload.company_email,
+        "pic_phone_number": payload.pic_phone_number,
+        "is_active": payload.is_active,
+        "logo_s3_path": logo_path_to_update,
+    }
+    update_data_filtered = {k: v for k, v in update_data.items() if v is not None}
+    for key, value in update_data_filtered.items():
+        setattr(company, key, value)
+
+    if target_admin and any([payload.admin_name, payload.admin_email, payload.admin_password]):
+        if payload.admin_name:
+            target_admin.name = payload.admin_name
+        if payload.admin_email:
+            target_admin.email = payload.admin_email
+        if payload.admin_password:
+            target_admin.hashed_password = get_password_hash(payload.admin_password)
+        db.add(target_admin)
+
+    db.add(company)
+    await db.commit()
+    await db.refresh(company)
+    if target_admin:
+        await db.refresh(target_admin)
+
+    admins_refreshed = await user_repository.get_admins_by_company(db, company_id=company_id)
+    return company_schema.CompanyDetailWithAdmins(
+        **company_schema.Company.from_orm(company).model_dump(),
+        admins=[company_schema.CompanyAdminSummary.from_orm(admin) for admin in admins_refreshed],
+    )
+
+
+async def update_company_admin_by_superadmin_service(
+    db: AsyncSession,
+    admin_id: int,
+    payload: user_schema.AdminSuperadminUpdate,
+):
+    admin = await user_repository.get_user(db, admin_id)
+    if not admin or admin.role != "admin" or not admin.company_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Admin not found."
+        )
+
+    if payload.name:
+        admin.name = payload.name
+    if payload.email:
+        admin.email = payload.email
+    if payload.username:
+        admin.username = payload.username
+    if payload.password:
+        admin.hashed_password = get_password_hash(payload.password)
+
+    db.add(admin)
+    await db.commit()
+    await db.refresh(admin)
+    return admin
+
+
+async def create_company_by_superadmin_service(
+    db: AsyncSession,
+    payload: company_schema.CompanySuperadminCreate,
+):
+    existing_company = await company_repository.get_company_by_name(db, name=payload.name)
+    if existing_company:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Company name already exists."
+        )
+    existing_company_email = await company_repository.get_company_by_email(db, company_email=payload.company_email)
+    if existing_company_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Company email already exists."
+        )
+    if payload.code:
+        existing_code = await company_repository.get_company_by_code(db, code=payload.code)
+        if existing_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Company code already exists."
+            )
+
+    existing_admin_email = await user_repository.get_user_by_email(db, email=payload.admin_email)
+    if existing_admin_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Admin email already exists."
+        )
+
+    code_to_use = payload.code or generate_company_code()
+    company = Company(
+        name=payload.name,
+        code=code_to_use,
+        address=payload.address,
+        company_email=payload.company_email,
+        pic_phone_number=payload.pic_phone_number,
+        is_active=payload.is_active,
+        activation_email_sent=payload.is_active,
+    )
+    db.add(company)
+    await db.flush()
+
+    admin_user = user_model.Users(
+        name=payload.admin_name,
+        email=payload.admin_email,
+        username=payload.admin_email,
+        password=get_password_hash(payload.admin_password),
+        role="admin",
+        company_id=company.id,
+    )
+    db.add(admin_user)
+    await db.commit()
+    await db.refresh(company)
+    await db.refresh(admin_user)
+
+    return company_schema.CompanyDetailWithAdmins(
+        **company_schema.Company.from_orm(company).model_dump(),
+        admins=[company_schema.CompanyAdminSummary.from_orm(admin_user)],
+    )
+
+async def update_company_status_service(
+    db: AsyncSession,
+    company_id: int,
+    is_active: bool,
+):
+    company: Company = await company_repository.get_company(db, company_id=company_id)
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Company with id {company_id} not found."
+        )
+
+    previous_status = company.is_active
+    if previous_status == is_active:
+        return company
+
+    company.is_active = is_active
+    db.add(company)
+    await db.commit()
+    await db.refresh(company)
+
+    # Kirim email hanya pada aktivasi pertama (False -> True dan belum pernah dikirim)
+    if (not previous_status) and is_active and not company.activation_email_sent:
+        try:
+            if company.company_email:
+                subject = "Perusahaan Anda telah disetujui"
+                body = (
+                    f"<p>Perusahaan '{company.name}' telah disetujui.</p>"
+                    f"<p>Silakan login ke platform untuk mulai menggunakan layanan.</p>"
+                )
+                await send_brevo_email(to_email=company.company_email, subject=subject, html_content=body)
+                company.activation_email_sent = True
+                db.add(company)
+                await db.commit()
+        except Exception as e:
+            import logging
+            logging.error("Failed to send activation email for company %s: %s", company_id, e)
+
+    return company

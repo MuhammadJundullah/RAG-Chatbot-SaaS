@@ -17,6 +17,10 @@ class CompanyRepository(BaseRepository[company_model.Company]):
         result = await db.execute(select(self.model).filter(self.model.name == name))
         return result.scalar_one_or_none()
 
+    async def get_company_by_email(self, db: AsyncSession, company_email: str) -> Optional[company_model.Company]:
+        result = await db.execute(select(self.model).filter(self.model.company_email == company_email))
+        return result.scalar_one_or_none()
+
     async def get_company_by_code(self, db: AsyncSession, code: str) -> Optional[company_model.Company]:
         result = await db.execute(select(self.model).filter(self.model.code == code))
         return result.scalar_one_or_none()

@@ -23,6 +23,7 @@ class Company(Base):
     code = Column(String(10), unique=True)
     logo_s3_path = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=False)
+    activation_email_sent = Column(Boolean, default=False)
     address = Column(String(255), nullable=True)
     pic_phone_number = Column(String(50), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
