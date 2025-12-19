@@ -190,7 +190,6 @@ async def sse_chat_endpoint(
             referenced_document_ids=document_ids,
             match_score=match_score,
             response_time_ms=int((time.monotonic() - start_time) * 1000),
-            input_type="text",
         )
         await chatlog_repository.create_chatlog(db=db, chatlog=chatlog_data)
 

@@ -15,40 +15,6 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
     async def create_chatlog(self, db: AsyncSession, chatlog: chatlog_schema.ChatlogCreate) -> chatlog_model.Chatlogs:
         return await self.create(db, chatlog)
 
-    async def update_audio_fields(
-        self,
-        db: AsyncSession,
-        chatlog_id: int,
-        *,
-        input_audio_path: Optional[str] = None,
-        output_audio_path: Optional[str] = None,
-        stt_request_id: Optional[str] = None,
-        tts_request_id: Optional[str] = None,
-        input_duration_ms: Optional[int] = None,
-    ) -> Optional[chatlog_model.Chatlogs]:
-        """
-        Update audio-related metadata for a chatlog entry.
-        """
-        db_obj = await self.get(db, chatlog_id)
-        if not db_obj:
-            return None
-
-        if input_audio_path is not None:
-            db_obj.input_audio_path = input_audio_path
-        if output_audio_path is not None:
-            db_obj.output_audio_path = output_audio_path
-        if stt_request_id is not None:
-            db_obj.stt_request_id = stt_request_id
-        if tts_request_id is not None:
-            db_obj.tts_request_id = tts_request_id
-        if input_duration_ms is not None:
-            db_obj.input_duration_ms = input_duration_ms
-
-        db.add(db_obj)
-        await db.commit()
-        await db.refresh(db_obj)
-        return db_obj
-
     async def get_chatlogs(
         self, db: AsyncSession,
         company_id: Optional[int] = None,

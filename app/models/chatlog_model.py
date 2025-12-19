@@ -32,12 +32,6 @@ class Chatlogs(Base):
     referenced_document_ids = Column(JSON, nullable=True)
     match_score = Column(Float, nullable=True)  # Stored as percentage (0-100)
     response_time_ms = Column(Integer, nullable=True)
-    input_type = Column(String(20), nullable=True)  # "text" or "audio"
-    input_audio_path = Column(String, nullable=True)
-    output_audio_path = Column(String, nullable=True)
-    stt_request_id = Column(String, nullable=True)
-    tts_request_id = Column(String, nullable=True)
-    input_duration_ms = Column(Integer, nullable=True)
 
     user = relationship("Users", back_populates="chatlogs")
     company = relationship("Company", back_populates="chatlogs")

@@ -11,12 +11,6 @@ class ChatlogBase(BaseModel):
     conversation_id: uuid.UUID
     match_score: Optional[float] = None  # percentage 0-100
     response_time_ms: Optional[int] = None
-    input_type: Optional[str] = None
-    input_audio_path: Optional[str] = None
-    output_audio_path: Optional[str] = None
-    stt_request_id: Optional[str] = None
-    tts_request_id: Optional[str] = None
-    input_duration_ms: Optional[int] = None
 
 class ChatlogCreate(ChatlogBase):
     referenced_document_ids: Optional[List[int]] = None
@@ -37,12 +31,6 @@ class ChatlogResponse(BaseModel):
     conversation_id: uuid.UUID
     match_score: Optional[float] = None
     response_time_ms: Optional[int] = None
-    input_type: Optional[str] = None
-    input_audio_path: Optional[str] = None
-    output_audio_path: Optional[str] = None
-    stt_request_id: Optional[str] = None
-    tts_request_id: Optional[str] = None
-    input_duration_ms: Optional[int] = None
 
 class PaginatedChatlogResponse(BaseModel):
     chatlogs: List[ChatlogResponse]
