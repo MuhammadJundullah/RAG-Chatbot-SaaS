@@ -214,7 +214,8 @@ async def update_employee_by_admin(
 async def authenticate_user(
     db: AsyncSession,
     password: str,
-    company_email: Optional[str] = None,
+    email: Optional[str] = None,
+    username: Optional[str] = None,
 ) -> Optional[user_model.Users]:
     """
     Authenticates a user by email or username and password.
@@ -224,10 +225,14 @@ async def authenticate_user(
     Returns the user object if authentication is successful, otherwise None.
     """
     user = None
-    if company_email:
-        company = await company_repository.get_company_by_email(db, company_email=company_email)
-        if company:
-            user = await user_repository.get_first_admin_by_company(db, company_id=company.id)
+    if email:
+        user = await user_repository.get_user_by_email(db, email=email)
+        if not user:
+            company = await company_repository.get_company_by_email(db, company_email=email)
+            if company:
+                user = await user_repository.get_first_admin_by_company(db, company_id=company.id)
+    elif username:
+        user = await user_repository.get_user_by_username(db, username=username)
     
     if not user or not verify_password(password, user.password):
         return None

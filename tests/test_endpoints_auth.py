@@ -83,6 +83,41 @@ def test_login_endpoint():
                 assert response.json()["user"]["name"] == "Test User"
 
 
+def test_login_endpoint_with_username():
+    with TestClient(app) as client:
+        # Mock login data with username
+        login_data = {
+            "username": "testuser",
+            "password": "password123"
+        }
+
+        # Mock the user service
+        with patch('app.modules.auth.service.authenticate_user', new_callable=AsyncMock) as mock_auth_user:
+            # Create a mock user instance
+            user_instance = Users(
+                id=2,
+                name="Test User 2",
+                email="test2@example.com",
+                username="testuser",
+                password="hashed_password",
+                role="employee",
+                company_id=1
+            )
+            mock_auth_user.return_value = user_instance
+
+            # Mock the token creation
+            with patch('app.utils.auth.create_access_token', return_value={"access_token": "mock_token", "expires_in": 3600}):
+                response = client.post("/api/auth/user/token", json=login_data)
+
+                # Check that the request was successful
+                assert response.status_code == 200
+                assert "access_token" in response.json()
+                assert response.json()["token_type"] == "bearer"
+                assert "user" in response.json()
+                assert response.json()["user"]["id"] == 2
+                assert response.json()["user"]["username"] == "testuser"
+
+
 def test_get_current_user_endpoint():
     with TestClient(app) as client:
         # Mock current user instance

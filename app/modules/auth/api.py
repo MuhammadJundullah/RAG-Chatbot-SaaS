@@ -16,7 +16,6 @@ router = APIRouter(
     tags=["Authentication"],
 )
 
-
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
     user_data: user_schema.UserRegistration,
@@ -76,7 +75,8 @@ async def login_for_access_token(
     try:
         user = await user_service.authenticate_user(
             db,
-            company_email=data.email,
+            email=data.email,
+            username=data.username,
             password=data.password,
         )
     except HTTPException as e:

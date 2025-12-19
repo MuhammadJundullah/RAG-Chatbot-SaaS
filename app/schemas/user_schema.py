@@ -47,9 +47,18 @@ class AdminCreate(BaseModel):
 
 
 class UserLoginCombined(BaseModel):
-    # Menggunakan field "email" untuk company_email sesuai kebutuhan form
-    email: EmailStr
+    # Login bisa pakai email user atau username
+    email: Optional[EmailStr] = None
+    username: Optional[str] = None
     password: str
+
+    @model_validator(mode="after")
+    def validate_identifier(self):
+        if not self.email and not self.username:
+            raise ValueError("Either email or username must be provided.")
+        if self.email and self.username:
+            raise ValueError("Provide only one of email or username.")
+        return self
 
 
 class EmployeeRegistrationByAdmin(BaseModel):
