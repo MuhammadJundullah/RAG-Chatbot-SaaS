@@ -293,7 +293,7 @@ async def request_password_reset(db: AsyncSession, email: str):
     await db.refresh(user)
 
     # Prepare email content
-    reset_link = f"{settings.APP_BASE_URL}/auth/reset-password?token={token}&email={company.company_email}"
+    reset_link = f"{settings.APP_BASE_URL}auth/reset-password?token={token}&email={company.company_email}"
     
     # Fetch company name for personalization, if available
     company_name = user.company.name if user.company else "Platform Kami"
