@@ -29,6 +29,12 @@ class ConversationListResponse(ConversationBase):
     class Config:
         from_attributes = True # For SQLAlchemy ORM mapping
 
+class PaginatedConversationResponse(BaseModel):
+    conversations: List[ConversationListResponse]
+    total_conversations: int
+    current_page: int
+    total_pages: int
+
 class CompanyConversationResponse(BaseModel):
     conversation_id: uuid.UUID = Field(..., alias='id')
     title: str

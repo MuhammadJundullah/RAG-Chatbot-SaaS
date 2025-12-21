@@ -96,12 +96,26 @@ async def read_chatlogs(
     return await chatlog_service.get_chatlogs(db, user_id=current_user.id, skip=skip, limit=limit)
 
 
-@user_router.get("/conversations", response_model=List[conversation_schema.ConversationListResponse])
+@user_router.get("/conversations", response_model=conversation_schema.PaginatedConversationResponse)
 async def get_conversations(
     db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_user)
+    current_user: Users = Depends(get_current_user),
+    search: Optional[str] = Query(
+        None,
+        max_length=100,
+        description="Cari di judul percakapan atau isi chat"
+    ),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
 ):
-    return await chatlog_service.get_conversations(db, user_id=current_user.id)
+    normalized_search = search.strip() if search and search.strip() else None
+    return await chatlog_service.get_conversations(
+        db,
+        user_id=current_user.id,
+        page=page,
+        limit=limit,
+        search=normalized_search,
+    )
 
 
 @user_router.get("/{conversation_id}", response_model=List[chatlog_schema.Chatlog])

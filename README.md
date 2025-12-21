@@ -303,15 +303,29 @@
 
 ---
 
-#### GET `/chatlogs/conversations` - Lihat Daftar ID Percakapan
-**Deskripsi**: Mendapatkan daftar unique conversation ID untuk pengguna saat ini.
+#### GET `/chatlogs/conversations` - Lihat Daftar Percakapan
+**Deskripsi**: Mendapatkan daftar percakapan pengguna saat ini dengan pagination.
+
+**Query Parameters**:
+- `page`: Nomor halaman (default 1)
+- `limit`: Jumlah data per halaman (default 20, max 100)
+- `search`: Cari judul percakapan atau isi chat (max 100 karakter)
 
 **Response Sukses (200 OK)**:
 ```json
-[
-  "conv-12345",
-  "conv-67890"
-]
+{
+  "conversations": [
+    {
+      "id": "conv-12345",
+      "title": "Kebijakan Cuti",
+      "created_at": "2025-11-02T10:30:00",
+      "is_archived": false
+    }
+  ],
+  "total_conversations": 1,
+  "current_page": 1,
+  "total_pages": 1
+}
 ```
 
 ---

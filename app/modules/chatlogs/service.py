@@ -384,13 +384,37 @@ async def get_chatlogs(db: AsyncSession, user_id: int, skip: int = 0, limit: int
     )
 
 
-async def get_conversations(db: AsyncSession, user_id: int, skip: int = 0, limit: int = 100):
+async def get_conversations(
+    db: AsyncSession,
+    user_id: int,
+    page: int = 1,
+    limit: int = 100,
+    search: Optional[str] = None,
+):
     """Return conversations for a user, matching the router response model."""
-    return await conversation_repository.get_conversations_for_user(
+    skip = (page - 1) * limit
+    rows, total_conversations = await conversation_repository.get_conversations_for_user(
         db=db,
         user_id=user_id,
         skip=skip,
         limit=limit,
+        search=search,
+    )
+    conversations = [
+        conversation_schema.ConversationListResponse(
+            id=str(row.id),
+            title=row.title,
+            created_at=row.created_at,
+            is_archived=row.is_archived,
+        ) for row in rows
+    ]
+
+    total_pages = math.ceil(total_conversations / limit) if limit > 0 else 0
+    return conversation_schema.PaginatedConversationResponse(
+        conversations=conversations,
+        total_conversations=total_conversations,
+        current_page=page,
+        total_pages=total_pages,
     )
 
 

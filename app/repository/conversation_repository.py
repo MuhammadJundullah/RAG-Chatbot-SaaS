@@ -1,8 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from typing import Optional, List
+from sqlalchemy import or_, exists, cast, String, func
+from typing import Optional, List, Tuple, Any
 from app.models.conversation_model import Conversation
-from app.schemas.conversation_schema import ConversationCreate, ConversationListResponse
+from app.schemas.conversation_schema import ConversationCreate
 from app.repository.base_repository import BaseRepository
 
 class ConversationRepository(BaseRepository[Conversation]):
@@ -24,7 +25,8 @@ class ConversationRepository(BaseRepository[Conversation]):
         user_id: int,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[ConversationListResponse]:
+        search: Optional[str] = None,
+    ) -> Tuple[List[Any], int]:
         # Fetch conversations associated with the user.
         # This assumes a relationship or a way to link conversations to users.
         # For now, let's assume we can fetch all conversations and filter by user_id if needed,
@@ -62,22 +64,46 @@ class ConversationRepository(BaseRepository[Conversation]):
         ).join(
             latest_chat_subquery, Conversation.id == latest_chat_subquery.c.conversation_id
         ).order_by(
-            latest_chat_subquery.c.latest_created_at.desc()
+            latest_chat_subquery.c.latest_created_at.desc(),
+            Conversation.id.desc(),
         )
 
+        if search:
+            like_term = f"%{search}%"
+            matching_chatlog_exists = exists().where(
+                Chatlogs.UsersId == user_id,
+                Chatlogs.conversation_id == Conversation.id,
+                or_(
+                    Chatlogs.question.ilike(like_term),
+                    Chatlogs.answer.ilike(like_term),
+                    cast(Chatlogs.conversation_id, String).ilike(like_term),
+                ),
+            )
+            query = query.where(
+                or_(
+                    Conversation.title.ilike(like_term),
+                    cast(Conversation.id, String).ilike(like_term),
+                    matching_chatlog_exists,
+                )
+            )
+
+        count_query = select(func.count()).select_from(Conversation).join(
+            latest_chat_subquery, Conversation.id == latest_chat_subquery.c.conversation_id
+        )
+        if search:
+            count_query = count_query.where(
+                or_(
+                    Conversation.title.ilike(like_term),
+                    cast(Conversation.id, String).ilike(like_term),
+                    matching_chatlog_exists,
+                )
+            )
+
+        total_conversations = await db.scalar(count_query)
         result = await db.execute(query.offset(skip).limit(limit))
         
-        # Convert results to ConversationListResponse schema
-        conversations = [
-            ConversationListResponse(
-                id=str(row.id), # Convert UUID to string
-                title=row.title,
-                created_at=row.created_at,
-                is_archived=row.is_archived,
-                # latest_message_at=row.latest_created_at # Optional: include latest message time
-            ) for row in result.all()
-        ]
-        return conversations
+        rows = result.all()
+        return rows, total_conversations or 0
 
     async def update_title(self, db: AsyncSession, conversation_id: str, title: str) -> Optional[Conversation]:
         conversation = await self.get(db, conversation_id)
