@@ -21,18 +21,20 @@ def test_together_service_initialization():
 @pytest.mark.asyncio
 async def test_authenticate_user_success(mock_db_session):
     # Mock user data
+    company = Company(id=1, name="Test Company", is_active=True)
     user = Users(
         id=1,
         name="Test User",
-        email="test@example.com",
         username="testuser",
         password="hashed_password",
-        role="employee",
+        role="admin",
         company_id=1,
         is_active=True
     )
+    user.company = company
     
-    with patch('app.modules.auth.service.user_repository.get_user_by_email', return_value=user), \
+    with patch('app.modules.auth.service.company_repository.get_company_by_email', return_value=company), \
+         patch('app.modules.auth.service.user_repository.get_first_admin_by_company', return_value=user), \
          patch('app.utils.security.verify_password', return_value=True):
         
         result = await authenticate_user(mock_db_session, email="test@example.com", password="password123")
@@ -41,7 +43,7 @@ async def test_authenticate_user_success(mock_db_session):
 
 @pytest.mark.asyncio
 async def test_authenticate_user_failure(mock_db_session):
-    with patch('app.modules.auth.service.user_repository.get_user_by_email', return_value=None):
+    with patch('app.modules.auth.service.company_repository.get_company_by_email', return_value=None):
         result = await authenticate_user(mock_db_session, email="nonexistent@example.com", password="password123")
         assert result is None
 
@@ -59,8 +61,7 @@ async def test_register_user(mock_db_session):
     new_user = Users(
         id=1,
         name=user_data.name,
-        email=user_data.email,
-        username=None, 
+        username=user_data.email,
         password="hashed_password",
         role="admin", 
         is_active=False
@@ -72,12 +73,13 @@ async def test_register_user(mock_db_session):
         is_active=False 
     )
     
-    with patch('app.modules.auth.service.user_repository.get_user_by_email', return_value=None), \
+    with patch('app.modules.auth.service.user_repository.get_user_by_username', return_value=None), \
          patch('app.modules.auth.service.user_repository.create_user', return_value=new_user), \
-         patch('app.modules.auth.service.company_repository.create_company', return_value=new_company), \
+         patch('app.modules.auth.service.company_repository.get_company_by_name', return_value=None), \
+         patch('app.modules.auth.service.company_repository.get_company_by_email', return_value=None), \
          patch('app.utils.security.get_password_hash', return_value="hashed_password"):
         
         result = await register_user(mock_db_session, user_data=user_data)
-        assert result.email == user_data.email
+        assert result.username == user_data.email
         assert result.role == "admin"
         assert not result.is_active

@@ -23,6 +23,7 @@ from app.modules.chat.together_service import together_service
 from app.repository.conversation_repository import conversation_repository
 from app.schemas.conversation_schema import ConversationCreate
 from app.utils.activity_logger import log_activity
+from app.utils.user_identifier import get_user_identifier
 
 router = APIRouter()
 
@@ -47,12 +48,13 @@ async def chat_endpoint(
     )
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    user_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log,
-        activity_description=f"User '{current_user.email}' sent a chat message.",
+        activity_description=f"User '{user_identifier}' sent a chat message.",
     )
     return response_data
 
@@ -194,12 +196,13 @@ async def sse_chat_endpoint(
         await chatlog_repository.create_chatlog(db=db, chatlog=chatlog_data)
 
         company_id_to_log = current_user.company_id if current_user.company else None
+        user_identifier = get_user_identifier(current_user)
         await log_activity(
             db=db,
             user_id=current_user.id,
             activity_type_category="Data/CRUD",
             company_id=company_id_to_log,
-            activity_description=f"User '{current_user.email}' sent a chat message in conversation {conversation_id_str}.",
+            activity_description=f"User '{user_identifier}' sent a chat message in conversation {conversation_id_str}.",
         )
 
         yield "event: end\ndata: {}\n\n"
@@ -225,12 +228,13 @@ async def list_conversations_endpoint(
     )
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    user_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log,
-        activity_description=f"User '{current_user.email}' retrieved list of conversations. Found {len(conversations)} conversations.",
+        activity_description=f"User '{user_identifier}' retrieved list of conversations. Found {len(conversations)} conversations.",
     )
     return conversations
 
@@ -254,7 +258,7 @@ async def archive_conversation_endpoint(
         user_id=current_user.id,
         activity_type_category="Data/CRUD",
         company_id=current_user.company_id,
-        activity_description=f"User '{current_user.email}' archived conversation {conversation_id}.",
+        activity_description=f"User '{get_user_identifier(current_user)}' archived conversation {conversation_id}.",
     )
     return updated_conversation
 
@@ -281,7 +285,7 @@ async def set_archive_status_endpoint(
         user_id=current_user.id,
         activity_type_category="Data/CRUD",
         company_id=current_user.company_id,
-        activity_description=f"User '{current_user.email}' {status_label} conversation {conversation_id}.",
+        activity_description=f"User '{get_user_identifier(current_user)}' {status_label} conversation {conversation_id}.",
     )
     return updated_conversation
 
@@ -307,7 +311,7 @@ async def edit_conversation_title_endpoint(
         user_id=current_user.id,
         activity_type_category="Data/CRUD",
         company_id=current_user.company_id,
-        activity_description=f"User '{current_user.email}' edited title of conversation {conversation_id}.",
+        activity_description=f"User '{get_user_identifier(current_user)}' edited title of conversation {conversation_id}.",
     )
     return updated_conversation
 
@@ -328,12 +332,13 @@ async def get_company_documents(
     )
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    user_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log,
-        activity_description=f"User '{current_user.email}' retrieved list of company documents for chat. Found {len(documents_list)} documents.",
+        activity_description=f"User '{user_identifier}' retrieved list of company documents for chat. Found {len(documents_list)} documents.",
     )
 
     return [

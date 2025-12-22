@@ -93,7 +93,6 @@ async def update_company_by_superadmin(
     name: Optional[str] = Form(None),
     company_email: Optional[str] = Form(None),
     admin_name: Optional[str] = Form(None),
-    admin_email: Optional[str] = Form(None),
     admin_password: Optional[str] = Form(None),
     code: Optional[str] = Form(None),
     address: Optional[str] = Form(None),
@@ -112,7 +111,6 @@ async def update_company_by_superadmin(
         pic_phone_number=pic_phone_number,
         is_active=is_active,
         admin_name=admin_name,
-        admin_email=admin_email,
         admin_password=admin_password,
     )
     result = await admin_service.update_company_by_superadmin_service(

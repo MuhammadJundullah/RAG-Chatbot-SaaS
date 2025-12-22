@@ -28,7 +28,6 @@ def authenticated_client():
     mock_user = Users(
         id=1,
         name="Test User",
-        email="test@example.com",
         username="testuser",
         role="employee",
         company_id=1,
@@ -51,7 +50,6 @@ def admin_client():
     mock_admin = Users(
         id=2,
         name="Admin User",
-        email="admin@example.com",
         username="adminuser",
         role="admin",
         company_id=1,
@@ -69,7 +67,6 @@ def super_admin_client():
     mock_super_admin = Users(
         id=3,
         name="Super Admin",
-        email="superadmin@example.com",
         username="superadmin",
         role="super_admin",
         company_id=None,

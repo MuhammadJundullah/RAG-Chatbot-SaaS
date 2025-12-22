@@ -20,7 +20,6 @@ def test_user_model():
     # Create a test user instance
     user = Users(
         name="Test User",
-        email="test@example.com",
         username="testuser",
         password="hashed_password",
         role="employee",
@@ -30,7 +29,6 @@ def test_user_model():
     )
     
     assert user.name == "Test User"
-    assert user.email == "test@example.com"
     assert user.username == "testuser"
     assert user.role == "employee"
     assert user.company_id == 1

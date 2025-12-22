@@ -11,7 +11,6 @@ from app.models.chatlog_model import Chatlogs
 from app.schemas.company_schema import CompanyCreate
 from app.schemas.document_schema import DocumentCreate
 from app.schemas.chatlog_schema import ChatlogCreate
-from app.schemas.user_schema import UserRegistration
 
 
 class MockDBSession:
@@ -29,7 +28,7 @@ class MockDBSession:
 @pytest.mark.asyncio
 async def test_get_user():
     db = MockDBSession()
-    user = Users(id=1, name="Test User", email="test@example.com")
+    user = Users(id=1, name="Test User")
     db.users.append(user)
     
     with patch('sqlalchemy.ext.asyncio.AsyncSession.execute', new_callable=AsyncMock) as mock_execute:
@@ -43,40 +42,19 @@ async def test_get_user():
 
 
 @pytest.mark.asyncio
-async def test_get_user_by_email():
-    db = MockDBSession()
-    user = Users(id=1, name="Test User", email="test@example.com")
-    db.users.append(user)
-    
-    with patch('sqlalchemy.ext.asyncio.AsyncSession.execute', new_callable=AsyncMock) as mock_execute:
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = user
-        mock_execute.return_value = mock_result
-        
-        result = await user_repository.get_user_by_email(db, email="test@example.com")
-        assert result.email == "test@example.com"
-
-
-@pytest.mark.asyncio
 async def test_create_user():
     db = MockDBSession()
-    user_create = UserRegistration(
-        name="New User",
-        email="new@example.com",
-        password="hashed_password",
-        company_id=1
-    )
-    
     new_user = Users(
         id=1,
+        name="New User",
+        username="newuser",
         role="employee",
-        **user_create.dict(exclude={'password'})
+        company_id=1
     )
     
     with patch('app.repository.user_repository.Users', return_value=new_user):
         result = await user_repository.create_user(db, new_user)
         assert result.name == "New User"
-        assert result.email == "new@example.com"
         assert result.role == "employee"
 
 

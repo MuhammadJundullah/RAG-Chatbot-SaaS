@@ -36,7 +36,6 @@ def test_user_schema():
     user = User(
         id=1,
         name="Test User",
-        email="test@example.com",
         username="testuser",
         role="employee",
         company_id=1,
@@ -46,7 +45,6 @@ def test_user_schema():
     
     assert user.id == 1
     assert user.name == "Test User"
-    assert user.email == "test@example.com"
     assert user.username == "testuser"
     assert user.role == "employee"
     assert user.company_id == 1
@@ -135,7 +133,6 @@ def test_token_schema():
     user_mock = User(
         id=1,
         name="Test User",
-        email="test@example.com",
         username="testuser",
         role="employee",
         company_id=1,

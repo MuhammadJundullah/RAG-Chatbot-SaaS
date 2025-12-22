@@ -9,6 +9,7 @@ from app.schemas import document_schema
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.documents import service as document_service
 from app.utils.activity_logger import log_activity
+from app.utils.user_identifier import get_user_identifier
 
 router = APIRouter(
     prefix="/documents",
@@ -50,12 +51,13 @@ async def upload_document(
     )
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    admin_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Proses Dokumen",
         company_id=company_id_to_log,
-        activity_description=f"Document '{uploaded_document.title}' uploaded by admin '{current_user.email}'.",
+        activity_description=f"Document '{uploaded_document.title}' uploaded by admin '{admin_identifier}'.",
     )
     return uploaded_document
 
@@ -76,12 +78,13 @@ async def retry_document_upload(
     )
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    admin_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Proses Dokumen",
         company_id=company_id_to_log,
-        activity_description=f"Document ID {document_id} upload retried by admin '{current_user.email}'.",
+        activity_description=f"Document ID {document_id} upload retried by admin '{admin_identifier}'.",
     )
     return retried_document
 
@@ -111,12 +114,13 @@ async def read_all_company_documents(
     total_pages = ceil(total_count / limit) if limit > 0 else 0
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    admin_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log,
-        activity_description=f"Admin '{current_user.email}' retrieved list of documents. Found {total_count} documents.",
+        activity_description=f"Admin '{admin_identifier}' retrieved list of documents. Found {total_count} documents.",
     )
 
     return PaginatedDocumentsResponse(
@@ -138,12 +142,13 @@ async def get_documents_pending_validation(
     )
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    admin_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Proses Dokumen",
         company_id=company_id_to_log,
-        activity_description=f"Admin '{current_user.email}' retrieved list of documents pending validation. Found {len(documents)} documents.",
+        activity_description=f"Admin '{admin_identifier}' retrieved list of documents pending validation. Found {len(documents)} documents.",
     )
     return documents
 
@@ -163,12 +168,13 @@ async def confirm_document_and_trigger_embedding(
     )
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    admin_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Proses Dokumen",
         company_id=company_id_to_log,
-        activity_description=f"Document ID {document_id} confirmed and embedding triggered by admin '{current_user.email}'.",
+        activity_description=f"Document ID {document_id} confirmed and embedding triggered by admin '{admin_identifier}'.",
     )
     return confirmed_document
 
@@ -186,12 +192,13 @@ async def retry_failed_document_processing(
     )
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    admin_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Proses Dokumen",
         company_id=company_id_to_log,
-        activity_description=f"Document ID {document_id} processing retried by admin '{current_user.email}'.",
+        activity_description=f"Document ID {document_id} processing retried by admin '{admin_identifier}'.",
     )
     return retried_document
 
@@ -213,12 +220,13 @@ async def update_document_content(
     )
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    admin_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log,
-        activity_description=f"Document ID {document_id} content updated by admin '{current_user.email}'.",
+        activity_description=f"Document ID {document_id} content updated by admin '{admin_identifier}'.",
     )
     return updated_document
 
@@ -236,12 +244,13 @@ async def read_single_document(
     )
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    admin_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log,
-        activity_description=f"Document ID {document_id} read by admin '{current_user.email}'.",
+        activity_description=f"Document ID {document_id} read by admin '{admin_identifier}'.",
     )
     return document
 
@@ -259,11 +268,12 @@ async def delete_document(
     )
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    admin_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log,
-        activity_description=f"Document ID {document_id} deleted by admin '{current_user.email}'.",
+        activity_description=f"Document ID {document_id} deleted by admin '{admin_identifier}'.",
     )
     return None

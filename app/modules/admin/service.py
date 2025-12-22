@@ -17,6 +17,7 @@ from app.schemas import user_schema
 from app.models.company_model import Company
 from app.utils.generators import generate_company_code
 from app.models import user_model
+from app.utils.user_identifier import get_user_identifier
 
 async def get_companies_service(
     db: AsyncSession,
@@ -62,18 +63,15 @@ async def approve_company_service(
 
     company = result
 
-    # Non-blocking email notification to company admin(s)
+    # Non-blocking email notification to company
     try:
-        admins = await user_repository.get_admins_by_company(db, company_id=company_id)
-        emails = [admin.email for admin in admins if admin.email]
-        if emails:
+        if company.company_email:
             subject = "Perusahaan Anda telah disetujui"
             body = (
                 f"<p>Perusahaan '{company.name}' telah disetujui.</p>"
                 f"<p>Silakan login ke platform untuk mulai menggunakan layanan.</p>"
             )
-            for email in emails:
-                await send_brevo_email(to_email=email, subject=subject, html_content=body)
+            await send_brevo_email(to_email=company.company_email, subject=subject, html_content=body)
     except Exception as e:
         import logging
         logging.error("Failed to send approval email for company %s: %s", company_id, e)
@@ -182,15 +180,15 @@ async def export_activity_logs_service(
 
     # Write header row
     header = [
-        "ID", "Timestamp", "User ID", "Company ID", 
+        "ID", "Timestamp", "User ID", "Company ID",
         "Activity Type Category", "Activity Description",
-        "User Email", "Company Name"
+        "User Identifier", "Company Name"
     ]
     writer.writerow(header)
 
     # Write data rows
     for log in logs:
-        user_email = log.user.email if log.user else ""
+        user_email = get_user_identifier(log.user, company=log.company)
         company_name = log.company.name if log.company else ""
         
         writer.writerow([
@@ -333,11 +331,9 @@ async def update_company_by_superadmin_service(
     for key, value in update_data_filtered.items():
         setattr(company, key, value)
 
-    if target_admin and any([payload.admin_name, payload.admin_email, payload.admin_password]):
+    if target_admin and any([payload.admin_name, payload.admin_password]):
         if payload.admin_name:
             target_admin.name = payload.admin_name
-        if payload.admin_email:
-            target_admin.email = payload.admin_email
         if payload.admin_password:
             target_admin.hashed_password = get_password_hash(payload.admin_password)
         db.add(target_admin)
@@ -369,8 +365,6 @@ async def update_company_admin_by_superadmin_service(
 
     if payload.name:
         admin.name = payload.name
-    if payload.email:
-        admin.email = payload.email
     if payload.username:
         admin.username = payload.username
     if payload.password:
@@ -406,11 +400,11 @@ async def create_company_by_superadmin_service(
                 detail="Company code already exists."
             )
 
-    existing_admin_email = await user_repository.get_user_by_email(db, email=payload.admin_email)
-    if existing_admin_email:
+    existing_admin_username = await user_repository.get_user_by_username(db, username=payload.company_email)
+    if existing_admin_username:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Admin email already exists."
+            detail="Admin username already exists."
         )
 
     code_to_use = payload.code or generate_company_code()
@@ -428,8 +422,7 @@ async def create_company_by_superadmin_service(
 
     admin_user = user_model.Users(
         name=payload.admin_name,
-        email=payload.admin_email,
-        username=payload.admin_email,
+        username=payload.company_email,
         password=get_password_hash(payload.admin_password),
         role="admin",
         company_id=company.id,

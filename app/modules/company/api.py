@@ -11,6 +11,7 @@ from app.modules.company import service as company_service
 from app.modules.auth import service as user_service
 from app.modules.auth.service import EmployeeDeletionError, EmployeeUpdateError
 from app.utils.activity_logger import log_activity
+from app.utils.user_identifier import get_user_identifier
 
 router = APIRouter(
     prefix="/companies",
@@ -34,7 +35,6 @@ async def update_company_by_admin(
     name: Optional[str] = Form(None),
     company_email: Optional[str] = Form(None),
     admin_name: Optional[str] = Form(None),
-    admin_email: Optional[str] = Form(None),
     admin_password: Optional[str] = Form(None),
     code: Optional[str] = Form(None),
     address: Optional[str] = Form(None),
@@ -49,7 +49,6 @@ async def update_company_by_admin(
         name=name,
         company_email=company_email,
         admin_name=admin_name,
-        admin_email=admin_email,
         admin_password=admin_password,
         code=code,
         address=address,
@@ -58,12 +57,13 @@ async def update_company_by_admin(
     )
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    admin_identifier = get_user_identifier(current_user)
     log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log,
-        activity_description=f"Company '{updated_company.name}' updated by admin '{current_user.email}'.",
+        activity_description=f"Company '{updated_company.name}' updated by admin '{admin_identifier}'.",
         timestamp=datetime.now(timezone.utc)
     )
 
@@ -71,8 +71,7 @@ async def update_company_by_admin(
 
     response = company_schema.CompanyMeResponse(
         **company_data.model_dump(),
-        admin_name=updated_admin.name,
-        admin_email=updated_admin.email
+        admin_name=updated_admin.name
     )
     return response
 
@@ -80,7 +79,6 @@ async def update_company_by_admin(
 @router.post("/employees/register", response_model=user_schema.User)
 async def register_employee_by_admin(
     name: str = Form(...),
-    email: str = Form(...),
     username: str = Form(...),
     password: str = Form(...),
     division: Optional[str] = Form(None),
@@ -90,7 +88,6 @@ async def register_employee_by_admin(
 ):
     employee_data = user_schema.EmployeeRegistrationByAdmin(
         name=name,
-        email=email,
         username=username,
         password=password,
         division=division
@@ -105,12 +102,14 @@ async def register_employee_by_admin(
     )
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    admin_identifier = get_user_identifier(current_user)
+    employee_identifier = get_user_identifier(registered_employee, company=current_user.company)
     log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log,
-        activity_description=f"Employee '{registered_employee.email}' registered by admin '{current_user.email}'.",
+        activity_description=f"Employee '{employee_identifier}' registered by admin '{admin_identifier}'.",
         timestamp=datetime.now(timezone.utc)
     )
     return registered_employee
@@ -120,7 +119,6 @@ async def register_employee_by_admin(
 async def update_employee_by_admin(
     employee_id: int,
     name: Optional[str] = Form(None),
-    email: Optional[str] = Form(None),
     username: Optional[str] = Form(None),
     password: Optional[str] = Form(None),
     division: Optional[str] = Form(None),
@@ -130,7 +128,6 @@ async def update_employee_by_admin(
 ):
     employee_data = user_schema.EmployeeUpdate(
         name=name,
-        email=email,
         username=username,
         password=password,
         division=division
@@ -146,12 +143,14 @@ async def update_employee_by_admin(
         )
 
         company_id_to_log = current_user.company_id if current_user.company else None
+        admin_identifier = get_user_identifier(current_user)
+        employee_identifier = get_user_identifier(updated_employee, company=current_user.company)
         log_activity(
             db=db,
             user_id=current_user.id,
             activity_type_category="Data/CRUD",
             company_id=company_id_to_log,
-            activity_description=f"Employee '{updated_employee.email}' updated by admin '{current_user.email}'.",
+            activity_description=f"Employee '{employee_identifier}' updated by admin '{admin_identifier}'.",
             timestamp=datetime.now(timezone.utc)
         )
         return updated_employee
@@ -173,12 +172,13 @@ async def delete_employee_by_admin(
         )
 
         company_id_to_log = current_user.company_id if current_user.company else None
+        admin_identifier = get_user_identifier(current_user)
         log_activity(
             db=db,
             user_id=current_user.id,
             activity_type_category="Data/CRUD",
             company_id=company_id_to_log,
-            activity_description=f"Employee with ID {employee_id} deleted by admin '{current_user.email}'.",
+            activity_description=f"Employee with ID {employee_id} deleted by admin '{admin_identifier}'.",
             timestamp=datetime.now(timezone.utc)
         )
         return {"message": "Employee deleted successfully"}
@@ -206,8 +206,7 @@ async def read_company_by_admin(
         pic_phone_number=company_details.pic_phone_number,
         company_email=company_details.company_email,
         created_at=str(company_details.created_at) if company_details.created_at else None,
-        admin_name=current_user.name,
-        admin_email=current_user.email
+        admin_name=current_user.name
     )
 
     return response
@@ -228,7 +227,7 @@ async def get_company_users_by_admin(
         None,
         max_length=100,
         description=(
-            "Cari username, nama, atau email. Kosongkan untuk menampilkan semua pengguna; "
+            "Cari username atau nama. Kosongkan untuk menampilkan semua pengguna; "
             "pencarian diterapkan jika panjang kata kunci minimal 2 karakter."
         ),
     ),

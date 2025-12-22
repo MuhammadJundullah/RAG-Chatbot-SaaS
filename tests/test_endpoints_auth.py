@@ -17,7 +17,9 @@ def test_register_endpoint():
         }
         
         # Mock the user service and company repository
-        with patch('app.modules.auth.service.user_repository.get_user_by_email', return_value=None), \
+        with patch('app.modules.auth.service.user_repository.get_user_by_username', return_value=None), \
+             patch('app.modules.auth.service.company_repository.get_company_by_name', return_value=None), \
+             patch('app.modules.auth.service.company_repository.get_company_by_email', return_value=None), \
              patch('app.modules.auth.service.user_repository.create_user', new_callable=AsyncMock) as mock_create_user, \
              patch('app.modules.auth.service.company_repository.create_company', new_callable=AsyncMock) as mock_create_company, \
              patch('app.utils.security.get_password_hash', return_value="hashed_password"):
@@ -26,7 +28,6 @@ def test_register_endpoint():
             user_instance = Users(
                 id=1,
                 name=registration_data["name"],
-                email=registration_data["email"],
                 username=None,
                 password="hashed_password",
                 role="admin",
@@ -62,10 +63,9 @@ def test_login_endpoint():
             user_instance = Users(
                 id=1,
                 name="Test User",
-                email="test@example.com",
                 username="testuser",
                 password="hashed_password",
-                role="employee",
+                role="admin",
                 company_id=1
             )
             mock_auth_user.return_value = user_instance
@@ -97,7 +97,6 @@ def test_login_endpoint_with_username():
             user_instance = Users(
                 id=2,
                 name="Test User 2",
-                email="test2@example.com",
                 username="testuser",
                 password="hashed_password",
                 role="employee",
@@ -124,7 +123,6 @@ def test_get_current_user_endpoint():
         user_instance = Users(
             id=1,
             name="Test User",
-            email="test@example.com",
             username="testuser",
             role="employee",
             company_id=1,
@@ -149,7 +147,6 @@ def test_get_current_user_endpoint():
             assert response.status_code == 200
             assert response.json()["id"] == 1
             assert response.json()["name"] == "Test User"
-            assert response.json()["email"] == "test@example.com"
             # Assert that the user's personal pic_phone_number is NOT present
             assert "pic_phone_number" not in response.json() 
             # NOTE: The actual value cannot be tested without modifying the program code.

@@ -60,7 +60,6 @@ async def update_company_by_admin_service(
     name: Optional[str],
     company_email: Optional[str],
     admin_name: Optional[str],
-    admin_email: Optional[str],
     admin_password: Optional[str],
     code: Optional[str],
     address: Optional[str],
@@ -74,8 +73,6 @@ async def update_company_by_admin_service(
     # Update admin user details
     if admin_name:
         current_user.name = admin_name
-    if admin_email:
-        current_user.email = admin_email
     if admin_password:
         current_user.hashed_password = get_password_hash(admin_password)
     

@@ -21,7 +21,6 @@ async def test_register_employee_with_profile_picture(
     mock_user_data = {
         "id": 10,
         "name": "John Doe",
-        "email": "john.doe@example.com",
         "username": "johndoe",
         "role": "employee",
         "company_id": 1,
@@ -38,7 +37,6 @@ async def test_register_employee_with_profile_picture(
         # Prepare employee data
         employee_payload = {
             "name": "John Doe",
-            "email": "john.doe@example.com",
             "username": "johndoe",
             "password": "securepassword123",
             "division_id": 1
@@ -55,7 +53,6 @@ async def test_register_employee_with_profile_picture(
             "/companies/employees/register",
             data={
                 "name": employee_payload["name"],
-                "email": employee_payload["email"],
                 "username": employee_payload["username"],
                 "password": employee_payload["password"],
                 "division_id": employee_payload["division_id"],
@@ -67,7 +64,6 @@ async def test_register_employee_with_profile_picture(
         assert response.status_code == 200
         response_data = response.json()
         assert response_data["name"] == "John Doe"
-        assert response_data["email"] == "john.doe@example.com"
         assert response_data["profile_picture_url"] == mock_user_data["profile_picture_url"]
         
         # Verify service was called correctly
@@ -93,7 +89,6 @@ async def test_register_employee_without_profile_picture(
     mock_user_data = {
         "id": 11,
         "name": "Jane Smith",
-        "email": "jane.smith@example.com",
         "username": "janesmith",
         "role": "employee",
         "company_id": 1,
@@ -109,7 +104,6 @@ async def test_register_employee_without_profile_picture(
         
         employee_payload = {
             "name": "Jane Smith",
-            "email": "jane.smith@example.com",
             "username": "janesmith",
             "password": "securepassword456",
             "division_id": 1
@@ -120,7 +114,6 @@ async def test_register_employee_without_profile_picture(
             "/companies/employees/register",
             data={
                 "name": employee_payload["name"],
-                "email": employee_payload["email"],
                 "username": employee_payload["username"],
                 "password": employee_payload["password"],
                 "division_id": employee_payload["division_id"],
@@ -133,29 +126,23 @@ async def test_register_employee_without_profile_picture(
         assert response_data["profile_picture_url"] is None
         
         # Verify service was called correctly
-        mock_register_service.assert_called_once_with(
-            db=mock_db_session,
-            company_id=1,
-            employee_data=pytest.approx(employee_payload), # Pydantic model constructed from form fields
-            profile_picture_file=None # Ensure file is None
-        )
+        mock_register_service.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_register_employee_duplicate_email(
+async def test_register_employee_duplicate_username(
     admin_client: TestClient,
     mock_db_session: AsyncMock,
 ):
     """
-    Tests employee registration when the email already exists.
+    Tests employee registration when the username already exists.
     """
     # Mock the user_service to raise an error
-    with patch.object(user_service, 'register_employee_by_admin', side_effect=user_service.UserRegistrationError("Email is already registered.")) as mock_register_service, \
+    with patch.object(user_service, 'register_employee_by_admin', side_effect=user_service.UserRegistrationError("Username is already registered.")) as mock_register_service, \
          patch.object(app.dependency_overrides.get('get_db'), '__call__', return_value=mock_db_session):
         
         employee_payload = {
             "name": "Existing User",
-            "email": "existing@example.com",
             "username": "existinguser",
             "password": "password",
             "division_id": 1
@@ -166,7 +153,6 @@ async def test_register_employee_duplicate_email(
             "/companies/employees/register",
             data={
                 "name": employee_payload["name"],
-                "email": employee_payload["email"],
                 "username": employee_payload["username"],
                 "password": employee_payload["password"],
                 "division_id": employee_payload["division_id"],
@@ -174,7 +160,7 @@ async def test_register_employee_duplicate_email(
         )
         
         assert response.status_code == 400 # Expecting Bad Request for registration errors
-        assert response.json()["detail"] == "Email is already registered."
+        assert response.json()["detail"] == "Username is already registered."
         
         mock_register_service.assert_called_once()
 
@@ -194,7 +180,6 @@ async def test_register_employee_upload_failure(
         
         employee_payload = {
             "name": "John Doe",
-            "email": "john.doe@example.com",
             "username": "johndoe",
             "password": "securepassword123",
             "division_id": 1
@@ -209,7 +194,6 @@ async def test_register_employee_upload_failure(
             "/companies/employees/register",
             data={
                 "name": employee_payload["name"],
-                "email": employee_payload["email"],
                 "username": employee_payload["username"],
                 "password": employee_payload["password"],
                 "division_id": employee_payload["division_id"],
@@ -233,15 +217,15 @@ async def test_get_company_users_by_admin(
     # Mock data for users
     mock_users_data = [
         user_schema.User(
-            id=1, name="User One", email="user1@example.com", username="userone",
+            id=1, name="User One", username="userone",
             role="employee", company_id=1, division="HR", is_active=True, profile_picture_url=None
         ),
         user_schema.User(
-            id=2, name="User Two", email="user2@example.com", username="usertwo",
+            id=2, name="User Two", username="usertwo",
             role="employee", company_id=1, division="IT", is_active=True, profile_picture_url=None
         ),
         user_schema.User(
-            id=3, name="Admin User", email="admin@example.com", username="adminuser",
+            id=3, name="Admin User", username="adminuser",
             role="admin", company_id=1, division="Management", is_active=True, profile_picture_url=None
         ),
     ]

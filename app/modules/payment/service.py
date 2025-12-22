@@ -60,6 +60,8 @@ class IPaymuService:
 
     async def create_payment_link(self, subscription: Subscription, user: Users) -> tuple[str, str]:
         """Membuat tautan pembayaran dengan iPaymu."""
+        if not user.company or not user.company.company_email:
+            raise HTTPException(status_code=400, detail="Company email is required for payment.")
         payload = {
             "product": [subscription.plan.name],
             "qty": [1],
@@ -68,7 +70,7 @@ class IPaymuService:
             "notifyUrl": self._normalize_url("/api/webhooks/ipaymu-notify"),
             "referenceId": str(subscription.id),
             "buyerName": user.name,
-            "buyerEmail": user.email,
+            "buyerEmail": user.company.company_email,
         }
 
         timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
@@ -109,6 +111,8 @@ class IPaymuService:
         return_url: Optional[str] = None,
         failed_url: Optional[str] = None,
     ) -> tuple[str, str]:
+        if not user.company or not user.company.company_email:
+            raise HTTPException(status_code=400, detail="Company email is required for payment.")
         payload = {
             "product": [product_name],
             "qty": [1],
@@ -118,7 +122,7 @@ class IPaymuService:
             "notifyUrl": self._normalize_url("/api/webhooks/ipaymu-notify"),
             "referenceId": reference_id,
             "buyerName": user.name,
-            "buyerEmail": user.email,
+            "buyerEmail": user.company.company_email,
         }
 
         timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")

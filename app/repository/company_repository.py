@@ -162,14 +162,12 @@ class CompanyRepository(BaseRepository[company_model.Company]):
                 or_(
                     user_model.Users.username.ilike(pattern),
                     user_model.Users.name.ilike(pattern),
-                    user_model.Users.email.ilike(pattern),
                 )
             )
             count_stmt = count_stmt.where(
                 or_(
                     user_model.Users.username.ilike(pattern),
                     user_model.Users.name.ilike(pattern),
-                    user_model.Users.email.ilike(pattern),
                 )
             )
 

@@ -13,21 +13,21 @@ from app.schemas.user_schema import User, PaginatedUserResponse  # Import User s
 
 @pytest.fixture
 def override_get_current_user_as_admin():
-    mock_user = Users(id=1, email="admin@example.com", company_id=1, role='admin', is_active=True)
+    mock_user = Users(id=1, company_id=1, role='admin', is_active=True)
     app.dependency_overrides[get_current_user] = lambda: mock_user
     yield
     app.dependency_overrides.clear()
 
 @pytest.fixture
 def override_get_current_company_admin():
-    mock_admin = Users(id=1, email="admin@example.com", company_id=1, role='admin', is_active=True)
+    mock_admin = Users(id=1, company_id=1, role='admin', is_active=True)
     app.dependency_overrides[get_current_company_admin] = lambda: mock_admin
     yield
     app.dependency_overrides.clear()
 
 @pytest.fixture
 def override_get_current_super_admin():
-    mock_super_admin = Users(id=999, email="superadmin@example.com", company_id=None, role='super_admin', is_active=True)
+    mock_super_admin = Users(id=999, company_id=None, role='super_admin', is_active=True)
     app.dependency_overrides[get_current_super_admin] = lambda: mock_super_admin
     yield
     app.dependency_overrides.clear()
@@ -37,7 +37,7 @@ def override_get_current_super_admin():
 
 def test_read_my_company(admin_client):
     mock_company = Company(id=1, name="Test Company", code="TC", is_active=True)
-    employee = Users(id=1, email="emp@example.com", company_id=1, role='employee', is_active=True)
+    employee = Users(id=1, company_id=1, role='employee', is_active=True)
     app.dependency_overrides[get_current_employee] = lambda: employee
     try:
         with patch('app.modules.company.service.get_company_by_user_service', return_value=mock_company):
@@ -50,8 +50,8 @@ def test_read_my_company(admin_client):
 
 def test_get_company_users_endpoint(admin_client):
     mock_users = [
-        User(id=1, name="Admin User", email="admin@example.com", company_id=1, role='admin', is_active=True),
-        User(id=2, name="Employee User", email="user@example.com", company_id=1, role='employee', is_active=True)
+        User(id=1, name="Admin User", company_id=1, role='admin', is_active=True),
+        User(id=2, name="Employee User", company_id=1, role='employee', is_active=True)
     ]
     mock_response = PaginatedUserResponse(users=mock_users, total_users=2, current_page=1, total_pages=1)
     with patch('app.modules.company.service.get_company_users_paginated', return_value=mock_response):
@@ -61,14 +61,13 @@ def test_get_company_users_endpoint(admin_client):
         assert data['total_users'] == 2
         assert data['current_page'] == 1
         assert len(data['users']) == 2
-        assert data['users'][0]["email"] == "admin@example.com"
 
 
 def test_update_my_company(admin_client):
     update_data = {"name": "Updated Company", "code": "UC"}
     # Service returns tuple (company, admin) in real flow
     mock_updated_company = Company(id=1, name="Updated Company", code="UC", is_active=True)
-    mock_admin = Users(id=1, email="admin@example.com", company_id=1, role='admin', is_active=True)
+    mock_admin = Users(id=1, company_id=1, role='admin', is_active=True)
     with patch('app.modules.company.service.update_company_by_admin_service', return_value=(mock_updated_company, mock_admin)):
         response = admin_client.put("/api/companies/me", data=update_data)
         assert response.status_code == 200
@@ -133,7 +132,6 @@ async def test_register_employee_by_admin(override_get_current_company_admin, ad
     # Mock data for the request
     employee_data = {
         "name": "New Employee",
-        "email": "new.employee@example.com",
         "username": "newemp",
         "password": "password123",
     }
@@ -144,7 +142,6 @@ async def test_register_employee_by_admin(override_get_current_company_admin, ad
     mock_user = User(
         id=5,
         name="New Employee",
-        email="new.employee@example.com",
         username="newemp",
         role="employee",
         company_id=1,
@@ -185,7 +182,6 @@ async def test_update_employee_by_admin(override_get_current_company_admin, admi
     mock_updated_user = User(
         id=employee_id,
         name=expected_name,
-        email="test.employee@example.com",
         username="testemp",
         role="employee",
         company_id=1,

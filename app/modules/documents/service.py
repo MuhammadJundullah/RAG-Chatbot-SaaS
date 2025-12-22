@@ -13,6 +13,7 @@ from app.repository.document_repository import document_repository
 from app.core.config import settings
 from app.modules.documents.rag_service import rag_service
 from app.utils.activity_logger import log_activity
+from app.utils.user_identifier import get_user_identifier
 from app.modules.subscription.service import subscription_service
 
 
@@ -64,12 +65,13 @@ async def upload_document_service(
     )
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    admin_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Proses Dokumen",
         company_id=company_id_to_log,
-        activity_description=f"Document '{db_document.title}' (ID: {db_document.id}) uploaded by admin '{current_user.email}'.",
+        activity_description=f"Document '{db_document.title}' (ID: {db_document.id}) uploaded by admin '{admin_identifier}'.",
     )
 
     from app.tasks.document_tasks import process_ocr_task
@@ -94,12 +96,13 @@ async def retry_document_upload_service(
         )
 
         company_id_to_log = current_user.company_id if current_user.company else None
+        admin_identifier = get_user_identifier(current_user)
         await log_activity(
             db=db,
             user_id=current_user.id,
             activity_type_category="Proses Dokumen",
             company_id=company_id_to_log,
-            activity_description=f"Document ID {document_id} processing retried by admin '{current_user.email}'.",
+            activity_description=f"Document ID {document_id} processing retried by admin '{admin_identifier}'.",
         )
         from app.tasks.document_tasks import process_ocr_task
         process_ocr_task.delay(document_id)
@@ -122,12 +125,13 @@ async def get_all_company_documents_service(
     )
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    admin_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log,
-        activity_description=f"Admin '{current_user.email}' retrieved list of all company documents. Found {total_count} documents.",
+        activity_description=f"Admin '{admin_identifier}' retrieved list of all company documents. Found {total_count} documents.",
     )
     return documents, total_count
 
@@ -141,12 +145,13 @@ async def get_documents_pending_validation_service(
     )
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    admin_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Proses Dokumen",
         company_id=company_id_to_log,
-        activity_description=f"Admin '{current_user.email}' retrieved list of documents pending validation. Found {len(documents)} documents.",
+        activity_description=f"Admin '{admin_identifier}' retrieved list of documents pending validation. Found {len(documents)} documents.",
     )
     return documents
 
@@ -239,12 +244,13 @@ async def update_document_content_service(
     print(f"[Service] Queued embedding task for document ID: {document_id}")
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    admin_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log,
-        activity_description=f"Document ID {document_id} content updated by admin '{current_user.email}'.",
+        activity_description=f"Document ID {document_id} content updated by admin '{admin_identifier}'.",
     )
 
     return updated_doc_repo
@@ -263,12 +269,13 @@ async def read_single_document_service(
         raise HTTPException(status_code=403, detail="You do not have permission to access this document.")
 
     company_id_to_log = current_user.company_id if current_user.company else None
+    admin_identifier = get_user_identifier(current_user)
     await log_activity(
         db=db,
         user_id=current_user.id,
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log,
-        activity_description=f"Document ID {document_id} read by admin '{current_user.email}'.",
+        activity_description=f"Document ID {document_id} read by admin '{admin_identifier}'.",
     )
 
     return db_document
@@ -299,12 +306,13 @@ async def delete_document_service(
         await document_repository.delete_document(db=db, document_id=document_id)
 
         company_id_to_log = current_user.company_id if current_user.company else None
+        admin_identifier = get_user_identifier(current_user)
         await log_activity(
             db=db,
             user_id=current_user.id,
             activity_type_category="Data/CRUD",
             company_id=company_id_to_log,
-            activity_description=f"Document ID {document_id} deleted by admin '{current_user.email}'."
+            activity_description=f"Document ID {document_id} deleted by admin '{admin_identifier}'."
         )
 
         return None

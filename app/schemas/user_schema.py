@@ -4,13 +4,12 @@ from typing import Optional
 
 class UserBase(BaseModel):
     name: Optional[str] = None
-    email: Optional[str] = None
     username: Optional[str] = None
 
 
 class UserRegistration(BaseModel):
     name: str
-    email: EmailStr  # digunakan sebagai email admin
+    email: EmailStr  # digunakan sebagai company_email
     username: Optional[str] = None
     password: str
     company_name: str
@@ -22,7 +21,6 @@ class UserRegistration(BaseModel):
 
 class EmployeeUpdate(BaseModel):
     name: Optional[str] = None
-    email: Optional[str] = None
     username: Optional[str] = None  # Fixed: Added username field
     password: Optional[str] = None
     division: Optional[str] = None
@@ -40,14 +38,8 @@ class User(UserBase):
         from_attributes = True
         
 
-class AdminCreate(BaseModel):
-    name: str
-    email: str
-    password: str
-
-
 class UserLoginCombined(BaseModel):
-    # Login bisa pakai email user atau username
+    # Login: company admin pakai email perusahaan, superadmin/employee pakai username
     email: Optional[EmailStr] = None
     username: Optional[str] = None
     password: str
@@ -63,7 +55,6 @@ class UserLoginCombined(BaseModel):
 
 class EmployeeRegistrationByAdmin(BaseModel):
     name: str
-    email: str
     username: str
     password: str
     division: Optional[str] = None
@@ -77,7 +68,6 @@ class PasswordResetRequest(BaseModel):
 # New schema for updating user details
 class UserUpdate(BaseModel):
     name: Optional[str] = None
-    email: Optional[str] = None
     username: Optional[str] = None
     password: Optional[str] = None
 
@@ -91,6 +81,5 @@ class PaginatedUserResponse(BaseModel):
 
 class AdminSuperadminUpdate(BaseModel):
     name: Optional[str] = None
-    email: Optional[EmailStr] = None
     username: Optional[str] = None
     password: Optional[str] = None

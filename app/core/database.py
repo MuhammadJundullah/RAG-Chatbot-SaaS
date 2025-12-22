@@ -58,7 +58,6 @@ async def create_super_admin(db_session):
     super_admin = UserModel(
         name="Super Admin",
         username=SUPERADMIN_USERNAME,
-        email=None,
         password=hashed_password,
         role="super_admin",
         company_id=None

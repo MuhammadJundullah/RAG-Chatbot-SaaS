@@ -12,7 +12,6 @@ def test_chat_endpoint():
         mock_user = Users(
             id=1,
             name="Test User",
-            email="test@example.com",
             username="testuser",
             role="employee",
             company_id=1
@@ -59,7 +58,6 @@ def test_chat_endpoint_without_conversation_id():
         mock_user = Users(
             id=1,
             name="Test User",
-            email="test@example.com",
             username="testuser",
             role="employee",
             company_id=1

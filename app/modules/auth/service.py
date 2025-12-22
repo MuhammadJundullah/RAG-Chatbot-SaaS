@@ -41,7 +41,8 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
     Can either create a new company or assign to an existing one.
     """
     # Business Logic: Check if username already exists
-    username_to_use = user_data.username if user_data.username else user_data.email
+    company_email_to_use = user_data.company_email or user_data.email
+    username_to_use = user_data.username if user_data.username else company_email_to_use
     existing_user_by_username = await user_repository.get_user_by_username(db, username=username_to_use)
     if existing_user_by_username:
         raise UserRegistrationError("Username is already registered.")
@@ -55,7 +56,6 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
         if existing_company:
             raise UserRegistrationError("Company name is already registered.")
         # Gunakan email input sebagai company_email (Users.email tidak diisi)
-        company_email_to_use = user_data.company_email or user_data.email
         existing_company_email = await company_repository.get_company_by_email(db, company_email=company_email_to_use)
         if existing_company_email:
             raise UserRegistrationError("Company email is already registered.")
@@ -74,7 +74,6 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
         # Data Layer: Create new user object as company admin
         db_user = user_model.Users(
             name=user_data.name,
-            email=user_data.email,
             username=username_to_use,
             password=hashed_password,
             role="admin",
@@ -106,10 +105,6 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
         # If subscription is not active or found, prevent registration
         raise UserRegistrationError(f"Cannot add new employee: {e.detail}")
         
-    existing_user_by_email = await user_repository.get_user_by_email(db, email=employee_data.email)
-    if existing_user_by_email:
-        raise UserRegistrationError("Email is already registered.")
-    
     existing_user_by_username = await user_repository.get_user_by_username(db, username=employee_data.username)
     if existing_user_by_username:
         raise UserRegistrationError("Username is already registered.")
@@ -122,12 +117,11 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
         try:
             profile_picture_url = await save_uploaded_file(profile_picture_file, UPLOAD_DIR) # Use helper
         except Exception as e:
-            logging.error(f"Failed to upload profile picture for employee {employee_data.email}: {e}")
+            logging.error(f"Failed to upload profile picture for employee {employee_data.username}: {e}")
             raise UserRegistrationError(f"Failed to upload profile picture: {e}")
 
     db_user = user_model.Users(
         name=employee_data.name,
-        email=employee_data.email,
         username=employee_data.username,
         password=hashed_password,
         role="employee",
@@ -226,13 +220,15 @@ async def authenticate_user(
     """
     user = None
     if email:
-        user = await user_repository.get_user_by_email(db, email=email)
-        if not user:
-            company = await company_repository.get_company_by_email(db, company_email=email)
-            if company:
-                user = await user_repository.get_first_admin_by_company(db, company_id=company.id)
+        company = await company_repository.get_company_by_email(db, company_email=email)
+        if company:
+            user = await user_repository.get_first_admin_by_company(db, company_id=company.id)
+            if user and not user.company:
+                user.company = company
     elif username:
         user = await user_repository.get_user_by_username(db, username=username)
+        if user and user.role == "admin":
+            return None
     
     if not user or not verify_password(password, user.password):
         return None
@@ -277,7 +273,7 @@ async def request_password_reset(db: AsyncSession, email: str):
         )
 
     if not user.is_active:
-        logging.warning(f"Password reset requested for inactive user: {user.email}")
+        logging.warning(f"Password reset requested for inactive user: {user.username}")
         return {"message": "Jika akun dengan email tersebut ada, tautan reset kata sandi telah dikirim.", "code": 400}
 
     # Generate token and set expiry

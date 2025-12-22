@@ -33,12 +33,10 @@ class CompanyUpdateMe(BaseModel):
     name: Optional[str] = None
     company_email: Optional[EmailStr] = None
     admin_name: Optional[str] = None
-    admin_email: Optional[EmailStr] = None
     admin_password: Optional[str] = None
 
 class CompanyMeResponse(Company):
     admin_name: str
-    admin_email: EmailStr
 
 class PaginatedCompanyResponse(BaseModel):
     companies: List[Company]
@@ -50,7 +48,6 @@ class PaginatedCompanyResponse(BaseModel):
 class CompanyAdminSummary(BaseModel):
     id: int
     name: Optional[str] = None
-    email: Optional[EmailStr] = None
     username: Optional[str] = None
     role: Optional[str] = None
     company_id: Optional[int] = None
@@ -68,7 +65,6 @@ class CompanySuperadminUpdate(BaseModel):
     pic_phone_number: Optional[str] = None
     is_active: Optional[bool] = None
     admin_name: Optional[str] = None
-    admin_email: Optional[EmailStr] = None
     admin_password: Optional[str] = None
 
 
@@ -76,7 +72,6 @@ class CompanySuperadminCreate(BaseModel):
     name: str
     company_email: EmailStr
     admin_name: str
-    admin_email: EmailStr
     admin_password: str
     code: Optional[str] = None
     address: Optional[str] = None

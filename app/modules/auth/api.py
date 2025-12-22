@@ -10,6 +10,7 @@ from app.modules.auth.service import UserRegistrationError
 from app.schemas import user_schema, token_schema
 from app.utils import auth
 from app.utils.activity_logger import log_activity
+from app.utils.user_identifier import get_user_identifier
 
 router = APIRouter(
     prefix="/auth",
@@ -27,6 +28,7 @@ async def register(
     try:
         user = await user_service.register_user(db, user_data=user_data)
 
+        company_email_to_use = user_data.company_email or user_data.email
         company_id_to_log = user.company_id
         await log_activity(
             db=db,
@@ -34,12 +36,12 @@ async def register(
             activity_type_category="Data/CRUD",
             company_id=company_id_to_log,
             activity_description=(
-                f"Admin registered for company '{user_data.company_name}' with company email '{user_data.email}'."
+                f"Admin registered for company '{user_data.company_name}' with company email '{company_email_to_use}'."
             ),
         )
 
         if user.role == 'admin':
-            return {"message": f"Company '{user_data.company_name}' and admin user '{user.email}' registered successfully. Pending approval from a super admin."}
+            return {"message": f"Company '{user_data.company_name}' and admin user '{company_email_to_use}' registered successfully. Pending approval from a super admin."}
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -55,7 +57,7 @@ async def register(
         if "duplicate key value violates unique constraint" in str(e):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Username or email already registered. Please use a different username or email."
+                detail="Username or company email already registered. Please use a different username or company email."
             )
         else:
             raise HTTPException(
@@ -116,12 +118,13 @@ async def login_for_access_token(
         token_data_payload["logo_s3_path"] = user.company.logo_s3_path
     token_data_payload["login_at"] = datetime.utcnow().isoformat() + "Z"
 
+    user_identifier = get_user_identifier(user)
     await log_activity(
         db=db,
         user_id=user.id,
         activity_type_category="Login/Akses",
         company_id=user.company_id if user.company else None,
-        activity_description=f"User login successfully for company '{user.company.company_email if user.company else ''}'.",
+        activity_description=f"User '{user_identifier}' login successfully for company '{user.company.company_email if user.company else ''}'.",
     )
 
     token_data = auth.create_access_token(data=token_data_payload)

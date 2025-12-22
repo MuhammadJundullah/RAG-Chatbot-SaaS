@@ -26,14 +26,6 @@ class UserRepository(BaseRepository[user_model.Users]):
         )
         return result.scalar_one_or_none()
 
-    async def get_user_by_email(self, db: AsyncSession, email: str) -> Optional[user_model.Users]:
-        result = await db.execute(
-            select(self.model)
-            .options(joinedload(self.model.company))
-            .filter(self.model.email == email)
-        )
-        return result.scalar_one_or_none()
-
     async def get_user_by_username(self, db: AsyncSession, username: str) -> Optional[user_model.Users]:
         result = await db.execute(
             select(self.model)
