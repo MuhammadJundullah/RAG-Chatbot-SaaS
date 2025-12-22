@@ -1,7 +1,8 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
 from datetime import datetime
 
+from app.utils.url_builder import add_app_base_url
 class CompanyBase(BaseModel):
     name: str
     code: str
@@ -11,6 +12,11 @@ class CompanyBase(BaseModel):
     pic_phone_number: Optional[str] = None 
     company_email: Optional[str] = None
     created_at: Optional[datetime] = None
+
+    @field_validator("logo_s3_path", mode="before")
+    @classmethod
+    def build_logo_url(cls, value: Optional[str]) -> Optional[str]:
+        return add_app_base_url(value)
 
 class CompanyCreate(CompanyBase):
     pass

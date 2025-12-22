@@ -9,6 +9,7 @@ from app.modules.auth import service as user_service
 from app.modules.auth.service import UserRegistrationError
 from app.schemas import user_schema, token_schema
 from app.utils import auth
+from app.utils.url_builder import add_app_base_url
 from app.utils.activity_logger import log_activity
 from app.utils.user_identifier import get_user_identifier
 
@@ -115,7 +116,7 @@ async def login_for_access_token(
     if user.company and user.company.name:
         token_data_payload["company_name"] = user.company.name
     if user.company and user.company.logo_s3_path:
-        token_data_payload["logo_s3_path"] = user.company.logo_s3_path
+        token_data_payload["logo_s3_path"] = add_app_base_url(user.company.logo_s3_path)
     token_data_payload["login_at"] = datetime.utcnow().isoformat() + "Z"
 
     user_identifier = get_user_identifier(user)
