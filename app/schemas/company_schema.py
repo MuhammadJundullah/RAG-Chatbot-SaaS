@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, AliasChoices, field_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -78,7 +78,7 @@ class CompanySuperadminCreate(BaseModel):
     name: str
     company_email: EmailStr
     admin_name: str
-    admin_password: str
+    password: str
     code: Optional[str] = None
     address: Optional[str] = None
     pic_phone_number: Optional[str] = None

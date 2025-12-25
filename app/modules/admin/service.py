@@ -423,7 +423,7 @@ async def create_company_by_superadmin_service(
     admin_user = user_model.Users(
         name=payload.admin_name,
         username=payload.company_email,
-        password=get_password_hash(payload.admin_password),
+        password=get_password_hash(payload.password),
         role="admin",
         company_id=company.id,
     )
