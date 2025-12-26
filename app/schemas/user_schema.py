@@ -25,6 +25,11 @@ class EmployeeUpdate(BaseModel):
     username: Optional[str] = None  # Fixed: Added username field
     password: Optional[str] = None
     division: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class EmployeeStatusUpdate(BaseModel):
+    is_active: bool
 
 
 class User(UserBase):

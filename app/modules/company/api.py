@@ -122,6 +122,7 @@ async def update_employee_by_admin(
     username: Optional[str] = Form(None),
     password: Optional[str] = Form(None),
     division: Optional[str] = Form(None),
+    is_active: Optional[bool] = Form(None),
     profile_picture_file: Optional[UploadFile] = None,
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_company_admin)
@@ -130,7 +131,8 @@ async def update_employee_by_admin(
         name=name,
         username=username,
         password=password,
-        division=division
+        division=division,
+        is_active=is_active
     )
 
     try:
@@ -152,6 +154,39 @@ async def update_employee_by_admin(
             company_id=company_id_to_log,
             activity_description=f"Employee '{employee_identifier}' updated by admin '{admin_identifier}'.",
             timestamp=datetime.now(timezone.utc)
+        )
+        return updated_employee
+    except EmployeeUpdateError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+
+
+@router.patch("/employees/{employee_id}/status", response_model=user_schema.User)
+async def update_employee_status_by_admin(
+    employee_id: int,
+    payload: user_schema.EmployeeStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_company_admin),
+):
+    try:
+        updated_employee = await user_service.update_employee_status_by_admin(
+            db=db,
+            company_id=current_user.company_id,
+            employee_id=employee_id,
+            is_active=payload.is_active,
+        )
+
+        company_id_to_log = current_user.company_id if current_user.company else None
+        admin_identifier = get_user_identifier(current_user)
+        employee_identifier = get_user_identifier(updated_employee, company=current_user.company)
+        log_activity(
+            db=db,
+            user_id=current_user.id,
+            activity_type_category="Data/CRUD",
+            company_id=company_id_to_log,
+            activity_description=(
+                f"Employee '{employee_identifier}' status set to {payload.is_active} by admin '{admin_identifier}'."
+            ),
+            timestamp=datetime.now(timezone.utc),
         )
         return updated_employee
     except EmployeeUpdateError as e:

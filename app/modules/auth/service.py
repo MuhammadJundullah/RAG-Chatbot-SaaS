@@ -205,6 +205,22 @@ async def update_employee_by_admin(
     await db.refresh(employee)
     return employee
 
+async def update_employee_status_by_admin(
+    db: AsyncSession,
+    company_id: int,
+    employee_id: int,
+    is_active: bool,
+) -> user_model.Users:
+    """
+    Updates an employee's active status.
+    """
+    employee = await user_repository.get_user(db, user_id=employee_id)
+
+    if not employee or employee.company_id != company_id:
+        raise EmployeeUpdateError(detail="Employee not found or not part of your company.", status_code=404)
+
+    return await user_repository.update_user_status(db, user=employee, status=is_active)
+
 async def authenticate_user(
     db: AsyncSession,
     password: str,

@@ -37,7 +37,7 @@ class UserRepository(BaseRepository[user_model.Users]):
     async def get_users(self, db: AsyncSession, skip: int = 0, limit: int = 100) -> List[user_model.Users]:
         return await self.get_multi(db, skip=skip, limit=limit)
 
-    async def update_user_status(self, db: AsyncSession, user: user_model.Users, status: str) -> user_model.Users:
+    async def update_user_status(self, db: AsyncSession, user: user_model.Users, status: bool) -> user_model.Users:
         user.is_active = status 
         db.add(user)
         await db.commit()
