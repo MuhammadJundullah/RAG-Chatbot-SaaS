@@ -90,6 +90,13 @@ class PaginatedUserResponse(BaseModel):
     total_pages: int
 
 
+class PaginatedAdminResponse(BaseModel):
+    admins: list[User]
+    total_admin: int
+    current_page: int
+    total_page: int
+
+
 class AdminSuperadminUpdate(BaseModel):
     name: Optional[str] = None
     username: Optional[str] = None

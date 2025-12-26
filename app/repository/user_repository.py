@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from app.models import user_model
 from app.repository.base_repository import BaseRepository
@@ -65,6 +66,29 @@ class UserRepository(BaseRepository[user_model.Users]):
             select(self.model).filter(self.model.role == "admin")
         )
         return result.scalars().all()
+
+    async def get_all_admins_paginated(
+        self,
+        db: AsyncSession,
+        skip: int = 0,
+        limit: int = 100
+    ) -> tuple[List[user_model.Users], int]:
+        stmt = (
+            select(self.model)
+            .filter(self.model.role == "admin")
+            .order_by(self.model.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        count_stmt = (
+            select(func.count())
+            .select_from(self.model)
+            .where(self.model.role == "admin")
+        )
+        result = await db.execute(stmt)
+        admins = result.scalars().all()
+        total_admins = await db.scalar(count_stmt) or 0
+        return admins, total_admins
 
     async def get_first_admin_by_company(self, db: AsyncSession, company_id: int) -> Optional[user_model.Users]:
         result = await db.execute(

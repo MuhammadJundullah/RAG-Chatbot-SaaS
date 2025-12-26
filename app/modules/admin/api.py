@@ -48,11 +48,19 @@ async def read_companies(
     )
     return companies
 
-@router.get("/companies/admins", response_model=List[user_schema.User])
+@router.get("/companies/admins", response_model=user_schema.PaginatedAdminResponse)
 async def get_all_company_admins(
     db: AsyncSession = Depends(get_db),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(100, ge=1, le=1000, description="Items per page"),
 ):
-    return await admin_service.get_all_company_admins_service(db)
+    skip = (page - 1) * limit
+    return await admin_service.get_all_company_admins_service(
+        db=db,
+        skip=skip,
+        limit=limit,
+        page=page,
+    )
 
 
 @router.post("/companies", response_model=company_schema.CompanyDetailWithAdmins)

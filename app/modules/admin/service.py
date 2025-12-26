@@ -235,8 +235,24 @@ async def get_company_admins_service(
     return await user_repository.get_admins_by_company(db, company_id=company_id)
 
 
-async def get_all_company_admins_service(db: AsyncSession):
-    return await user_repository.get_all_admins(db)
+async def get_all_company_admins_service(
+    db: AsyncSession,
+    skip: int,
+    limit: int,
+    page: int
+) -> user_schema.PaginatedAdminResponse:
+    admins, total_admins = await user_repository.get_all_admins_paginated(
+        db=db,
+        skip=skip,
+        limit=limit,
+    )
+    total_pages = (total_admins + limit - 1) // limit if limit > 0 else 0
+    return user_schema.PaginatedAdminResponse(
+        admins=admins,
+        total_admin=total_admins,
+        current_page=page,
+        total_page=total_pages,
+    )
 
 
 async def get_company_admin_by_id_service(
