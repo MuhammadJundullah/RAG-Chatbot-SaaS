@@ -65,4 +65,4 @@ async def root():
 async def health_check(db: AsyncSession = Depends(get_db)):
     # For health checks, user_id and company_id might be unknown or N/A
 
-    return {"status": "healthy"}
+    return {"status": "sehat bwang"}
