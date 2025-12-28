@@ -43,7 +43,7 @@ class SubscriptionService:
             return existing
 
         plan = await self.get_trial_plan(db)
-        now = datetime.utcnow()
+        now = datetime.now()
         subscription = Subscription(
             company_id=company_id,
             plan_id=plan.id,
@@ -102,7 +102,7 @@ class SubscriptionService:
 
         days_until_renewal = None
         if sub.end_date:
-            delta_days = (sub.end_date - datetime.utcnow()).days
+            delta_days = (sub.end_date - datetime.now()).days
             days_until_renewal = max(delta_days, 0)
 
         document_quota = getattr(plan, "document_quota", -1)
@@ -293,8 +293,8 @@ class SubscriptionService:
             return None
         
         subscription.status = 'active'
-        subscription.start_date = datetime.utcnow()
-        subscription.end_date = datetime.utcnow() + timedelta(days=30)
+        subscription.start_date = datetime.now()
+        subscription.end_date = datetime.now() + timedelta(days=30)
         subscription.current_question_usage = 0
         
         await db.commit()
@@ -315,7 +315,7 @@ class SubscriptionService:
         if sub.status != 'active':
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Subscription is not active. Current status: {sub.status}")
         
-        if sub.end_date and sub.end_date < datetime.utcnow():
+        if sub.end_date and sub.end_date < datetime.now():
             sub.status = 'expired'
             await db.commit()
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Subscription has expired.")

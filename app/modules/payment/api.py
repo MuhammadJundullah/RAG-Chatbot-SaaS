@@ -74,7 +74,7 @@ async def ipaymu_notify(request: Request, db: AsyncSession = Depends(get_db)):
                     if _is_success(status_val, status_code):
                         if transaction.status != "paid":
                             transaction.status = "paid"
-                            transaction.paid_at = datetime.utcnow()
+                            transaction.paid_at = datetime.now()
 
                             if transaction.type == "topup":
                                 subscription = await subscription_service.get_subscription_by_company(

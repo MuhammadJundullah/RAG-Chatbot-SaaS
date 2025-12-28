@@ -14,10 +14,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     """Creates a new JWT access token and returns it along with its expiry."""
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now() + expires_delta
         expires_in_seconds = int(expires_delta.total_seconds())
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         expires_in_seconds = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     
     to_encode.update({"exp": expire})

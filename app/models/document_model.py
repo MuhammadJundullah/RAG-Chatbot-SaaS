@@ -32,7 +32,7 @@ class Documents(Base):
     extracted_text = Column(Text, nullable=True)
     failed_reason = Column(Text, nullable=True)
     tags = Column(ARRAY(String), nullable=True) 
-    uploaded_at = Column(DateTime, nullable=True, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=True, default=datetime.utcnow, onupdate=datetime.utcnow)
+    uploaded_at = Column(DateTime, nullable=True, default=datetime.now)
+    updated_at = Column(DateTime, nullable=True, default=datetime.now, onupdate=datetime.now)
 
     company = relationship("Company", back_populates="documents")

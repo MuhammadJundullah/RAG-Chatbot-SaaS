@@ -12,7 +12,7 @@ class ActivityLog(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime, default=datetime.now, nullable=False)
     
     # Foreign key to the users table
     user_id = Column(Integer, ForeignKey("Users.id"), nullable=True) 

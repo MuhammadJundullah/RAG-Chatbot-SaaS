@@ -284,7 +284,7 @@ async def authenticate_user(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Subscription not found for this company.",
                 )
-            if subscription.end_date and subscription.end_date < datetime.utcnow():
+            if subscription.end_date and subscription.end_date < datetime.now():
                 if subscription.status != "expired":
                     subscription.status = "expired"
                     await db.commit()
@@ -331,7 +331,7 @@ async def request_password_reset(db: AsyncSession, email: str):
     # Generate token and set expiry
     token = generate_reset_token() # Use helper
     # Menggunakan durasi token yang sama untuk reset token expiry
-    expiry_time = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES) 
+    expiry_time = datetime.now() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     user.reset_token = token
     user.reset_token_expiry = expiry_time
@@ -400,7 +400,7 @@ async def reset_password(db: AsyncSession, email: str, token: str, new_password:
         )
 
     # Verifikasi token dan expiry
-    if user.reset_token != token or datetime.utcnow() > user.reset_token_expiry:
+    if user.reset_token != token or datetime.now() > user.reset_token_expiry:
         # Hapus token yang tidak valid dari pengguna untuk mencegah upaya penggunaan ulang
         user.reset_token = None
         user.reset_token_expiry = None

@@ -51,7 +51,7 @@ async def get_company_users_paginated(
     user_ids = [user.id for user in users]
     chat_counts: dict[int, int] = {}
     if user_ids:
-        now = datetime.utcnow()
+        now = datetime.now()
         month_start = datetime(now.year, now.month, 1)
         if now.month == 12:
             next_month_start = datetime(now.year + 1, 1, 1)

@@ -19,7 +19,7 @@ def check_expired_subscriptions():
     try:
         expired_subs = db.query(Subscription).filter(
             Subscription.status == 'active',
-            Subscription.end_date < datetime.utcnow()
+            Subscription.end_date < datetime.now()
         ).all()
 
         if not expired_subs:

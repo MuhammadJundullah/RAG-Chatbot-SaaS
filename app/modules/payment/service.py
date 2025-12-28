@@ -73,7 +73,7 @@ class IPaymuService:
             "buyerEmail": user.company.company_email,
         }
 
-        timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         signature = self._get_api_signature("POST", body=payload)
 
         try:
@@ -125,7 +125,7 @@ class IPaymuService:
             "buyerEmail": user.company.company_email,
         }
 
-        timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         signature = self._get_api_signature("POST", body=payload)
 
         try:
@@ -160,7 +160,7 @@ class IPaymuService:
             return None
 
         payload = {"transactionId": transaction_id, "account": self.va}
-        timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         signature = self._get_api_signature("POST", body=payload)
 
         try:

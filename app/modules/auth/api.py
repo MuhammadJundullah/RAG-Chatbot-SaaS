@@ -117,7 +117,7 @@ async def login_for_access_token(
         token_data_payload["company_name"] = user.company.name
     if user.company and user.company.logo_s3_path:
         token_data_payload["logo_s3_path"] = add_app_base_url(user.company.logo_s3_path)
-    token_data_payload["login_at"] = datetime.utcnow().isoformat() + "Z"
+    token_data_payload["login_at"] = datetime.now().isoformat()
 
     user_identifier = get_user_identifier(user)
     await log_activity(

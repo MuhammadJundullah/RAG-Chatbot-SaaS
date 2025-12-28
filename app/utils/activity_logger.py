@@ -23,7 +23,7 @@ async def log_activity(
         timestamp: The datetime of the activity. Defaults to now.
     """
     if timestamp is None:
-        timestamp = datetime.datetime.utcnow()
+        timestamp = datetime.datetime.now()
 
     log_entry = ActivityLog(
         timestamp=timestamp,
@@ -37,4 +37,3 @@ async def log_activity(
     await db.commit()
     # Optionally, you can still print for debugging if needed
     # print(f"Logged activity: {log_entry.activity_description}")
-

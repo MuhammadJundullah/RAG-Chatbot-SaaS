@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, UploadFile, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.core.dependencies import get_db, get_current_company_admin, get_current_employee
 from app.models.user_model import Users
@@ -64,7 +64,7 @@ async def update_company_by_admin(
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log,
         activity_description=f"Company '{updated_company.name}' updated by admin '{admin_identifier}'.",
-        timestamp=datetime.now(timezone.utc)
+        timestamp=datetime.now()
     )
 
     company_data = company_schema.Company.from_orm(updated_company)
@@ -110,7 +110,7 @@ async def register_employee_by_admin(
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log,
         activity_description=f"Employee '{employee_identifier}' registered by admin '{admin_identifier}'.",
-        timestamp=datetime.now(timezone.utc)
+        timestamp=datetime.now()
     )
     return registered_employee
 
@@ -153,7 +153,7 @@ async def update_employee_by_admin(
             activity_type_category="Data/CRUD",
             company_id=company_id_to_log,
             activity_description=f"Employee '{employee_identifier}' updated by admin '{admin_identifier}'.",
-            timestamp=datetime.now(timezone.utc)
+            timestamp=datetime.now()
         )
         return updated_employee
     except EmployeeUpdateError as e:
@@ -186,7 +186,7 @@ async def update_employee_status_by_admin(
             activity_description=(
                 f"Employee '{employee_identifier}' status set to {payload.is_active} by admin '{admin_identifier}'."
             ),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(),
         )
         return updated_employee
     except EmployeeUpdateError as e:
@@ -214,7 +214,7 @@ async def delete_employee_by_admin(
             activity_type_category="Data/CRUD",
             company_id=company_id_to_log,
             activity_description=f"Employee with ID {employee_id} deleted by admin '{admin_identifier}'.",
-            timestamp=datetime.now(timezone.utc)
+            timestamp=datetime.now()
         )
         return {"message": "Employee deleted successfully"}
     except EmployeeDeletionError as e:
@@ -306,7 +306,7 @@ async def get_active_companies(
         activity_type_category="Data/CRUD",
         company_id=company_id_to_log,
         activity_description=f"Retrieved list of active companies. Found {len(companies)} companies.",
-        timestamp=datetime.now(timezone.utc)
+        timestamp=datetime.now()
     )
     return companies
 
