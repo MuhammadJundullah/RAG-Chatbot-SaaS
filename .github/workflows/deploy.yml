@@ -19,7 +19,9 @@ jobs:
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
           script: |
+            set -e  # Berhenti jika ada perintah yang gagal
             cd /home/backend-smartai
+            git config --global --add safe.directory /home/backend-smartai
             git pull origin master
             source venv/bin/activate
             pip install -r requirements.txt
