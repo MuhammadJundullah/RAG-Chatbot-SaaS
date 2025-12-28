@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
 from typing import List, Optional
+from datetime import datetime
 import uuid
 import os
 
@@ -50,11 +51,19 @@ async def get_company_users_paginated(
     user_ids = [user.id for user in users]
     chat_counts: dict[int, int] = {}
     if user_ids:
+        now = datetime.utcnow()
+        month_start = datetime(now.year, now.month, 1)
+        if now.month == 12:
+            next_month_start = datetime(now.year + 1, 1, 1)
+        else:
+            next_month_start = datetime(now.year, now.month + 1, 1)
         chat_count_stmt = (
             select(chatlog_model.Chatlogs.UsersId, func.count(chatlog_model.Chatlogs.id))
             .where(
                 chatlog_model.Chatlogs.company_id == company_id,
                 chatlog_model.Chatlogs.UsersId.in_(user_ids),
+                chatlog_model.Chatlogs.created_at >= month_start,
+                chatlog_model.Chatlogs.created_at < next_month_start,
             )
             .group_by(chatlog_model.Chatlogs.UsersId)
         )
