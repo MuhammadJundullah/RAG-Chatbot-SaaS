@@ -6,6 +6,7 @@ from app.utils.url_builder import add_app_base_url
 class UserBase(BaseModel):
     name: Optional[str] = None
     username: Optional[str] = None
+    email: Optional[EmailStr] = None
 
 
 class UserRegistration(BaseModel):
@@ -49,6 +50,10 @@ class User(UserBase):
         from_attributes = True
         
 
+class UserWithChatUsage(User):
+    chat_count: int = 0
+
+
 class UserLoginCombined(BaseModel):
     # Login: company admin pakai email perusahaan, superadmin/employee pakai username
     email: Optional[EmailStr] = None
@@ -84,7 +89,7 @@ class UserUpdate(BaseModel):
 
 
 class PaginatedUserResponse(BaseModel):
-    users: list[User]
+    users: list[UserWithChatUsage]
     total_users: int
     current_page: int
     total_pages: int
@@ -100,4 +105,11 @@ class PaginatedAdminResponse(BaseModel):
 class AdminSuperadminUpdate(BaseModel):
     name: Optional[str] = None
     username: Optional[str] = None
+    password: Optional[str] = None
+
+
+class SuperAdminUpdate(BaseModel):
+    name: Optional[str] = None
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
     password: Optional[str] = None

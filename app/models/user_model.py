@@ -22,6 +22,7 @@ class Users(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(255))
     username = Column(String(255), unique=True, index=True, nullable=True)
+    email = Column(String(255), unique=True, index=True, nullable=True)
     password = Column(String(255))
     role = Column(String(50), nullable=False)
     company_id = Column(Integer, ForeignKey("Company.id"), nullable=True)

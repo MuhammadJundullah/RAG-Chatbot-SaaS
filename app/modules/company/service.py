@@ -1,13 +1,14 @@
 from fastapi import HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import func
 from typing import List, Optional
 import uuid
 import os
 
 from app.repository.company_repository import company_repository
 from app.repository import user_repository
-from app.models import user_model, company_model
+from app.models import user_model, company_model, chatlog_model
 from app.schemas import user_schema, company_schema
 from app.core.config import settings
 from app.utils.security import get_password_hash
@@ -46,9 +47,29 @@ async def get_company_users_paginated(
         limit=limit,
         search=search
     )
+    user_ids = [user.id for user in users]
+    chat_counts: dict[int, int] = {}
+    if user_ids:
+        chat_count_stmt = (
+            select(chatlog_model.Chatlogs.UsersId, func.count(chatlog_model.Chatlogs.id))
+            .where(
+                chatlog_model.Chatlogs.company_id == company_id,
+                chatlog_model.Chatlogs.UsersId.in_(user_ids),
+            )
+            .group_by(chatlog_model.Chatlogs.UsersId)
+        )
+        chat_count_result = await db.execute(chat_count_stmt)
+        chat_counts = {row[0]: row[1] for row in chat_count_result.all()}
+
+    users_with_usage = []
+    for user in users:
+        user_data = user_schema.UserWithChatUsage.model_validate(user)
+        user_data.chat_count = chat_counts.get(user.id, 0)
+        users_with_usage.append(user_data)
+
     total_pages = (total_users + limit - 1) // limit
     return user_schema.PaginatedUserResponse(
-        users=users,
+        users=users_with_usage,
         total_users=total_users,
         current_page=page,
         total_pages=total_pages

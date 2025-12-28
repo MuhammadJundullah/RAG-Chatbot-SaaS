@@ -35,6 +35,14 @@ class UserRepository(BaseRepository[user_model.Users]):
         )
         return result.scalar_one_or_none()
 
+    async def get_user_by_email(self, db: AsyncSession, email: str) -> Optional[user_model.Users]:
+        result = await db.execute(
+            select(self.model)
+            .options(joinedload(self.model.company))
+            .filter(self.model.email == email)
+        )
+        return result.scalar_one_or_none()
+
     async def get_users(self, db: AsyncSession, skip: int = 0, limit: int = 100) -> List[user_model.Users]:
         return await self.get_multi(db, skip=skip, limit=limit)
 
@@ -57,6 +65,21 @@ class UserRepository(BaseRepository[user_model.Users]):
             .filter(
                 self.model.company_id == company_id,
                 self.model.role == "admin",
+            )
+        )
+        return result.scalars().all()
+
+    async def get_admins_by_company_ids(
+        self,
+        db: AsyncSession,
+        company_ids: List[int],
+    ) -> List[user_model.Users]:
+        if not company_ids:
+            return []
+        result = await db.execute(
+            select(self.model).filter(
+                self.model.role == "admin",
+                self.model.company_id.in_(company_ids),
             )
         )
         return result.scalars().all()
@@ -89,6 +112,18 @@ class UserRepository(BaseRepository[user_model.Users]):
         admins = result.scalars().all()
         total_admins = await db.scalar(count_stmt) or 0
         return admins, total_admins
+
+    async def get_users_by_company_ids(
+        self,
+        db: AsyncSession,
+        company_ids: List[int],
+    ) -> List[user_model.Users]:
+        if not company_ids:
+            return []
+        result = await db.execute(
+            select(self.model).filter(self.model.company_id.in_(company_ids))
+        )
+        return result.scalars().all()
 
     async def get_first_admin_by_company(self, db: AsyncSession, company_id: int) -> Optional[user_model.Users]:
         result = await db.execute(

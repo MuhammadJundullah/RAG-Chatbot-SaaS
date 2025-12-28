@@ -249,12 +249,17 @@ async def authenticate_user(
     if not user or not verify_password(password, user.password):
         return None
 
-    # Superadmin specific check
-    if user.role == 'super_admin':
+    # Superadmin bypasses active checks
+    if user.role == "super_admin":
         return user
 
     # Company admin/employee specific checks
     if user.role in ['admin', 'employee']:
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User is inactive."
+            )
         # Ensure company relationship is loaded for the user
         if not user.company or not user.company.is_active:
             raise HTTPException(

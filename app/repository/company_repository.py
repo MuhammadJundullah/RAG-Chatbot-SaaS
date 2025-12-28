@@ -5,6 +5,7 @@ from app.models import company_model, user_model
 from app.schemas import company_schema
 from app.repository.base_repository import BaseRepository
 from typing import Optional, List
+import re
 
 class CompanyRepository(BaseRepository[company_model.Company]):
     def __init__(self):
@@ -45,14 +46,18 @@ class CompanyRepository(BaseRepository[company_model.Company]):
             count_query = count_query.filter(self.model.is_active.is_(False))
 
         if search and search.strip():
-            pattern = f"%{search.strip()}%"
-            filter_clause = or_(
-                self.model.name.ilike(pattern),
-                self.model.code.ilike(pattern),
-                self.model.company_email.ilike(pattern),
-            )
-            query = query.filter(filter_clause)
-            count_query = count_query.filter(filter_clause)
+            tokens = [token for token in re.split(r"[,\s]+", search.strip()) if token]
+            for token in tokens:
+                pattern = f"%{token}%"
+                filter_clause = or_(
+                    self.model.name.ilike(pattern),
+                    self.model.code.ilike(pattern),
+                    self.model.company_email.ilike(pattern),
+                    self.model.address.ilike(pattern),
+                    self.model.pic_phone_number.ilike(pattern),
+                )
+                query = query.filter(filter_clause)
+                count_query = count_query.filter(filter_clause)
         
         query = query.order_by(self.model.created_at.desc()).offset(skip).limit(limit)
         result = await db.execute(query)
