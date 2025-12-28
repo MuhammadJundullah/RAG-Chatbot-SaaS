@@ -69,6 +69,23 @@ async def read_chatlogs_as_company_admin(
         search=normalized_search,
     )
 
+@company_admin_router.get("/export")
+async def export_chatlogs_as_company_admin(
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_company_admin),
+    start_date: Optional[date] = Query(None, description="Start date in YYYY-MM-DD format"),
+    end_date: Optional[date] = Query(None, description="End date in YYYY-MM-DD format"),
+):
+    json_data = await chatlog_service.export_chatlogs_as_company_admin(
+        db, current_user.company_id, start_date=start_date, end_date=end_date
+    )
+    json_bytes = json_data.encode('utf-8')
+    return StreamingResponse(
+        io.BytesIO(json_bytes),
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=chatlogs.json"}
+    )
+
 @company_admin_router.get("/{conversation_id}", response_model=conversation_schema.ConversationDetailResponse)
 async def get_conversation_details_as_company_admin(
     conversation_id: str,
@@ -164,24 +181,6 @@ async def recommend_topics_for_employee(
     """
     topics = await chatlog_service.recommend_topics_for_division_ai(db=db, current_user=current_user)
     return {"topics": topics}
-
-
-@company_admin_router.get("/export")
-async def export_chatlogs_as_company_admin(
-    db: AsyncSession = Depends(get_db),
-    current_user: Users = Depends(get_current_company_admin),
-    start_date: Optional[date] = Query(None, description="Start date in YYYY-MM-DD format"),
-    end_date: Optional[date] = Query(None, description="End date in YYYY-MM-DD format"),
-):
-    json_data = await chatlog_service.export_chatlogs_as_company_admin(
-        db, current_user.company_id, start_date=start_date, end_date=end_date
-    )
-    json_bytes = json_data.encode('utf-8')
-    return StreamingResponse(
-        io.BytesIO(json_bytes),
-        media_type="application/json",
-        headers={"Content-Disposition": "attachment; filename=chatlogs.json"}
-    )
 
 
 @admin_router.get("/export")

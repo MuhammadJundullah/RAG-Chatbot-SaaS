@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlalchemy.future import select
-from sqlalchemy import func
+from sqlalchemy import func, update
 from app.models import Subscription, Company, Plan, Users, TopUpPackage
 from app.schemas.subscription_schema import (
     SubscriptionStatus,
@@ -18,6 +18,48 @@ from app.repository.document_repository import document_repository
 from app.modules.subscription.topup_repository import topup_package_repository
 
 class SubscriptionService:
+    TRIAL_PLAN_NAME = "Trial Plan"
+    TRIAL_DURATION_DAYS = 7
+
+    async def get_trial_plan(self, db: AsyncSession) -> Plan:
+        result = await db.execute(select(Plan).filter(Plan.name == self.TRIAL_PLAN_NAME))
+        plan = result.scalars().first()
+        if not plan:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Trial plan '{self.TRIAL_PLAN_NAME}' is not configured.",
+            )
+        return plan
+
+    async def create_trial_subscription(
+        self,
+        db: AsyncSession,
+        company_id: int,
+        *,
+        commit: bool = True,
+    ) -> Subscription:
+        existing = await self.get_subscription_by_company_optional(db, company_id=company_id)
+        if existing:
+            return existing
+
+        plan = await self.get_trial_plan(db)
+        now = datetime.utcnow()
+        subscription = Subscription(
+            company_id=company_id,
+            plan_id=plan.id,
+            status="active",
+            start_date=now,
+            end_date=now + timedelta(days=self.TRIAL_DURATION_DAYS),
+            current_question_usage=0,
+            top_up_quota=0,
+        )
+        db.add(subscription)
+        if commit:
+            await db.commit()
+            await db.refresh(subscription)
+        else:
+            await db.flush()
+        return subscription
     async def list_active_topup_packages(self, db: AsyncSession) -> List[TopUpPackage]:
         return await topup_package_repository.list_active(db)
 
@@ -174,6 +216,9 @@ class SubscriptionService:
         # Pastikan ID tersedia sebelum aktivasi
         await db.flush()
         await self.activate_subscription(db, subscription_id=subscription.id)
+        plan = await db.get(Plan, subscription.plan_id)
+        if plan:
+            await self.enforce_user_limit(db, company_id=subscription.company_id, max_users=plan.max_users)
 
     async def create_topup_payment(
         self,
@@ -276,6 +321,40 @@ class SubscriptionService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Subscription has expired.")
         
         return sub
+
+    async def enforce_user_limit(self, db: AsyncSession, company_id: int, max_users: int) -> None:
+        if max_users is None or max_users < 0:
+            return
+
+        active_count_query = select(func.count(Users.id)).where(
+            Users.company_id == company_id,
+            Users.is_active.is_(True),
+        )
+        active_users = (await db.execute(active_count_query)).scalar_one()
+        if active_users <= max_users:
+            return
+
+        excess = active_users - max_users
+        employee_ids_result = await db.execute(
+            select(Users.id)
+            .where(
+                Users.company_id == company_id,
+                Users.role == "employee",
+                Users.is_active.is_(True),
+            )
+            .order_by(func.random())
+            .limit(excess)
+        )
+        employee_ids = [row[0] for row in employee_ids_result.all()]
+        if not employee_ids:
+            return
+
+        await db.execute(
+            update(Users)
+            .where(Users.id.in_(employee_ids))
+            .values(is_active=False)
+        )
+        await db.commit()
 
     async def check_and_increment_usage(self, db: AsyncSession, company_id: int):
         sub = await self.check_active_subscription(db, company_id)

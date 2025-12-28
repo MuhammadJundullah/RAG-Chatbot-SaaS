@@ -20,6 +20,7 @@ from app.utils.file_manager import save_uploaded_file, delete_static_file
 from app.schemas import user_schema
 from app.models.company_model import Company
 from app.models.subscription_model import Subscription
+from app.modules.subscription.service import subscription_service
 from app.utils.generators import generate_company_code
 from app.models import user_model
 from app.utils.user_identifier import get_user_identifier
@@ -569,6 +570,11 @@ async def create_company_by_superadmin_service(
         company.logo_s3_path = f"/{file_path}"
     db.add(company)
     await db.flush()
+    await subscription_service.create_trial_subscription(
+        db,
+        company_id=company.id,
+        commit=False,
+    )
 
     admin_user = user_model.Users(
         name=payload.admin_name,

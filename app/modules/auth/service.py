@@ -82,8 +82,16 @@ async def register_user(db: AsyncSession, user_data: user_schema.UserRegistratio
     else:
         raise UserRegistrationError("Invalid registration data: only new company registration is allowed via this endpoint.")
 
-    # Data Layer: Save the new user to the database
-    return await user_repository.create_user(db, user=db_user)
+    await subscription_service.create_trial_subscription(
+        db,
+        company_id=new_company_obj.id,
+        commit=False,
+    )
+
+    db.add(db_user)
+    await db.commit()
+    await db.refresh(db_user)
+    return db_user
 
 async def register_employee_by_admin(db: AsyncSession, employee_data: user_schema.EmployeeRegistrationByAdmin, company_id: int, current_user: user_model.Users, profile_picture_file: UploadFile = None):
     """
@@ -266,6 +274,29 @@ async def authenticate_user(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Company is inactive."
             )
+        if user.role == "employee":
+            subscription = await subscription_service.get_subscription_by_company_optional(
+                db,
+                company_id=user.company_id,
+            )
+            if not subscription:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Subscription not found for this company.",
+                )
+            if subscription.end_date and subscription.end_date < datetime.utcnow():
+                if subscription.status != "expired":
+                    subscription.status = "expired"
+                    await db.commit()
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Subscription has expired.",
+                )
+            if subscription.status != "active":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Subscription is not active. Current status: {subscription.status}",
+                )
         return user
         
     return None
