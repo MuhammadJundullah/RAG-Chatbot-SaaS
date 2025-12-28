@@ -24,6 +24,7 @@ class UserRegistration(BaseModel):
 class EmployeeUpdate(BaseModel):
     name: Optional[str] = None
     username: Optional[str] = None  # Fixed: Added username field
+    email: Optional[EmailStr] = None
     password: Optional[str] = None
     division: Optional[str] = None
     is_active: Optional[bool] = None
@@ -72,6 +73,7 @@ class UserLoginCombined(BaseModel):
 class EmployeeRegistrationByAdmin(BaseModel):
     name: str
     username: str
+    email: Optional[EmailStr] = None
     password: str
     division: Optional[str] = None
 

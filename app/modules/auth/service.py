@@ -117,6 +117,11 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
     if existing_user_by_username:
         raise UserRegistrationError("Username is already registered.")
 
+    if employee_data.email:
+        existing_user_by_email = await user_repository.get_user_by_email(db, email=employee_data.email)
+        if existing_user_by_email:
+            raise UserRegistrationError("Email is already registered.")
+
     hashed_password = get_password_hash(employee_data.password)
 
     profile_picture_url = None
@@ -131,6 +136,7 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
     db_user = user_model.Users(
         name=employee_data.name,
         username=employee_data.username,
+        email=employee_data.email,
         password=hashed_password,
         role="employee",
         company_id=company_id,
@@ -145,6 +151,8 @@ async def register_employee_by_admin(db: AsyncSession, employee_data: user_schem
         # Catch database integrity errors, specifically username uniqueness violations
         if "ix_Users_username" in str(e):
             raise UserRegistrationError("Username already exists.")
+        if "ix_Users_email" in str(e):
+            raise UserRegistrationError("Email already exists.")
         else:
             # Re-raise other integrity errors
             raise e

@@ -27,7 +27,6 @@ from app.utils.user_identifier import get_user_identifier
 
 router = APIRouter()
 
-
 class ChatDocumentResponse(BaseModel):
     id: int
     title: str

@@ -80,6 +80,7 @@ async def update_company_by_admin(
 async def register_employee_by_admin(
     name: str = Form(...),
     username: str = Form(...),
+    email: Optional[str] = Form(None),
     password: str = Form(...),
     division: Optional[str] = Form(None),
     profile_picture_file: UploadFile = None,
@@ -89,6 +90,7 @@ async def register_employee_by_admin(
     employee_data = user_schema.EmployeeRegistrationByAdmin(
         name=name,
         username=username,
+        email=email,
         password=password,
         division=division
     )
@@ -120,6 +122,7 @@ async def update_employee_by_admin(
     employee_id: int,
     name: Optional[str] = Form(None),
     username: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
     password: Optional[str] = Form(None),
     division: Optional[str] = Form(None),
     is_active: Optional[bool] = Form(None),
@@ -130,6 +133,7 @@ async def update_employee_by_admin(
     employee_data = user_schema.EmployeeUpdate(
         name=name,
         username=username,
+        email=email,
         password=password,
         division=division,
         is_active=is_active
