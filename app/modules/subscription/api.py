@@ -50,7 +50,11 @@ async def get_available_plans(
     current_user: Users = Depends(get_current_company_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(select(Plan).filter(Plan.is_active == True).order_by(Plan.price))
+    result = await db.execute(
+        select(Plan)
+        .filter(Plan.is_active == True, Plan.name != "Trial Plan")
+        .order_by(Plan.price)
+    )
     plans = result.scalars().all()
 
     def format_quota(value: int | None, label: str) -> str:
