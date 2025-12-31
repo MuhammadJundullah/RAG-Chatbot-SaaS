@@ -52,6 +52,7 @@ class SuperAdminDashboardData(BaseModel):
     daily_chat_counts: dict
 
     top_user_logs: List[dict]
+    daily_company_registrations_7d: dict
 
 
 class SuperAdminDashboardResponse(BaseModel):

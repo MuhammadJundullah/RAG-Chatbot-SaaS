@@ -29,6 +29,7 @@ class SuperAdminDashboardService:
         start_of_week = today - timedelta(days=today.weekday())  # Monday
         start_of_prev_week = start_of_week - timedelta(days=7)
         end_of_prev_week = start_of_week - timedelta(days=1)
+        start_7d = today - timedelta(days=6)
 
         # Active company admins
         active_admin_stmt = select(func.count(Users.id)).where(and_(Users.role == "admin", Users.is_active.is_(True)))
@@ -153,6 +154,23 @@ class SuperAdminDashboardService:
             for log in logs
         ]
 
+        daily_company_counts: Dict[str, int] = {}
+        company_daily_stmt = (
+            select(func.date(Company.created_at).label("company_date"), func.count(Company.id).label("company_count"))
+            .where(Company.created_at.isnot(None), Company.created_at >= start_7d)
+            .group_by(func.date(Company.created_at))
+            .order_by(func.date(Company.created_at))
+        )
+        company_daily_rows = await db.execute(company_daily_stmt)
+        for company_date, company_count in company_daily_rows.all():
+            daily_company_counts[str(company_date)] = company_count
+        current_day = start_7d
+        while current_day <= today:
+            key = current_day.strftime("%Y-%m-%d")
+            daily_company_counts.setdefault(key, 0)
+            current_day += timedelta(days=1)
+        daily_company_counts = dict(sorted(daily_company_counts.items()))
+
         return {
             "active_company_admins": active_company_admins or 0,
             "active_companies_this_month": active_companies_this_month or 0,
@@ -166,6 +184,7 @@ class SuperAdminDashboardService:
             "daily_chat_counts": daily_counts,
             "total_questions_this_month": total_questions_this_month or 0,
             "top_user_logs": top_logs,
+            "daily_company_registrations_7d": daily_company_counts,
         }
 
     async def _get_completed_documents_wow(self, db: AsyncSession, today: date) -> dict:
