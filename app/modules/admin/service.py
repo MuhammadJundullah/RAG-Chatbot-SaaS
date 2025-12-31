@@ -162,6 +162,20 @@ async def reject_company_service(
     await company_repository.reject_company(db, company_id=company_id)
     return {"message": f"Company with id {company_id} has been rejected and deleted."}
 
+async def delete_company_service(
+    db: AsyncSession,
+    company_id: int
+):
+    company = await company_repository.get_company(db, company_id=company_id)
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Company with id {company_id} not found."
+        )
+
+    await company_repository.delete_company_cascade(db, company_id=company_id)
+    return {"message": f"Company with id {company_id} has been deleted."}
+
 async def get_activity_logs_service(
     db: AsyncSession,
     skip: int,

@@ -212,6 +212,23 @@ async def update_company_status(
     return company
 
 
+@router.delete("/companies/{company_id}")
+async def delete_company_by_superadmin(
+    company_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_super_admin),
+):
+    result = await admin_service.delete_company_service(db, company_id=company_id)
+    await log_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type_category="Data/CRUD",
+        company_id=None,
+        activity_description=f"Superadmin deleted company {company_id}.",
+    )
+    return result
+
+
 @router.get("/subscriptions", response_model=List[subscription_schema.Subscription])
 async def get_all_subscriptions(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Subscription).options(joinedload(Subscription.plan)))

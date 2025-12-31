@@ -2,6 +2,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, or_
 from app.models import company_model, user_model
+from app.models import document_model, conversation_model, chatlog_model, log_model, subscription_model, transaction_model
+from sqlalchemy import delete
 from app.schemas import company_schema
 from app.repository.base_repository import BaseRepository
 from typing import Optional, List
@@ -96,6 +98,26 @@ class CompanyRepository(BaseRepository[company_model.Company]):
         if admin_user:
             await db.delete(admin_user)
         
+        await db.delete(company)
+        await db.commit()
+        return company
+
+    async def delete_company_cascade(self, db: AsyncSession, company_id: int) -> Optional[company_model.Company]:
+        """
+        Hard-delete a company and all related records (users, documents, chats, logs, subscriptions, transactions).
+        """
+        company = await self.get(db, company_id)
+        if not company:
+            return None
+
+        await db.execute(delete(chatlog_model.Chatlogs).where(chatlog_model.Chatlogs.company_id == company_id))
+        await db.execute(delete(conversation_model.Conversation).where(conversation_model.Conversation.company_id == company_id))
+        await db.execute(delete(document_model.Documents).where(document_model.Documents.company_id == company_id))
+        await db.execute(delete(log_model.ActivityLog).where(log_model.ActivityLog.company_id == company_id))
+        await db.execute(delete(transaction_model.Transaction).where(transaction_model.Transaction.company_id == company_id))
+        await db.execute(delete(subscription_model.Subscription).where(subscription_model.Subscription.company_id == company_id))
+        await db.execute(delete(user_model.Users).where(user_model.Users.company_id == company_id))
+
         await db.delete(company)
         await db.commit()
         return company
