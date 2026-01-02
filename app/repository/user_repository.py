@@ -77,10 +77,12 @@ class UserRepository(BaseRepository[user_model.Users]):
         if not company_ids:
             return []
         result = await db.execute(
-            select(self.model).filter(
+            select(self.model)
+            .filter(
                 self.model.role == "admin",
                 self.model.company_id.in_(company_ids),
             )
+            .order_by(self.model.company_id, self.model.created_at.desc())
         )
         return result.scalars().all()
 

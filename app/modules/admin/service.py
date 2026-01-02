@@ -51,54 +51,34 @@ async def get_companies_service(
         )
         subscriptions = result.scalars().all()
         subscription_map = {sub.company_id: sub for sub in subscriptions}
-    users = await user_repository.get_users_by_company_ids(db, company_ids)
-    users_by_company = {}
-    for user in users:
-        users_by_company.setdefault(user.company_id, []).append(user)
+    admins = await user_repository.get_admins_by_company_ids(db, company_ids)
+    admins_by_company = {}
+    for admin in admins:
+        if admin.company_id not in admins_by_company:
+            admins_by_company[admin.company_id] = admin
     items: List[company_schema.CompanyUserListItem] = []
     for company in companies:
-        company_users = users_by_company.get(company.id, [])
-        if company_users:
-            for user in company_users:
-                items.append(
-                    company_schema.CompanyUserListItem(
-                        company_id=company.id,
-                        company_name=company.name,
-                        company_email=company.company_email,
-                        company_code=company.code,
-                        company_logo_s3_path=company.logo_s3_path,
-                        company_is_active=company.is_active,
-                        company_address=company.address,
-                        company_pic_phone_number=company.pic_phone_number,
-                        company_created_at=company.created_at,
-                        subscription_plan=(
-                            subscription_map.get(company.id).plan.name
-                            if subscription_map.get(company.id) and subscription_map.get(company.id).plan
-                            else None
-                        ),
-                        admin_name=user.name,
-                        admin_profile_picture_url=user.profile_picture_url,
-                    )
-                )
-        else:
-            items.append(
-                company_schema.CompanyUserListItem(
-                    company_id=company.id,
-                    company_name=company.name,
-                    company_email=company.company_email,
-                    company_code=company.code,
-                    company_logo_s3_path=company.logo_s3_path,
-                    company_is_active=company.is_active,
-                    company_address=company.address,
-                    company_pic_phone_number=company.pic_phone_number,
-                    company_created_at=company.created_at,
-                    subscription_plan=(
-                        subscription_map.get(company.id).plan.name
-                        if subscription_map.get(company.id) and subscription_map.get(company.id).plan
-                        else None
-                    ),
-                )
+        admin = admins_by_company.get(company.id)
+        items.append(
+            company_schema.CompanyUserListItem(
+                company_id=company.id,
+                company_name=company.name,
+                company_email=company.company_email,
+                company_code=company.code,
+                company_logo_s3_path=company.logo_s3_path,
+                company_is_active=company.is_active,
+                company_address=company.address,
+                company_pic_phone_number=company.pic_phone_number,
+                company_created_at=company.created_at,
+                subscription_plan=(
+                    subscription_map.get(company.id).plan.name
+                    if subscription_map.get(company.id) and subscription_map.get(company.id).plan
+                    else None
+                ),
+                admin_name=admin.name if admin else None,
+                admin_profile_picture_url=admin.profile_picture_url if admin else None,
             )
+        )
     total_page = ceil(total_companies / limit) if total_companies else 0
     return company_schema.PaginatedCompanyUserListResponse(
         companies=items,
