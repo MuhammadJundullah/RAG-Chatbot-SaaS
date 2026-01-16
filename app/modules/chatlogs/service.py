@@ -340,6 +340,21 @@ async def delete_conversation_service(
     return Response(status_code=204)
 
 
+async def delete_chatlog_as_company_admin_service(
+    db: AsyncSession,
+    current_user: Users,
+    chatlog_id: int,
+):
+    deleted_count = await chatlog_repository.delete_chatlog_by_id_for_company(
+        db=db,
+        chatlog_id=chatlog_id,
+        company_id=current_user.company_id,
+    )
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Chatlog not found or user does not have permission.")
+    return Response(status_code=204)
+
+
 # ---- Wrapper functions used by existing routers ----
 
 async def get_chatlogs_as_admin(db: AsyncSession, skip: int = 0, limit: int = 100):

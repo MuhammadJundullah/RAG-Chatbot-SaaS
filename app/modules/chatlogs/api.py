@@ -103,6 +103,22 @@ async def get_conversation_details_as_company_admin(
     return {**conversation_details.model_dump(), "company_id": current_user.company_id}
 
 
+@company_admin_router.delete("/{chatlog_id}")
+async def delete_chatlog_as_company_admin(
+    chatlog_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_company_admin),
+):
+    """
+    Delete a single chatlog entry for the current company.
+    """
+    return await chatlog_service.delete_chatlog_as_company_admin_service(
+        db=db,
+        current_user=current_user,
+        chatlog_id=chatlog_id,
+    )
+
+
 @user_router.get("/", response_model=List[chatlog_schema.Chatlog])
 async def read_chatlogs(
     db: AsyncSession = Depends(get_db),

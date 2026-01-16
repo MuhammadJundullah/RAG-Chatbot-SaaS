@@ -202,6 +202,16 @@ class ChatlogRepository(BaseRepository[chatlog_model.Chatlogs]):
         await db.commit()
         return result.rowcount
 
+    async def delete_chatlog_by_id_for_company(self, db: AsyncSession, chatlog_id: int, company_id: int) -> int:
+        """Deletes a single chatlog entry by ID scoped to a company."""
+        stmt = delete(self.model).filter(
+            self.model.id == chatlog_id,
+            self.model.company_id == company_id,
+        )
+        result = await db.execute(stmt)
+        await db.commit()
+        return result.rowcount
+
     async def get_chatlogs_by_conversation_id(
         self, db: AsyncSession,
         conversation_id: str,
