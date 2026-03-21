@@ -1,23 +1,27 @@
-# Use an official Python runtime as a parent image
 FROM python:3.11-slim
 
-# Set the working directory in the container
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app
+
 WORKDIR /app
 
-# Copy the dependencies file to the working directory
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tesseract-ocr \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Running Database Migration
-RUN python -m app.database.init_db
+COPY app ./app
+COPY static ./static
+COPY alembic ./alembic
+COPY alembic.ini ./
 
-# Copy the rest of the application's code
-COPY ./app /app/app
-
-# Expose port 8000 to allow communication to the Uvicorn server
 EXPOSE 8000
 
-# Define the command to run your app using uvicorn
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

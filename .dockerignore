@@ -1,0 +1,16 @@
+.git
+.github
+.DS_Store
+.env
+.env.*
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+*.pyo
+*.pyd
+*.db
+tmp/
+tests/
+data upload/
+README.md

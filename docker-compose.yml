@@ -1,28 +1,49 @@
-version: '3.8'
-
 services:
   api:
+    image: ${DOCKER_IMAGE:-rag-chatbot-saas:latest}
     build:
       context: .
       dockerfile: Dockerfile
-    command: sh -c "uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
     env_file:
-      - ./.env
+      - .env
+    environment:
+      REDIS_URL: ${DOCKER_REDIS_URL:-redis://redis:6379/0}
     volumes:
       - ./app:/app/app
+      - ./static:/app/static
     restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
 
   worker:
+    image: ${DOCKER_IMAGE:-rag-chatbot-saas:latest}
     build:
       context: .
       dockerfile: Dockerfile
-    command: sh -c "celery -A app.core.celery_app worker --loglevel=info"
+    command: celery -A app.core.celery_app worker --loglevel=info
     env_file:
-      - ./.env
+      - .env
+    environment:
+      REDIS_URL: ${DOCKER_REDIS_URL:-redis://redis:6379/0}
     volumes:
       - ./app:/app/app
+      - ./static:/app/static
     restart: unless-stopped
     depends_on:
-      - api
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
