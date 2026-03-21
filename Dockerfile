@@ -18,9 +18,11 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY app ./app
-COPY static ./static
 COPY alembic ./alembic
 COPY alembic.ini ./
+
+# Upload assets are runtime data, not source artifacts.
+RUN mkdir -p static/company_logos static/employee_profiles static/admin_profiles
 
 EXPOSE 8000
 
